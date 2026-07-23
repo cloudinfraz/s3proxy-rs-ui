@@ -1,32 +1,48 @@
-# React + TypeScript + Vite
+# s3proxy Administration UI
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The administration UI is an optional standalone component. It is not embedded
+in the single, control, or data images.
 
-Currently, two official plugins are available:
+## Development
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+The Vite development server proxies `/admin/*` to a locally running control
+API:
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm ci
+npm run generate:api
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+The browser application is rooted at `/admin/ui/` and uses same-origin
+`/admin/*` requests for session cookies and CSRF protection.
+
+## Container Image
+
+Build from the repository root:
+
+```bash
+docker run --rm -v "$PWD:/repo" -w /repo/ui node:24.18.0-bookworm-slim \
+  /bin/sh -ec 'npm ci --registry=https://registry.npmjs.org/ && npm run lint && npm test && npm run build'
+
+docker buildx build \
+  --file ui/Dockerfile \
+  --tag s3proxy-ui:local \
+  --load ui
+```
+
+Asset compilation and image packaging are separate. `ui/Dockerfile` is a pure
+Nginx runtime image and never installs Node/npm dependencies.
+
+The runtime image:
+
+- serves the SPA at `/admin/ui/`;
+- exposes `/health` and `/healthz` on port `8080`;
+- proxies `/admin/*` to `http://s3proxy-control:8081`;
+- contains no s3proxy plane binary;
+- has no PostgreSQL, Redis, or Azure credentials;
+- runs as the unprivileged Nginx user.
+
+The fixed upstream DNS name expects the UI to run in the same Kubernetes
+namespace as Service `s3proxy-control`. Use the optional manifests under
+[`k8s/split/ui/`](../k8s/split/ui/).
