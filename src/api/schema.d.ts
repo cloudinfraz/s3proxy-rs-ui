@@ -250,12 +250,12 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/admin/virtual-buckets/{bucket_name}": {
+    "/admin/virtual-buckets/{bucket_id}": {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                bucket_name: string;
+                bucket_id: string;
             };
             cookie?: never;
         };
@@ -354,13 +354,33 @@ export interface paths {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                bucket: string;
+            };
             cookie?: never;
         };
         get: operations["getBucketPolicy"];
         put: operations["setBucketPolicy"];
         post?: never;
         delete: operations["deleteBucketPolicy"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/virtual-buckets/{bucket_id}/policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bucket_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["getVirtualBucketPolicy"];
+        put: operations["setVirtualBucketPolicy"];
+        post?: never;
+        delete: operations["deleteVirtualBucketPolicy"];
         options?: never;
         head?: never;
         patch?: never;
@@ -940,7 +960,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                bucket_name: string;
+                bucket_id: string;
             };
             cookie?: never;
         };
@@ -960,7 +980,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                bucket_name: string;
+                bucket_id: string;
             };
             cookie?: never;
         };
@@ -1129,12 +1149,14 @@ export interface operations {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                bucket: string;
+            };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Bucket policy */
+            /** @description Direct-mode global bucket policy */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1147,7 +1169,9 @@ export interface operations {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                bucket: string;
+            };
             cookie?: never;
         };
         requestBody?: never;
@@ -1165,7 +1189,69 @@ export interface operations {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                bucket: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getVirtualBucketPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bucket_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Virtual-mode scoped bucket policy */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    setVirtualBucketPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bucket_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Set */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    deleteVirtualBucketPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bucket_id: string;
+            };
             cookie?: never;
         };
         requestBody?: never;
