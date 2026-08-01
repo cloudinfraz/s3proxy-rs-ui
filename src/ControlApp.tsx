@@ -1,6 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { QueryClient, QueryClientProvider, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { BrowserRouter, NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+import { BrowserRouter, NavLink, Navigate, Route, Routes, useNavigate } from 'react-router'
 import { Theme } from '@radix-ui/themes'
 import { Activity, Box, ChevronRight, CircleGauge, Database, FileKey, KeyRound, LogOut, Menu, ScrollText, ServerCog, ShieldCheck, X } from 'lucide-react'
 import { api, ApiError, login, logout, setCsrfToken } from './api/client'
