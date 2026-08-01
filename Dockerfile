@@ -1,4 +1,4 @@
-FROM nginxinc/nginx-unprivileged:1.28.0-alpine
+FROM nginxinc/nginx-unprivileged:1.29.8-alpine@sha256:0c79d56aee561a1d81c63f00eee5fb5fe29279560cdc55e91425133104c7fbe6
 
 ARG OCI_SOURCE="https://github.com/cloudinfraz/s3proxy-rs"
 ARG OCI_REVISION="unknown"
