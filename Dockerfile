@@ -1,4 +1,6 @@
-FROM nginxinc/nginx-unprivileged:1.31.3-alpine3.24@sha256:59ccf0943b0b8e8d9e6ea9039a39555730f544701a655c596f7df7d096c593f5
+ARG UI_RUNTIME_IMAGE="quay.io/nginx/nginx-unprivileged:1.31.3-alpine3.24@sha256:f972e5322b9797dc2a6b830030094426437b1ae7032e4644496395336ac6fdac"
+
+FROM ${UI_RUNTIME_IMAGE}
 
 ARG OCI_SOURCE="https://github.com/cloudinfraz/s3proxy-rs"
 ARG OCI_REVISION="unknown"
