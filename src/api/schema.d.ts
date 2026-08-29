@@ -61,6 +61,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** @description Private control-plane operation. Deployment networking must prevent public access; the data plane does not register this route. */
         post: operations["bootstrapAdminKey"];
         delete?: never;
         options?: never;
@@ -420,6 +421,17 @@ export interface components {
             /** Format: date-time */
             expires_at: string;
         };
+        BootstrapAdminKeyRequest: {
+            key_name: string;
+            description?: string | null;
+            /** @default bootstrap */
+            created_by: string;
+        };
+        BootstrapAdminKeyResponse: {
+            key_name: string;
+            api_key: string;
+            warning: string;
+        };
         Error: {
             message?: string;
         };
@@ -497,16 +509,23 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BootstrapAdminKeyRequest"];
+            };
+        };
         responses: {
-            /** @description Bootstrapped */
+            /** @description First admin key created; response is not replayable and includes Cache-Control: no-store */
             200: {
                 headers: {
+                    "Cache-Control": "no-store";
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["BootstrapAdminKeyResponse"];
+                };
             };
-            /** @description Already bootstrapped */
+            /** @description Bootstrap is permanently disabled because an admin key already exists */
             403: {
                 headers: {
                     [name: string]: unknown;
