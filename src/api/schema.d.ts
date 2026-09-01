@@ -744,6 +744,13 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Final admin key cannot be deleted because bootstrap is permanently disabled */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     listCredentials: {
