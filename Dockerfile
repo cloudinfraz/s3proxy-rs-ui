@@ -1,4 +1,4 @@
-ARG UI_RUNTIME_IMAGE="quay.io/nginx/nginx-unprivileged:1.31.3-alpine3.24@sha256:f972e5322b9797dc2a6b830030094426437b1ae7032e4644496395336ac6fdac"
+ARG UI_RUNTIME_IMAGE="quay.io/nginx/nginx-unprivileged:1.31.5-alpine3.24@sha256:aa8c9087d36d93e9d650c5365f883b421e8214aedbad24ade52b844c583358f1"
 
 FROM ${UI_RUNTIME_IMAGE}
 
