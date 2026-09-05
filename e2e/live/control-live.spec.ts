@@ -54,6 +54,16 @@ for (const [viewport, device] of [['desktop', devices['Desktop Chrome']], ['mobi
         requireSuccess(loginStatus === 200 && hasSessionCookie, 'Login must establish a browser session')
         await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible()
 
+        stage = 'live operations navigation'
+        for (const title of ['Audit', 'Health', 'Admin keys', 'Overview']) {
+          const menu = page.getByRole('button', { name: 'Open navigation' })
+          if (await menu.isVisible()) await menu.click()
+          await page.getByRole('navigation', { name: 'Control navigation' }).getByRole('link', { name: title, exact: true }).click()
+          await expect(page.getByRole('dialog')).toHaveCount(0)
+          await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible()
+          requireSuccess(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Live operations layout overflowed')
+        }
+
         stage = 'authenticated contract reads and logout'
         const result = await page.evaluate(async () => {
           const read = async (path: string) => {

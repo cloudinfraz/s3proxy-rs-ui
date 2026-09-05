@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/test'
-import { emptyCollections } from './control-fixtures'
+import { emptyCollections, mockControlApi } from './control-fixtures'
 
 test('login and cookie mutation keep credential material out of browser storage', async ({ page }) => {
+  const verifyRequests = await mockControlApi(page, true)
   let mutationCsrf: string | null = null
   const emptyLists = [
     '/admin/credentials', '/admin/virtual-buckets', '/admin/backends', '/admin/policies', '/admin/api-keys',
@@ -21,7 +22,6 @@ test('login and cookie mutation keep credential material out of browser storage'
     if (route.request().method() === 'DELETE') return route.fulfill({ status: 204 })
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ authenticated: true, csrf_token: 'csrf-refresh', expires_at: '2026-07-22T00:00:00Z' }) })
   })
-  await page.route('**/admin/health', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'healthy' }) }))
   for (const path of emptyLists) {
     await page.route(`**${path}`, async route => {
       if (path === '/admin/credentials' && route.request().method() === 'POST') {
@@ -39,8 +39,8 @@ test('login and cookie mutation keep credential material out of browser storage'
 
   const menu = page.getByRole('button', { name: 'Open navigation' })
   if (await menu.isVisible()) await menu.click()
-  await page.getByRole('link', { name: 'Credentials' }).click()
-  await page.getByRole('button', { name: 'Add credentials' }).click()
+  await page.getByRole('navigation', { name: 'Control navigation' }).getByRole('link', { name: 'S3 identities' }).click()
+  await page.getByRole('button', { name: 'Add s3 identities' }).click()
   await page.getByLabel('S3 secret key').fill('never-store-this-secret')
   await page.getByLabel('Azure account').fill('testaccount')
   await page.getByRole('button', { name: 'Save' }).click()
@@ -55,4 +55,5 @@ test('login and cookie mutation keep credential material out of browser storage'
   expect(storage.session).toEqual([])
   expect(storage.body).not.toContain('browser-test-admin-key')
   expect(storage.body).not.toContain('never-store-this-secret')
+  verifyRequests()
 })

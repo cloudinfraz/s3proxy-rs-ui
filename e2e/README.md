@@ -6,8 +6,10 @@ E2E harness, inventory, or runner. The backend is an HTTP dependency.
 ## Mocked Contract Suite
 
 From the UI root, run `npm run build` then `npm run test:e2e`.
-Five scenarios run on desktop and mobile, including malformed-envelope rejection
-and recovery. Mocked passes do not establish live backend compatibility.
+Twelve unique scenario IDs cover 14 test cases on desktop and mobile (28 executions), including
+malformed-envelope rejection, navigation/history, keyboard/mobile navigation,
+health refresh recovery, admin-key lifecycle, late-response rejection, and bounded
+audit pagination. Mocked passes do not establish live backend compatibility.
 
 ## Live Local Suite
 
@@ -48,3 +50,33 @@ On 2026-09-05, both live executions passed with zero retries, including successf
 login/cookie creation, overview reload, and revoked-session rejection. Key cleanup
 succeeded; the proxy, disposable services, and browser artifacts were removed.
 The UI gate also passed six unit tests and ten mocked browser executions.
+
+## Shell and Operations Evidence (#424)
+
+On 2026-09-05, `make ui-check` passed the locked dependency audit (zero
+vulnerabilities), lint, 36 unit tests, build, and all 28 mocked browser executions.
+UI069-01 through UI069-07 are seven unique scenario IDs (nine cases, 18 viewport executions);
+the five existing contract/security scenarios remain covered (10 executions).
+UI069-06 covers late responses after navigation, dismissal, and logout. Each
+transition rejects the delayed secret on desktop and mobile without browser storage.
+Synthetic desktop/mobile health screenshots were reviewed for layout and overflow.
+
+`UI_E2E_DISPOSABLE=1 npm run test:e2e:live` passed both serial viewport executions
+with zero retries against a fresh local proxy and disposable PostgreSQL/Redis.
+The existing live journey now visits Audit, Health, Admin keys, and Overview in
+addition to its real authentication, contract, validation, and logout assertions.
+This is read-oriented live evidence; admin-key mutation lifecycle coverage is
+mocked, not a claim of live mutation coverage.
+
+`make ci-local-e2e` passed, including 947 application tests (five ignored) and
+81/81 strict Tier A tests with zero skips and exact inventory reconciliation.
+Backend source, E2E inventory, fixtures, harness, and runners were not changed.
+No Azure/cloud lane was needed or run for this UI-only change.
+
+Bootstrap cleanup passed. The local proxy and disposable services were removed;
+browser artifacts were deleted without inspection after the live run. Container,
+volume, and port checks confirmed cleanup.
+
+Readiness is configuration-only, not an Azure connectivity probe. The current
+API does not expose identity enabled state or effective role policies; these are
+reported as unknown rather than inferred. No unsupported entity links are added.

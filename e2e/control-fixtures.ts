@@ -4,6 +4,16 @@ import type { components } from '../src/api/schema'
 const timestamp = '2026-09-05T00:00:00Z'
 const fixtureId = '00000000-0000-4000-8000-000000000001'
 
+export const capabilities = { plane: 'control', authz_mode: 'off', sts_enabled: false, iam_assume_role_enabled: false, assume_role_ready: false, iam_account_configured: false, backend_routing_enabled: true, usable_registry_auth_modes: ['managed_identity'], legacy_routing_available: true, public_sts_endpoint: null, public_s3_endpoint: null } satisfies components['schemas']['ControlCapabilities']
+
+export const health = {
+  status: 'healthy', version: 'test', timestamp,
+  cache: { mode: 'memory', available: true, redis_connected: false },
+  credentials: { count: 1 },
+  multipart: { store_type: 'memory-only', redis_available: false, persistence: 'disabled', warning: 'State lost on restart' },
+  authorization: { mode: 'off', coherence: 'strict', resolver_ready: false, database_ready: false, audit_required: false, audit_dispatcher_ready: false },
+} satisfies components['schemas']['AdminHealthResponse']
+
 export const collections = {
   '/admin/credentials': {
     count: 1,
@@ -48,15 +58,11 @@ export async function mockControlApi(page: Page, empty = false) {
       return route.fulfill({ json: session })
     }
     if (path === '/admin/health' && request.method() === 'GET') {
-      const health = {
-        status: 'healthy', version: 'test', timestamp,
-        cache: { mode: 'memory', available: true, redis_connected: false },
-        credentials: { count: empty ? 0 : 1 },
-        multipart: { store_type: 'memory-only', redis_available: false, persistence: 'disabled', warning: 'State lost on restart' },
-        authorization: { mode: 'off', coherence: 'strict', resolver_ready: false, database_ready: false, audit_required: false, audit_dispatcher_ready: false },
-      } satisfies components['schemas']['AdminHealthResponse']
-      return route.fulfill({ json: health })
+      return route.fulfill({ json: { ...health, credentials: { count: empty ? 0 : 1 } } })
     }
+    if (path === '/admin/capabilities' && request.method() === 'GET') return route.fulfill({ json: capabilities })
+    if (path === '/admin/roles' && request.method() === 'GET') return route.fulfill({ json: { count: 0, items: [] } satisfies components['schemas']['IamRoleListResponse'] })
+    if (path === '/admin/audit' && request.method() === 'GET') return route.fulfill({ json: [] satisfies components['schemas']['AuditEventList'] })
     unexpected.push(`${request.method()} ${path}`)
     return route.abort()
   })
@@ -64,7 +70,9 @@ export async function mockControlApi(page: Page, empty = false) {
 }
 
 export async function navigateTo(page: Page, label: string) {
-  const menu = page.getByRole('button', { name: 'Open navigation' })
+  const menu = page.getByRole('button', { name: 'Open navigation', includeHidden: true })
+  await menu.waitFor({ state: 'attached' })
   if (await menu.isVisible()) await menu.click()
-  await page.getByRole('link', { name: label, exact: true }).click()
+  await page.getByRole('navigation', { name: 'Control navigation' }).getByRole('link', { name: label, exact: true }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
 }

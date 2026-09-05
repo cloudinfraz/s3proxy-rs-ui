@@ -7,11 +7,11 @@ test('UI068-01 typed collections render rows and overview counts', async ({ page
   await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible()
   await expect(page.locator('.metric strong')).toHaveText(['1', '1', '1', '1'])
   for (const [label, value] of [
-    ['Credentials', 'fixture-access'], ['Policies', 'fixture-policy'],
-    ['Storage backends', 'fixture-backend'], ['Virtual buckets', 'fixture-bucket'],
+    ['S3 identities', 'fixture-access'], ['Policies', 'fixture-policy'],
+    ['Azure backends', 'fixture-backend'], ['Bucket routing', 'fixture-bucket'],
     ['Admin keys', 'fixture-admin'],
   ]) {
-    await navigateTo(page, label === 'Storage backends' ? 'Backends' : label)
+    await navigateTo(page, label)
     await expect(page.getByRole('cell', { name: value, exact: true })).toBeVisible()
     await expect(page.locator('tbody tr')).toHaveCount(1)
   }
@@ -22,7 +22,7 @@ test('UI068-02 empty envelopes and arrays show zero counts and empty tables', as
   const verifyRequests = await mockControlApi(page, true)
   await page.goto('/admin/ui/')
   await expect(page.locator('.metric strong')).toHaveText(['0', '0', '0', '0'])
-  for (const label of ['Credentials', 'Policies', 'Backends', 'Virtual buckets', 'Admin keys']) {
+  for (const label of ['S3 identities', 'Policies', 'Azure backends', 'Bucket routing', 'Admin keys']) {
     await navigateTo(page, label)
     await expect(page.getByText('No records', { exact: true })).toBeVisible()
     await expect(page.locator('tbody tr')).toHaveCount(0)

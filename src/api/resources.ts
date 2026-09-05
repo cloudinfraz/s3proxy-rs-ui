@@ -27,6 +27,10 @@ export function normalizeResourceRows<P extends ResourceListPath>(
     : response as VirtualBucketList | StorageBackendList | AdminApiKeyList
 
   if (!Array.isArray(rows)) throw new Error('Invalid resource collection response')
+  if (path === '/admin/credentials' || path === '/admin/policies') {
+    const envelope = response as CredentialList | PolicyList
+    if (!Number.isInteger(envelope.count) || envelope.count !== rows.length) throw new Error('Invalid resource collection response')
+  }
   return rows.map(row => ({ ...row }))
 }
 

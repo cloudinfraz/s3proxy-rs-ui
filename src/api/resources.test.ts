@@ -38,6 +38,7 @@ describe('normalizeResourceRows', () => {
 
   it('accepts empty collections but rejects malformed wire responses', () => {
     expect(normalizeResourceRows('/admin/credentials', { count: 0, items: [] })).toEqual([])
+    expect(() => normalizeResourceRows('/admin/credentials', { count: 1, items: [] })).toThrow('Invalid resource collection response')
     const malformed = JSON.parse('{"count":0}') as components['schemas']['CredentialListResponse']
     expect(() => normalizeResourceRows('/admin/credentials', malformed)).toThrow('Invalid resource collection response')
     const invalidArray = JSON.parse('{}') as components['schemas']['StorageBackendList']
