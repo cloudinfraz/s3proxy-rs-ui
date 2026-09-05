@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { emptyCollections } from './control-fixtures'
 
 test('login and cookie mutation keep credential material out of browser storage', async ({ page }) => {
   let mutationCsrf: string | null = null
@@ -27,7 +28,7 @@ test('login and cookie mutation keep credential material out of browser storage'
         mutationCsrf = route.request().headers()['x-csrf-token'] ?? null
         return route.fulfill({ status: 201, contentType: 'application/json', body: '{}' })
       }
-      return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+      return route.fulfill({ status: 200, json: emptyCollections[path as keyof typeof emptyCollections] })
     })
   }
 

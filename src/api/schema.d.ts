@@ -117,6 +117,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getCapabilities"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/audit": {
         parameters: {
             query?: never;
@@ -154,7 +170,7 @@ export interface paths {
             query?: never;
             header?: never;
             path: {
-                key_name: string;
+                key_name: components["parameters"]["KeyName"];
             };
             cookie?: never;
         };
@@ -188,7 +204,7 @@ export interface paths {
             query?: never;
             header?: never;
             path: {
-                access_key: string;
+                access_key: components["parameters"]["AccessKey"];
             };
             cookie?: never;
         };
@@ -222,7 +238,7 @@ export interface paths {
             query?: never;
             header?: never;
             path: {
-                name: string;
+                name: components["parameters"]["Name"];
             };
             cookie?: never;
         };
@@ -256,7 +272,7 @@ export interface paths {
             query?: never;
             header?: never;
             path: {
-                bucket_id: string;
+                bucket_id: components["parameters"]["BucketId"];
             };
             cookie?: never;
         };
@@ -306,7 +322,7 @@ export interface paths {
             query?: never;
             header?: never;
             path: {
-                name: string;
+                name: components["parameters"]["Name"];
             };
             cookie?: never;
         };
@@ -323,7 +339,9 @@ export interface paths {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                access_key: components["parameters"]["AccessKey"];
+            };
             cookie?: never;
         };
         get?: never;
@@ -339,7 +357,10 @@ export interface paths {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                access_key: components["parameters"]["AccessKey"];
+                name: components["parameters"]["Name"];
+            };
             cookie?: never;
         };
         get?: never;
@@ -356,7 +377,7 @@ export interface paths {
             query?: never;
             header?: never;
             path: {
-                bucket: string;
+                bucket: components["parameters"]["Bucket"];
             };
             cookie?: never;
         };
@@ -374,7 +395,7 @@ export interface paths {
             query?: never;
             header?: never;
             path: {
-                bucket_id: string;
+                bucket_id: components["parameters"]["BucketId"];
             };
             cookie?: never;
         };
@@ -403,10 +424,161 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listRoles"];
+        put?: never;
+        post: operations["createRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/roles/{role_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: components["parameters"]["RoleId"];
+            };
+            cookie?: never;
+        };
+        get: operations["getRole"];
+        put?: never;
+        post?: never;
+        delete: operations["deleteRole"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/roles/{role_id}/trust": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: components["parameters"]["RoleId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["updateRoleTrust"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/roles/{role_id}/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: components["parameters"]["RoleId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["updateRoleSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/roles/{role_id}/enabled": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: components["parameters"]["RoleId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["setRoleEnabled"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/roles/{role_id}/retire-sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: components["parameters"]["RoleId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["retireRoleSessions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/roles/{role_id}/policies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: components["parameters"]["RoleId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["attachRolePolicy"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/roles/{role_id}/policies/{policy_name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: components["parameters"]["RoleId"];
+                policy_name: components["parameters"]["PolicyName"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["detachRolePolicy"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        Error: {
+            message?: string;
+        };
+        ValidationError: {
+            message?: string;
+            field?: string | null;
+        };
+        JsonValue: unknown;
         LoginRequest: {
             api_key: string;
         };
@@ -432,17 +604,437 @@ export interface components {
             api_key: string;
             warning: string;
         };
-        Error: {
-            message?: string;
+        CreateAdminApiKeyRequest: {
+            key_name: string;
+            description?: string | null;
+            expires_in_days?: number | null;
+            created_by?: string | null;
         };
-        JsonObject: {
+        CreateAdminApiKeyResponse: {
+            /** Format: uuid */
+            id?: string;
+            key_name?: string;
+            api_key?: string | null;
+            description?: string | null;
+            /** Format: date-time */
+            expires_at?: string | null;
+            /** Format: date-time */
+            created_at?: string;
+            warning?: string;
+        };
+        AdminApiKey: {
+            /** Format: uuid */
+            id?: string;
+            key_name?: string;
+            description?: string | null;
+            enabled?: boolean;
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            last_used_at?: string | null;
+            /** Format: date-time */
+            expires_at?: string | null;
+            created_by?: string | null;
+        };
+        AdminApiKeySummary: components["schemas"]["AdminApiKey"] & {
+            status?: string;
+        };
+        AdminApiKeyList: components["schemas"]["AdminApiKeySummary"][];
+        UpdateAdminApiKeyRequest: {
+            enabled: boolean;
+        };
+        /** @enum {string} */
+        CredentialAccessMode: "direct" | "virtual";
+        CreateCredentialRequest: {
+            /** @default  */
+            s3_access_key: string;
+            /** @default  */
+            s3_secret_key: string;
+            azure_account: string;
+            azure_key?: string | null;
+            use_managed_identity: boolean;
+            credential_scope?: string | null;
+            access_mode: components["schemas"]["CredentialAccessMode"];
+            versioning_enabled?: boolean | null;
+            /** Format: uuid */
+            default_backend_id?: string | null;
+        };
+        UpdateCredentialRequest: {
+            s3_secret_key?: string | null;
+            azure_account?: string | null;
+            azure_key?: string | null;
+            use_managed_identity?: boolean | null;
+            credential_scope?: string | null;
+            access_mode?: components["schemas"]["CredentialAccessMode"] | null;
+            versioning_enabled?: boolean | null;
+            enabled?: boolean | null;
+            /** Format: uuid */
+            default_backend_id?: string | null;
+        };
+        CredentialCreatedResponse: {
+            /** Format: uuid */
+            credential_id?: string;
+            s3_access_key?: string;
+            s3_secret_key?: string;
+            s3_endpoint?: string;
+            azure_account?: string;
+            access_mode?: components["schemas"]["CredentialAccessMode"];
+            use_managed_identity?: boolean;
+            /** Format: uuid */
+            default_backend_id?: string | null;
+        };
+        CredentialSummary: {
+            /** Format: uuid */
+            credential_id?: string | null;
+            s3_access_key?: string;
+            azure_account?: string;
+            access_mode?: components["schemas"]["CredentialAccessMode"];
+            use_managed_identity?: boolean;
+            versioning_enabled?: boolean;
+            /** Format: uuid */
+            default_backend_id?: string | null;
+        };
+        CredentialDetail: components["schemas"]["CredentialSummary"] & {
+            credential_scope?: string | null;
+        };
+        CredentialListResponse: {
+            count?: number;
+            items?: components["schemas"]["CredentialSummary"][];
+        };
+        /** @enum {string} */
+        BackendAuthMode: "managed_identity" | "account_key" | "sas_token";
+        StorageBackendRequest: {
+            name: string;
+            azure_account: string;
+            auth_mode: components["schemas"]["BackendAuthMode"];
+            /** Format: uuid */
+            managed_identity_client_id?: string | null;
+            secret_ref?: string | null;
+            /** @default false */
+            user_delegation_sas_enabled: boolean;
+            region_label?: string | null;
+            /** @default true */
+            enabled: boolean;
+        };
+        StorageBackendResponse: {
+            /** Format: uuid */
+            id?: string;
+            name?: string;
+            azure_account?: string;
+            auth_mode?: components["schemas"]["BackendAuthMode"];
+            /** Format: uuid */
+            managed_identity_client_id?: string | null;
+            user_delegation_sas_enabled?: boolean;
+            has_secret_ref?: boolean;
+            region_label?: string | null;
+            enabled?: boolean;
+        };
+        StorageBackendList: components["schemas"]["StorageBackendResponse"][];
+        CreateVirtualBucketRequest: {
+            virtual_bucket_name: string;
+            azure_container: string;
+            /** Format: uuid */
+            credential_id: string;
+            /** Format: uuid */
+            backend_id?: string | null;
+            endpoint_prefix?: string | null;
+        };
+        UpdateVirtualBucketRequest: {
+            enabled: boolean;
+        };
+        VirtualBucketResponse: {
+            /** Format: uuid */
+            id?: string;
+            virtual_bucket_name?: string;
+            azure_container?: string;
+            /** Format: uuid */
+            credential_id?: string;
+            /** Format: uuid */
+            backend_id?: string | null;
+            endpoint_prefix?: string | null;
+            enabled?: boolean;
+        };
+        VirtualBucketList: components["schemas"]["VirtualBucketResponse"][];
+        CreatePolicyRequest: {
+            name: string;
+            document: components["schemas"]["JsonValue"];
+            description?: string | null;
+        };
+        UpdatePolicyRequest: {
+            document?: components["schemas"]["JsonValue"] | null;
+            description?: string | null;
+        };
+        PolicyResponse: {
+            /** Format: uuid */
+            id?: string;
+            name?: string;
+            document?: components["schemas"]["JsonValue"];
+            description?: string | null;
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        PolicyListResponse: {
+            count?: number;
+            items?: components["schemas"]["PolicyResponse"][];
+        };
+        PolicyGuardrailLimits: {
+            max_attachments_per_credential?: number;
+            max_policy_bytes?: number;
+            max_policy_statements?: number;
+            max_compiled_bytes?: number;
+        };
+        PolicyGuardrailViolation: {
             [key: string]: unknown;
         };
-        JsonArray: components["schemas"]["JsonObject"][];
+        PolicyPreflightResponse: {
+            limits?: components["schemas"]["PolicyGuardrailLimits"];
+            count?: number;
+            items?: components["schemas"]["PolicyGuardrailViolation"][];
+        };
+        AttachPolicyRequest: {
+            policy_name: string;
+        };
+        CredentialPolicyAttachmentResponse: {
+            access_key?: string;
+            policy_name?: string;
+            /** @constant */
+            attached?: true;
+        };
+        SetBucketPolicyRequest: {
+            document: components["schemas"]["JsonValue"];
+        };
+        BucketPolicyResponse: {
+            /** Format: uuid */
+            credential_id?: string | null;
+            bucket?: string;
+            document?: components["schemas"]["JsonValue"];
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        SimulatePolicyRequest: {
+            access_key: string;
+            action: string;
+            resource: string;
+            /** @default {} */
+            conditions: {
+                [key: string]: string;
+            };
+        };
+        SimulatePolicyResponse: {
+            allowed?: boolean;
+            effect?: string;
+            matched_sid?: string;
+            evaluated_policies?: number;
+        };
+        AuditEvent: {
+            /** Format: uuid */
+            id?: string;
+            entity_type?: string;
+            entity_id?: string;
+            action?: string;
+            changed_by?: string | null;
+            changes?: components["schemas"]["JsonValue"];
+            /** Format: date-time */
+            created_at?: string;
+        };
+        AuditEventList: components["schemas"]["AuditEvent"][];
+        HealthComponent: {
+            [key: string]: unknown;
+        };
+        AdminHealthResponse: {
+            status?: string;
+            version?: string;
+            cache?: components["schemas"]["HealthComponent"];
+            credentials?: components["schemas"]["HealthComponent"];
+            multipart?: components["schemas"]["HealthComponent"];
+            /** Format: date-time */
+            timestamp?: string;
+            database?: components["schemas"]["HealthComponent"];
+            authorization?: components["schemas"]["HealthComponent"];
+            virtual_buckets?: components["schemas"]["HealthComponent"];
+        };
+        ControlCapabilities: {
+            plane?: string;
+            authz_mode?: string;
+            sts_enabled?: boolean;
+            iam_assume_role_enabled?: boolean;
+            assume_role_ready?: boolean;
+            iam_account_configured?: boolean;
+            backend_routing_enabled?: boolean;
+            usable_registry_auth_modes?: components["schemas"]["BackendAuthMode"][];
+            legacy_routing_available?: boolean;
+            /** Format: uri */
+            public_sts_endpoint?: string | null;
+            /** Format: uri */
+            public_s3_endpoint?: string | null;
+        };
+        CreateIamRoleRequest: {
+            account_id: string;
+            /** @default / */
+            role_path: string;
+            role_name: string;
+            /** Format: uuid */
+            resource_credential_id: string;
+            trust_policy: components["schemas"]["JsonValue"];
+            /** @default 3600 */
+            max_session_duration_seconds: number;
+        };
+        IamRoleResponse: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            role_id?: string;
+            account_id?: string;
+            role_path?: string;
+            role_name?: string;
+            role_arn?: string;
+            /** Format: uuid */
+            resource_credential_id?: string;
+            trust_policy?: components["schemas"]["JsonValue"];
+            max_session_duration_seconds?: number;
+            enabled?: boolean;
+            lifecycle_revision?: number;
+            trust_revision?: number;
+            attachment_revision?: number;
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        IamRoleListResponse: {
+            count?: number;
+            items?: components["schemas"]["IamRoleResponse"][];
+        };
+        UpdateIamRoleTrustRequest: {
+            trust_policy: components["schemas"]["JsonValue"];
+        };
+        UpdateIamRoleSettingsRequest: {
+            max_session_duration_seconds: number;
+        };
+        SetIamRoleEnabledRequest: {
+            enabled: boolean;
+        };
+        RetireIamRoleSessionsRequest: {
+            batch_size: number;
+        };
+        RetireIamRoleSessionsResponse: {
+            retired_sessions?: number;
+        };
+        RolePolicyAttachmentRequest: {
+            policy_name: string;
+        };
+        OpenApiDocument: {
+            openapi?: string;
+            info?: Record<string, never>;
+            paths?: Record<string, never>;
+        };
     };
     responses: never;
-    parameters: never;
-    requestBodies: never;
+    parameters: {
+        KeyName: string;
+        AccessKey: string;
+        Name: string;
+        BucketId: string;
+        Bucket: string;
+        RoleId: string;
+        PolicyName: string;
+    };
+    requestBodies: {
+        CreateAdminApiKey: {
+            content: {
+                "application/json": components["schemas"]["CreateAdminApiKeyRequest"];
+            };
+        };
+        UpdateAdminApiKey: {
+            content: {
+                "application/json": components["schemas"]["UpdateAdminApiKeyRequest"];
+            };
+        };
+        CreateCredential: {
+            content: {
+                "application/json": components["schemas"]["CreateCredentialRequest"];
+            };
+        };
+        UpdateCredential: {
+            content: {
+                "application/json": components["schemas"]["UpdateCredentialRequest"];
+            };
+        };
+        StorageBackend: {
+            content: {
+                "application/json": components["schemas"]["StorageBackendRequest"];
+            };
+        };
+        CreateVirtualBucket: {
+            content: {
+                "application/json": components["schemas"]["CreateVirtualBucketRequest"];
+            };
+        };
+        UpdateVirtualBucket: {
+            content: {
+                "application/json": components["schemas"]["UpdateVirtualBucketRequest"];
+            };
+        };
+        CreatePolicy: {
+            content: {
+                "application/json": components["schemas"]["CreatePolicyRequest"];
+            };
+        };
+        UpdatePolicy: {
+            content: {
+                "application/json": components["schemas"]["UpdatePolicyRequest"];
+            };
+        };
+        AttachPolicy: {
+            content: {
+                "application/json": components["schemas"]["AttachPolicyRequest"];
+            };
+        };
+        SetBucketPolicy: {
+            content: {
+                "application/json": components["schemas"]["SetBucketPolicyRequest"];
+            };
+        };
+        SimulatePolicy: {
+            content: {
+                "application/json": components["schemas"]["SimulatePolicyRequest"];
+            };
+        };
+        CreateIamRole: {
+            content: {
+                "application/json": components["schemas"]["CreateIamRoleRequest"];
+            };
+        };
+        UpdateIamRoleTrust: {
+            content: {
+                "application/json": components["schemas"]["UpdateIamRoleTrustRequest"];
+            };
+        };
+        UpdateIamRoleSettings: {
+            content: {
+                "application/json": components["schemas"]["UpdateIamRoleSettingsRequest"];
+            };
+        };
+        SetIamRoleEnabled: {
+            content: {
+                "application/json": components["schemas"]["SetIamRoleEnabledRequest"];
+            };
+        };
+        RetireIamRoleSessions: {
+            content: {
+                "application/json": components["schemas"]["RetireIamRoleSessionsRequest"];
+            };
+        };
+        RolePolicyAttachment: {
+            content: {
+                "application/json": components["schemas"]["RolePolicyAttachmentRequest"];
+            };
+        };
+    };
     headers: never;
     pathItems: never;
 }
@@ -498,7 +1090,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["OpenApiDocument"];
+                };
             };
         };
     };
@@ -525,7 +1119,7 @@ export interface operations {
                     "application/json": components["schemas"]["BootstrapAdminKeyResponse"];
                 };
             };
-            /** @description Bootstrap is permanently disabled because an admin key already exists */
+            /** @description Bootstrap permanently disabled */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -624,7 +1218,29 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["AdminHealthResponse"];
+                };
+            };
+        };
+    };
+    getCapabilities: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Safe runtime capabilities */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ControlCapabilities"];
+                };
             };
         };
     };
@@ -645,7 +1261,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["JsonArray"];
+                    "application/json": components["schemas"]["AuditEventList"];
                 };
             };
         };
@@ -664,7 +1280,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["AdminApiKeyList"];
+                };
             };
         };
     };
@@ -675,14 +1293,16 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: components["requestBodies"]["CreateAdminApiKey"];
         responses: {
             /** @description Admin key created */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CreateAdminApiKeyResponse"];
+                };
             };
         };
     };
@@ -691,7 +1311,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                key_name: string;
+                key_name: components["parameters"]["KeyName"];
             };
             cookie?: never;
         };
@@ -702,7 +1322,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["AdminApiKey"];
+                };
             };
         };
     };
@@ -711,11 +1333,11 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                key_name: string;
+                key_name: components["parameters"]["KeyName"];
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: components["requestBodies"]["UpdateAdminApiKey"];
         responses: {
             /** @description Updated */
             204: {
@@ -731,7 +1353,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                key_name: string;
+                key_name: components["parameters"]["KeyName"];
             };
             cookie?: never;
         };
@@ -739,13 +1361,6 @@ export interface operations {
         responses: {
             /** @description Deleted */
             204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Final admin key cannot be deleted because bootstrap is permanently disabled */
-            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -767,7 +1382,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CredentialListResponse"];
+                };
             };
         };
     };
@@ -778,14 +1395,16 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: components["requestBodies"]["CreateCredential"];
         responses: {
             /** @description Credential created */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CredentialCreatedResponse"];
+                };
             };
         };
     };
@@ -794,7 +1413,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                access_key: string;
+                access_key: components["parameters"]["AccessKey"];
             };
             cookie?: never;
         };
@@ -805,7 +1424,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CredentialDetail"];
+                };
             };
         };
     };
@@ -814,18 +1435,20 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                access_key: string;
+                access_key: components["parameters"]["AccessKey"];
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: components["requestBodies"]["UpdateCredential"];
         responses: {
             /** @description Updated */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CredentialDetail"];
+                };
             };
         };
     };
@@ -834,7 +1457,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                access_key: string;
+                access_key: components["parameters"]["AccessKey"];
             };
             cookie?: never;
         };
@@ -863,7 +1486,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["StorageBackendList"];
+                };
             };
         };
     };
@@ -874,14 +1499,16 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: components["requestBodies"]["StorageBackend"];
         responses: {
-            /** @description Backend created */
+            /** @description Created */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["StorageBackendResponse"];
+                };
             };
         };
     };
@@ -890,7 +1517,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                name: string;
+                name: components["parameters"]["Name"];
             };
             cookie?: never;
         };
@@ -901,7 +1528,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["StorageBackendResponse"];
+                };
             };
         };
     };
@@ -910,18 +1539,20 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                name: string;
+                name: components["parameters"]["Name"];
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: components["requestBodies"]["StorageBackend"];
         responses: {
             /** @description Updated */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["StorageBackendResponse"];
+                };
             };
         };
     };
@@ -930,7 +1561,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                name: string;
+                name: components["parameters"]["Name"];
             };
             cookie?: never;
         };
@@ -959,7 +1590,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["VirtualBucketList"];
+                };
             };
         };
     };
@@ -970,14 +1603,16 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: components["requestBodies"]["CreateVirtualBucket"];
         responses: {
-            /** @description Virtual bucket created */
+            /** @description Created */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["VirtualBucketResponse"];
+                };
             };
         };
     };
@@ -986,14 +1621,14 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                bucket_id: string;
+                bucket_id: components["parameters"]["BucketId"];
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: components["requestBodies"]["UpdateVirtualBucket"];
         responses: {
             /** @description Updated */
-            200: {
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1006,7 +1641,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                bucket_id: string;
+                bucket_id: components["parameters"]["BucketId"];
             };
             cookie?: never;
         };
@@ -1035,7 +1670,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["PolicyListResponse"];
+                };
             };
         };
     };
@@ -1046,14 +1683,16 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: components["requestBodies"]["CreatePolicy"];
         responses: {
-            /** @description Policy created */
+            /** @description Created */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["PolicyResponse"];
+                };
             };
         };
     };
@@ -1071,7 +1710,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["PolicyPreflightResponse"];
+                };
             };
         };
     };
@@ -1080,7 +1721,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                name: string;
+                name: components["parameters"]["Name"];
             };
             cookie?: never;
         };
@@ -1091,7 +1732,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["PolicyResponse"];
+                };
             };
         };
     };
@@ -1100,18 +1743,20 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                name: string;
+                name: components["parameters"]["Name"];
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: components["requestBodies"]["UpdatePolicy"];
         responses: {
             /** @description Updated */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["PolicyResponse"];
+                };
             };
         };
     };
@@ -1120,7 +1765,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                name: string;
+                name: components["parameters"]["Name"];
             };
             cookie?: never;
         };
@@ -1139,17 +1784,30 @@ export interface operations {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                access_key: components["parameters"]["AccessKey"];
+            };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: components["requestBodies"]["AttachPolicy"];
         responses: {
-            /** @description Attached */
-            204: {
+            /** @description Already attached */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CredentialPolicyAttachmentResponse"];
+                };
+            };
+            /** @description Attached */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CredentialPolicyAttachmentResponse"];
+                };
             };
         };
     };
@@ -1157,7 +1815,10 @@ export interface operations {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                access_key: components["parameters"]["AccessKey"];
+                name: components["parameters"]["Name"];
+            };
             cookie?: never;
         };
         requestBody?: never;
@@ -1176,18 +1837,20 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                bucket: string;
+                bucket: components["parameters"]["Bucket"];
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Direct-mode global bucket policy */
+            /** @description Policy */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["BucketPolicyResponse"];
+                };
             };
         };
     };
@@ -1196,18 +1859,20 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                bucket: string;
+                bucket: components["parameters"]["Bucket"];
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: components["requestBodies"]["SetBucketPolicy"];
         responses: {
             /** @description Set */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["BucketPolicyResponse"];
+                };
             };
         };
     };
@@ -1216,7 +1881,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                bucket: string;
+                bucket: components["parameters"]["Bucket"];
             };
             cookie?: never;
         };
@@ -1236,18 +1901,20 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                bucket_id: string;
+                bucket_id: components["parameters"]["BucketId"];
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Virtual-mode scoped bucket policy */
+            /** @description Policy */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["BucketPolicyResponse"];
+                };
             };
         };
     };
@@ -1256,18 +1923,20 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                bucket_id: string;
+                bucket_id: components["parameters"]["BucketId"];
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: components["requestBodies"]["SetBucketPolicy"];
         responses: {
             /** @description Set */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["BucketPolicyResponse"];
+                };
             };
         };
     };
@@ -1276,7 +1945,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                bucket_id: string;
+                bucket_id: components["parameters"]["BucketId"];
             };
             cookie?: never;
         };
@@ -1298,10 +1967,223 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: components["requestBodies"]["SimulatePolicy"];
         responses: {
             /** @description Simulation */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulatePolicyResponse"];
+                };
+            };
+        };
+    };
+    listRoles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Roles */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IamRoleListResponse"];
+                };
+            };
+        };
+    };
+    createRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["CreateIamRole"];
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IamRoleResponse"];
+                };
+            };
+        };
+    };
+    getRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: components["parameters"]["RoleId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Role */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IamRoleResponse"];
+                };
+            };
+        };
+    };
+    deleteRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: components["parameters"]["RoleId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    updateRoleTrust: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: components["parameters"]["RoleId"];
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["UpdateIamRoleTrust"];
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IamRoleResponse"];
+                };
+            };
+        };
+    };
+    updateRoleSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: components["parameters"]["RoleId"];
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["UpdateIamRoleSettings"];
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IamRoleResponse"];
+                };
+            };
+        };
+    };
+    setRoleEnabled: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: components["parameters"]["RoleId"];
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["SetIamRoleEnabled"];
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IamRoleResponse"];
+                };
+            };
+        };
+    };
+    retireRoleSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: components["parameters"]["RoleId"];
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["RetireIamRoleSessions"];
+        responses: {
+            /** @description Retired */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetireIamRoleSessionsResponse"];
+                };
+            };
+        };
+    };
+    attachRolePolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: components["parameters"]["RoleId"];
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["RolePolicyAttachment"];
+        responses: {
+            /** @description Attached */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    detachRolePolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: components["parameters"]["RoleId"];
+                policy_name: components["parameters"]["PolicyName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Detached */
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };
