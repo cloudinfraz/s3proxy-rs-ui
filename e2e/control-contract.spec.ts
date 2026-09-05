@@ -32,11 +32,11 @@ test('UI068-02 empty envelopes and arrays show zero counts and empty tables', as
 
 test('UI068-02 failed collection reads show an error and recover on reload', async ({ page }) => {
   const verifyRequests = await mockControlApi(page)
-  await page.route('**/admin/credentials', route => route.fulfill({ status: 503, json: { message: 'Control service unavailable' } }))
+  await page.route('**/admin/ui/identities', route => route.fulfill({ status: 503, json: { message: 'Control service unavailable' } }))
   await page.goto('/admin/ui/credentials')
   await expect(page.getByText('Control service unavailable', { exact: true })).toBeVisible()
   await expect(page.getByText('No records', { exact: true })).toHaveCount(0)
-  await page.unroute('**/admin/credentials')
+  await page.unroute('**/admin/ui/identities')
   await page.reload()
   await expect(page.getByRole('cell', { name: 'fixture-access', exact: true })).toBeVisible()
   await expect(page.getByText('Control service unavailable', { exact: true })).toHaveCount(0)
@@ -45,11 +45,11 @@ test('UI068-02 failed collection reads show an error and recover on reload', asy
 
 test('UI068-06 malformed envelopes fail visibly instead of appearing empty', async ({ page }) => {
   await mockControlApi(page)
-  await page.route('**/admin/credentials', route => route.fulfill({ json: { count: 0 } }))
+  await page.route('**/admin/ui/identities', route => route.fulfill({ json: { count: 0 } }))
   await page.goto('/admin/ui/credentials')
   await expect(page.getByText('Invalid resource collection response', { exact: true })).toBeVisible()
   await expect(page.getByText('No records', { exact: true })).toHaveCount(0)
-  await page.unroute('**/admin/credentials')
+  await page.unroute('**/admin/ui/identities')
   await page.reload()
   await expect(page.getByRole('cell', { name: 'fixture-access', exact: true })).toBeVisible()
 })

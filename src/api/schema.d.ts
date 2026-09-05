@@ -199,6 +199,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/ui/identities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listIdentityProjections"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/credentials/{access_key}": {
         parameters: {
             query?: never;
@@ -212,6 +228,24 @@ export interface paths {
         put: operations["updateCredential"];
         post?: never;
         delete: operations["deleteCredential"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/credentials/{credential_id}/rotate-secret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                credential_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["rotateCredentialSecret"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -717,6 +751,30 @@ export interface components {
             /** Format: uuid */
             default_backend_id: string | null;
             credential_scope: string | null;
+        };
+        IdentityProjection: {
+            /** Format: uuid */
+            credential_id: string;
+            s3_access_key: string;
+            azure_account: string;
+            access_mode: components["schemas"]["CredentialAccessMode"];
+            use_managed_identity: boolean;
+            versioning_enabled: boolean;
+            /** Format: uuid */
+            default_backend_id: string | null;
+            enabled: boolean;
+            virtual_bucket_count: number;
+            policy_attachment_count: number;
+        };
+        IdentityProjectionListResponse: {
+            count: number;
+            items: components["schemas"]["IdentityProjection"][];
+        };
+        RotateCredentialSecretResponse: {
+            /** Format: uuid */
+            credential_id: string;
+            s3_access_key: string;
+            s3_secret_key: string;
         };
         CredentialListResponse: {
             count: number;
@@ -1540,6 +1598,28 @@ export interface operations {
             default: components["responses"]["ControlError"];
         };
     };
+    listIdentityProjections: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Identity metadata for the control UI */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityProjectionListResponse"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["ControlError"];
+        };
+    };
     getCredential: {
         parameters: {
             query?: never;
@@ -1611,6 +1691,33 @@ export interface operations {
                 content?: never;
             };
             403: components["responses"]["Forbidden"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    rotateCredentialSecret: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                credential_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Secret rotated and returned once */
+            200: {
+                headers: {
+                    "Cache-Control"?: string;
+                    Pragma?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RotateCredentialSecretResponse"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["ControlError"];
             default: components["responses"]["ControlError"];
         };
     };

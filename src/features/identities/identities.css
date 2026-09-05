@@ -1,0 +1,47 @@
+.operation-form select {
+  width: 100%;
+  border: 1px solid #bbc5bf;
+  background: #fff;
+  color: #18201d;
+  padding: 9px 10px;
+  outline: none;
+  font: inherit;
+  letter-spacing: 0;
+}
+
+.operation-form select:focus {
+  border-color: #176b4d;
+  box-shadow: 0 0 0 2px rgba(23, 107, 77, 0.12);
+}
+
+.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.checkbox-field input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+.one-time-material {
+  display: grid;
+  gap: 14px;
+}
+
+.one-time-material code {
+  display: block;
+  padding: 10px;
+  border: 1px solid #d8dfda;
+  background: #f5f7f5;
+  font: 12px 'IBM Plex Mono', monospace;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.confirmation-name {
+  font: 13px 'IBM Plex Mono', monospace;
+  overflow-wrap: anywhere;
+}

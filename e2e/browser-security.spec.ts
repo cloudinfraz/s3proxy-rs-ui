@@ -5,7 +5,7 @@ test('login and cookie mutation keep credential material out of browser storage'
   const verifyRequests = await mockControlApi(page, true)
   let mutationCsrf: string | null = null
   const emptyLists = [
-    '/admin/credentials', '/admin/virtual-buckets', '/admin/backends', '/admin/policies', '/admin/api-keys',
+    '/admin/credentials', '/admin/ui/identities', '/admin/virtual-buckets', '/admin/backends', '/admin/policies', '/admin/api-keys',
   ]
 
   await page.route('**/admin/session/login', async route => {
@@ -26,7 +26,7 @@ test('login and cookie mutation keep credential material out of browser storage'
     await page.route(`**${path}`, async route => {
       if (path === '/admin/credentials' && route.request().method() === 'POST') {
         mutationCsrf = route.request().headers()['x-csrf-token'] ?? null
-        return route.fulfill({ status: 201, contentType: 'application/json', body: '{}' })
+        return route.fulfill({ status: 201, json: { credential_id: 'created-id', s3_access_key: 'generated-access', s3_secret_key: 'generated-one-time-secret', s3_endpoint: 'https://synthetic.invalid' } })
       }
       return route.fulfill({ status: 200, json: emptyCollections[path as keyof typeof emptyCollections] })
     })
@@ -40,11 +40,12 @@ test('login and cookie mutation keep credential material out of browser storage'
   const menu = page.getByRole('button', { name: 'Open navigation' })
   if (await menu.isVisible()) await menu.click()
   await page.getByRole('navigation', { name: 'Control navigation' }).getByRole('link', { name: 'S3 identities' }).click()
-  await page.getByRole('button', { name: 'Add s3 identities' }).click()
-  await page.getByLabel('S3 secret key').fill('never-store-this-secret')
+  await page.getByRole('button', { name: 'Create identity', exact: true }).click()
   await page.getByLabel('Azure account').fill('testaccount')
-  await page.getByRole('button', { name: 'Save' }).click()
+  await page.getByRole('button', { name: 'Create identity', exact: true }).last().click()
   await expect.poll(() => mutationCsrf).toBe('csrf-login')
+  await expect(page.getByRole('dialog')).toContainText('generated-one-time-secret')
+  await page.getByRole('button', { name: 'Dismiss', exact: true }).click()
 
   const storage = await page.evaluate(() => ({
     local: Object.keys(localStorage),
@@ -54,6 +55,6 @@ test('login and cookie mutation keep credential material out of browser storage'
   expect(storage.local).toEqual([])
   expect(storage.session).toEqual([])
   expect(storage.body).not.toContain('browser-test-admin-key')
-  expect(storage.body).not.toContain('never-store-this-secret')
+  expect(storage.body).not.toContain('generated-one-time-secret')
   verifyRequests()
 })

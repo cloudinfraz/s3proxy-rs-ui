@@ -6,7 +6,7 @@ const base: ReadinessInput = {
   now, identities: [], buckets: [], backends: [], keys: [], roles: [],
   capabilities: { plane: 'control', authz_mode: 'off', sts_enabled: false, iam_assume_role_enabled: false, assume_role_ready: false, iam_account_configured: false, backend_routing_enabled: true, usable_registry_auth_modes: ['managed_identity'], legacy_routing_available: true, public_sts_endpoint: null, public_s3_endpoint: null },
 }
-const identity = { credential_id: 'identity-id', s3_access_key: 'synthetic-do-not-emit', azure_account: 'account', access_mode: 'direct' as const, use_managed_identity: true, versioning_enabled: false, default_backend_id: 'backend-id' }
+const identity = { credential_id: 'identity-id', s3_access_key: 'synthetic-do-not-emit', azure_account: 'account', access_mode: 'direct' as const, use_managed_identity: true, versioning_enabled: false, default_backend_id: 'backend-id', enabled: true, virtual_bucket_count: 0, policy_attachment_count: 0 }
 const backend = { id: 'backend-id', name: 'primary', azure_account: 'account', auth_mode: 'managed_identity' as const, managed_identity_client_id: null, user_delegation_sas_enabled: false, has_secret_ref: false, region_label: null, enabled: false }
 
 describe('configuration readiness', () => {

@@ -19,6 +19,10 @@ export const collections = {
     count: 1,
     items: [{ credential_id: fixtureId, s3_access_key: 'fixture-access', azure_account: 'fixtureaccount', access_mode: 'direct', use_managed_identity: true, versioning_enabled: false, default_backend_id: null }],
   } satisfies components['schemas']['CredentialListResponse'],
+  '/admin/ui/identities': {
+    count: 1,
+    items: [{ credential_id: fixtureId, s3_access_key: 'fixture-access', azure_account: 'fixtureaccount', access_mode: 'direct', use_managed_identity: true, versioning_enabled: false, default_backend_id: null, enabled: true, virtual_bucket_count: 1, policy_attachment_count: 1 }],
+  } satisfies components['schemas']['IdentityProjectionListResponse'],
   '/admin/policies': {
     count: 1,
     items: [{ id: fixtureId, name: 'fixture-policy', document: { Version: '2012-10-17', Statement: [] }, description: null, created_at: timestamp, updated_at: timestamp }],
@@ -36,6 +40,7 @@ export const collections = {
 
 export const emptyCollections = {
   '/admin/credentials': { count: 0, items: [] },
+  '/admin/ui/identities': { count: 0, items: [] },
   '/admin/policies': { count: 0, items: [] },
   '/admin/backends': [],
   '/admin/virtual-buckets': [],
@@ -48,7 +53,7 @@ export async function mockControlApi(page: Page, empty = false) {
     const request = route.request()
     if (request.isNavigationRequest()) return route.continue()
     const path = new URL(request.url()).pathname
-    if (path.startsWith('/admin/ui/')) return route.continue()
+    if (path.startsWith('/admin/ui/') && path !== '/admin/ui/identities') return route.continue()
     if (request.method() === 'GET' && path in collections) {
       const selected = empty ? emptyCollections : collections
       return route.fulfill({ json: selected[path as keyof typeof collections] })

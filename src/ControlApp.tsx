@@ -8,6 +8,7 @@ import AdminKeysPage from './features/operations/AdminKeysPage'
 import AuditPage from './features/operations/AuditPage'
 import HealthPage from './features/operations/HealthPage'
 import ResourcePage from './features/resources/ResourcePage'
+import IdentitiesPage from './features/identities/IdentitiesPage'
 import '@radix-ui/themes/styles.css'
 import '@fontsource/manrope/latin-400.css'
 import '@fontsource/manrope/latin-500.css'
@@ -25,7 +26,8 @@ export default function ControlApp() {
     <Route path="/login" element={<LoginPage />} />
     <Route element={<Shell />}>
       <Route index element={<OverviewPage />} />
-      {['credentials', 'buckets', 'backends', 'policies'].map(path => <Route key={path} path={path} element={<ResourcePage key={path} resourceName={path} />} />)}
+      <Route path="credentials" element={<IdentitiesPage />} />
+      {['buckets', 'backends', 'policies'].map(path => <Route key={path} path={path} element={<ResourcePage key={path} resourceName={path} />} />)}
       <Route path="keys" element={<AdminKeysPage />} />
       <Route path="audit" element={<AuditPage />} />
       <Route path="health" element={<HealthPage />} />
