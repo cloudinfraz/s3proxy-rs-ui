@@ -29,7 +29,7 @@ const resources: Record<string, ResourceConfig> = {
 const navigation = [['/', 'Overview', CircleGauge], ['/credentials', 'Credentials', KeyRound], ['/buckets', 'Virtual buckets', Box], ['/backends', 'Backends', Database], ['/policies', 'Policies', ShieldCheck], ['/keys', 'Admin keys', FileKey], ['/audit', 'Audit', ScrollText], ['/health', 'Health', Activity]] as const
 
 export default function ControlApp() {
-  return <Theme accentColor="jade" grayColor="sand" radius="small"><QueryClientProvider client={queryClient}><BrowserRouter basename="/admin/ui"><Routes><Route path="/login" element={<LoginPage />} /><Route path="/*" element={<AuthenticatedApp />} /></Routes></BrowserRouter></QueryClientProvider></Theme>
+  return <Theme accentColor="jade" grayColor="sand" radius="small"><QueryClientProvider client={queryClient}><BrowserRouter basename={import.meta.env.BASE_URL}><Routes><Route path="/login" element={<LoginPage />} /><Route path="/*" element={<AuthenticatedApp />} /></Routes></BrowserRouter></QueryClientProvider></Theme>
 }
 
 function AuthenticatedApp() {

@@ -23,9 +23,10 @@ export function normalizeResourceRows<P extends ResourceListPath>(
   response: ResourceListResponses[P],
 ): ResourceRow[] {
   const rows = path === '/admin/credentials' || path === '/admin/policies'
-    ? (response as CredentialList | PolicyList).items ?? []
+    ? (response as CredentialList | PolicyList).items
     : response as VirtualBucketList | StorageBackendList | AdminApiKeyList
 
+  if (!Array.isArray(rows)) throw new Error('Invalid resource collection response')
   return rows.map(row => ({ ...row }))
 }
 

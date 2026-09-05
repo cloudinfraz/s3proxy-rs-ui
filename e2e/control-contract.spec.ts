@@ -42,3 +42,14 @@ test('UI068-02 failed collection reads show an error and recover on reload', asy
   await expect(page.getByText('Control service unavailable', { exact: true })).toHaveCount(0)
   verifyRequests()
 })
+
+test('UI068-06 malformed envelopes fail visibly instead of appearing empty', async ({ page }) => {
+  await mockControlApi(page)
+  await page.route('**/admin/credentials', route => route.fulfill({ json: { count: 0 } }))
+  await page.goto('/admin/ui/credentials')
+  await expect(page.getByText('Invalid resource collection response', { exact: true })).toBeVisible()
+  await expect(page.getByText('No records', { exact: true })).toHaveCount(0)
+  await page.unroute('**/admin/credentials')
+  await page.reload()
+  await expect(page.getByRole('cell', { name: 'fixture-access', exact: true })).toBeVisible()
+})
