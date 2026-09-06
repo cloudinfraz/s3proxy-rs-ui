@@ -77,6 +77,7 @@ export async function mockControlApi(page: Page, empty = false) {
     }
     if (path === '/admin/capabilities' && request.method() === 'GET') return route.fulfill({ json: capabilities })
     if (path === '/admin/roles' && request.method() === 'GET') return route.fulfill({ json: { count: 0, items: [] } satisfies components['schemas']['IamRoleListResponse'] })
+    if (path === '/admin/ui/roles' && request.method() === 'GET') return route.fulfill({ json: { items: [], next_after_id: null, limits: { min_duration_seconds: 3600, max_duration_seconds: 43200, max_retirement_batch: 1000, retained_count_cap: 1000, default_page_size: 100, max_page_size: 200 } } satisfies components['schemas']['AdminIamRolePage'] })
     if (path === '/admin/audit' && request.method() === 'GET') return route.fulfill({ json: [] satisfies components['schemas']['AuditEventList'] })
     unexpected.push(`${request.method()} ${path}`)
     return route.abort()

@@ -4,6 +4,146 @@
  */
 
 export interface paths {
+    "/admin/ui/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listAdminRoles"];
+        put?: never;
+        post: operations["createAdminRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/ui/role-policies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listRolePolicyOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/ui/roles/{role_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["getAdminRole"];
+        put?: never;
+        post?: never;
+        delete: operations["deleteReviewedRole"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/ui/roles/{role_id}/trust": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["replaceReviewedRoleTrust"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/ui/roles/{role_id}/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["updateReviewedRoleSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/ui/roles/{role_id}/enabled": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["setReviewedRoleEnabled"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/ui/roles/{role_id}/retire-sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["retireReviewedRoleSessions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/ui/roles/{role_id}/policies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["attachReviewedRolePolicy"];
+        delete: operations["detachReviewedRolePolicy"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/ui/virtual-buckets": {
         parameters: {
             query?: never;
@@ -691,6 +831,117 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AdminIamRole: {
+            /** Format: uuid */
+            id: string;
+            role_id: string;
+            account_id: string;
+            role_path: string;
+            role_name: string;
+            role_arn: string;
+            /** Format: uuid */
+            resource_credential_id: string;
+            max_session_duration_seconds: number;
+            enabled: boolean;
+            lifecycle_revision: number;
+            trust_revision: number;
+            attachment_revision: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        IamRoleLimits: {
+            /** @constant */
+            min_duration_seconds: 3600;
+            /** @constant */
+            max_duration_seconds: 43200;
+            /** @constant */
+            max_retirement_batch: 1000;
+            /** @constant */
+            retained_count_cap: 1000;
+            /** @constant */
+            default_page_size: 100;
+            /** @constant */
+            max_page_size: 200;
+        };
+        AdminIamRolePage: {
+            items: components["schemas"]["AdminIamRole"][];
+            /** Format: uuid */
+            next_after_id: string | null;
+            limits: components["schemas"]["IamRoleLimits"];
+        };
+        TrustConditionSummary: {
+            operator: string;
+            key: string;
+        };
+        TrustStatementSummary: {
+            /** @enum {string} */
+            effect: "Allow" | "Deny";
+            principals: string[];
+            conditions: components["schemas"]["TrustConditionSummary"][];
+        };
+        TrustPolicySummary: {
+            statements: components["schemas"]["TrustStatementSummary"][];
+        };
+        RetainedRoleSessions: {
+            count: number;
+            truncated: boolean;
+            deletion_eligible: boolean;
+        };
+        AdminIamRolePolicy: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            revision: number;
+        };
+        AdminIamRolePolicyPage: {
+            items: components["schemas"]["AdminIamRolePolicy"][];
+            /** Format: uuid */
+            next_after_id: string | null;
+        };
+        AdminIamRoleDetail: {
+            role: components["schemas"]["AdminIamRole"];
+            trust: components["schemas"]["TrustPolicySummary"];
+            policies: components["schemas"]["AdminIamRolePolicy"][];
+            retained_sessions: components["schemas"]["RetainedRoleSessions"];
+            impact_token: string;
+            limits: components["schemas"]["IamRoleLimits"];
+        };
+        AdminIamRoleMutationResult: {
+            detail: components["schemas"]["AdminIamRoleDetail"] | null;
+            retired_sessions: number | null;
+            deleted: boolean;
+        };
+        ReviewRoleTrustRequest: {
+            expected_impact_token: string;
+            change: components["schemas"]["UpdateIamRoleTrustRequest"];
+            acknowledge_condition_replacement: boolean;
+        };
+        ReviewRoleSettingsRequest: {
+            expected_impact_token: string;
+            change: components["schemas"]["UpdateIamRoleSettingsRequest"];
+        };
+        ReviewRoleEnabledRequest: {
+            expected_impact_token: string;
+            change: components["schemas"]["SetIamRoleEnabledRequest"];
+        };
+        ReviewRoleRetirementRequest: {
+            expected_impact_token: string;
+            change: components["schemas"]["RetireIamRoleSessionsRequest"];
+        };
+        ReviewedIamRolePolicy: {
+            /** Format: uuid */
+            policy_id: string;
+            expected_policy_revision: number;
+        };
+        ReviewRolePolicyRequest: {
+            expected_impact_token: string;
+            change: components["schemas"]["ReviewedIamRolePolicy"];
+        };
+        ReviewRoleDeleteRequest: {
+            expected_impact_token: string;
+        };
         VirtualMappingSummary: {
             /** Format: uuid */
             id: string;
@@ -1397,6 +1648,320 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    listAdminRoles: {
+        parameters: {
+            query?: {
+                after_id?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Safe bounded role page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminIamRolePage"];
+                };
+            };
+            400: components["responses"]["ControlError"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    createAdminRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateIamRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description Created role without persisted trust values */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminIamRoleDetail"];
+                };
+            };
+            400: components["responses"]["ControlError"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    listRolePolicyOptions: {
+        parameters: {
+            query?: {
+                after_id?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Safe policy selection metadata */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminIamRolePolicyPage"];
+                };
+            };
+            400: components["responses"]["ControlError"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    getAdminRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authoritative role review */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminIamRoleDetail"];
+                };
+            };
+            400: components["responses"]["ControlError"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    deleteReviewedRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewRoleDeleteRequest"];
+            };
+        };
+        responses: {
+            /** @description Role deleted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminIamRoleMutationResult"];
+                };
+            };
+            400: components["responses"]["ControlError"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["ControlError"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    replaceReviewedRoleTrust: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewRoleTrustRequest"];
+            };
+        };
+        responses: {
+            /** @description Trust replaced for future issuance */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminIamRoleMutationResult"];
+                };
+            };
+            400: components["responses"]["ControlError"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["ControlError"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    updateReviewedRoleSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewRoleSettingsRequest"];
+            };
+        };
+        responses: {
+            /** @description Duration updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminIamRoleMutationResult"];
+                };
+            };
+            400: components["responses"]["ControlError"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["ControlError"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    setReviewedRoleEnabled: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewRoleEnabledRequest"];
+            };
+        };
+        responses: {
+            /** @description Lifecycle updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminIamRoleMutationResult"];
+                };
+            };
+            400: components["responses"]["ControlError"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["ControlError"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    retireReviewedRoleSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewRoleRetirementRequest"];
+            };
+        };
+        responses: {
+            /** @description One bounded retirement batch */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminIamRoleMutationResult"];
+                };
+            };
+            400: components["responses"]["ControlError"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["ControlError"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    attachReviewedRolePolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewRolePolicyRequest"];
+            };
+        };
+        responses: {
+            /** @description Policy attached */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminIamRoleMutationResult"];
+                };
+            };
+            400: components["responses"]["ControlError"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["ControlError"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    detachReviewedRolePolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewRolePolicyRequest"];
+            };
+        };
+        responses: {
+            /** @description Policy detached */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminIamRoleMutationResult"];
+                };
+            };
+            400: components["responses"]["ControlError"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["ControlError"];
+            default: components["responses"]["ControlError"];
+        };
+    };
     listVirtualMappings: {
         parameters: {
             query?: {

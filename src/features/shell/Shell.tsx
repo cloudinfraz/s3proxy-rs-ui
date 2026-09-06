@@ -12,7 +12,7 @@ const groups = [
   { label: 'Overview', links: [{ to: '/', label: 'Overview', icon: CircleGauge }] },
   { label: 'Access', links: [{ to: '/credentials', label: 'S3 identities', icon: KeyRound }] },
   { label: 'Storage', links: [{ to: '/backends', label: 'Azure backends', icon: Database }, { to: '/buckets', label: 'Bucket routing', icon: Box }] },
-  { label: 'Authorization', links: [{ to: '/policies', label: 'Policies', icon: ShieldCheck }] },
+  { label: 'Authorization', links: [{ to: '/policies', label: 'Policies', icon: ShieldCheck }, { to: '/iam-roles', label: 'IAM roles', icon: ShieldCheck }] },
   { label: 'Operations', links: [{ to: '/keys', label: 'Admin keys', icon: FileKey }, { to: '/audit', label: 'Audit', icon: ScrollText }, { to: '/health', label: 'Health', icon: Activity }] },
 ]
 

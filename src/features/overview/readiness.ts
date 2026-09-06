@@ -7,7 +7,7 @@ export type ReadinessInput = {
   buckets?: Schema['VirtualBucketResponse'][]
   backends?: Schema['StorageBackendResponse'][]
   keys?: Schema['AdminApiKeySummary'][]
-  roles?: Schema['IamRoleResponse'][]
+  roles?: Schema['AdminIamRole'][]
   now: number
 }
 
