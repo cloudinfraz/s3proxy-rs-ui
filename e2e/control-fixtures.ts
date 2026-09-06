@@ -32,7 +32,7 @@ export const collections = {
   ] satisfies components['schemas']['StorageBackendList'],
   '/admin/ui/backends': {
     count: 1,
-    items: [{ id: fixtureId, name: 'fixture-backend', azure_account: 'fixtureaccount', auth_mode: 'managed_identity', managed_identity_client_id: null, user_delegation_sas_enabled: false, has_secret_ref: false, region_label: null, enabled: true, credential_default_count: 2, virtual_bucket_count: 3 }],
+    items: [{ id: fixtureId, name: 'fixture-backend', azure_account: 'fixtureaccount', auth_mode: 'managed_identity', managed_identity_client_id: null, user_delegation_sas_enabled: false, has_secret_ref: false, region_label: null, enabled: true, credential_default_count: 2, virtual_bucket_count: 3, impact_token: '0123456789abcdef0123456789abcdef' }],
   } satisfies components['schemas']['StorageBackendProjectionListResponse'],
   '/admin/virtual-buckets': [
     { id: fixtureId, virtual_bucket_name: 'fixture-bucket', azure_container: 'fixturecontainer', credential_id: fixtureId, backend_id: null, endpoint_prefix: null, enabled: true },

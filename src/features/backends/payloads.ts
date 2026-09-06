@@ -34,3 +34,10 @@ export function requiresImpactConfirmation(
     || current.managed_identity_client_id !== next.managed_identity_client_id
     || (current.enabled && !next.enabled)
 }
+
+export function reviewedBackendPayload(
+  payload: Schema['StorageBackendRequest'],
+  backend: Schema['StorageBackendProjection'],
+): Schema['StorageBackendUpdateRequest'] {
+  return { ...payload, expected_impact_token: backend.impact_token }
+}

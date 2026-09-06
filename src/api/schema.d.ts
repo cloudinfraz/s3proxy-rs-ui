@@ -857,6 +857,21 @@ export interface components {
             enabled: boolean;
             credential_default_count: number;
             virtual_bucket_count: number;
+            impact_token: string;
+        };
+        StorageBackendUpdateRequest: {
+            name: string;
+            azure_account: string;
+            auth_mode: components["schemas"]["BackendAuthMode"];
+            /** Format: uuid */
+            managed_identity_client_id?: string | null;
+            secret_ref?: string | null;
+            /** @default false */
+            user_delegation_sas_enabled: boolean;
+            region_label?: string | null;
+            /** @default true */
+            enabled: boolean;
+            expected_impact_token: string;
         };
         StorageBackendProjectionListResponse: {
             count: number;
@@ -1343,7 +1358,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["StorageBackendRequest"];
+                "application/json": components["schemas"]["StorageBackendUpdateRequest"];
             };
         };
         responses: {
@@ -1358,6 +1373,7 @@ export interface operations {
             };
             400: components["responses"]["ValidationRejected"];
             403: components["responses"]["Forbidden"];
+            409: components["responses"]["ControlError"];
             413: components["responses"]["ValidationRejected"];
             415: components["responses"]["ValidationRejected"];
             422: components["responses"]["ValidationRejected"];
