@@ -30,6 +30,10 @@ export const collections = {
   '/admin/backends': [
     { id: fixtureId, name: 'fixture-backend', azure_account: 'fixtureaccount', auth_mode: 'managed_identity', managed_identity_client_id: null, user_delegation_sas_enabled: false, has_secret_ref: false, region_label: null, enabled: true },
   ] satisfies components['schemas']['StorageBackendList'],
+  '/admin/ui/backends': {
+    count: 1,
+    items: [{ id: fixtureId, name: 'fixture-backend', azure_account: 'fixtureaccount', auth_mode: 'managed_identity', managed_identity_client_id: null, user_delegation_sas_enabled: false, has_secret_ref: false, region_label: null, enabled: true, credential_default_count: 2, virtual_bucket_count: 3 }],
+  } satisfies components['schemas']['StorageBackendProjectionListResponse'],
   '/admin/virtual-buckets': [
     { id: fixtureId, virtual_bucket_name: 'fixture-bucket', azure_container: 'fixturecontainer', credential_id: fixtureId, backend_id: null, endpoint_prefix: null, enabled: true },
   ] satisfies components['schemas']['VirtualBucketList'],
@@ -43,6 +47,7 @@ export const emptyCollections = {
   '/admin/ui/identities': { count: 0, items: [] },
   '/admin/policies': { count: 0, items: [] },
   '/admin/backends': [],
+  '/admin/ui/backends': { count: 0, items: [] },
   '/admin/virtual-buckets': [],
   '/admin/api-keys': [],
 } satisfies { [Path in keyof typeof collections]: (typeof collections)[Path] }
@@ -52,8 +57,8 @@ export async function mockControlApi(page: Page, empty = false) {
   await page.route('**/admin/**', async route => {
     const request = route.request()
     if (request.isNavigationRequest()) return route.continue()
+    if (!['fetch', 'xhr'].includes(request.resourceType())) return route.continue()
     const path = new URL(request.url()).pathname
-    if (path.startsWith('/admin/ui/') && path !== '/admin/ui/identities') return route.continue()
     if (request.method() === 'GET' && path in collections) {
       const selected = empty ? emptyCollections : collections
       return route.fulfill({ json: selected[path as keyof typeof collections] })

@@ -4,6 +4,40 @@
  */
 
 export interface paths {
+    "/admin/ui/backends": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listBackendProjections"];
+        put?: never;
+        post: operations["createBackendForUi"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/ui/backends/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: components["parameters"]["Name"];
+            };
+            cookie?: never;
+        };
+        get: operations["getBackendProjection"];
+        put: operations["updateBackendForUi"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -809,6 +843,25 @@ export interface components {
             enabled: boolean;
         };
         StorageBackendList: components["schemas"]["StorageBackendResponse"][];
+        StorageBackendProjection: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            azure_account: string;
+            auth_mode: components["schemas"]["BackendAuthMode"];
+            /** Format: uuid */
+            managed_identity_client_id: string | null;
+            user_delegation_sas_enabled: boolean;
+            has_secret_ref: boolean;
+            region_label: string | null;
+            enabled: boolean;
+            credential_default_count: number;
+            virtual_bucket_count: number;
+        };
+        StorageBackendProjectionListResponse: {
+            count: number;
+            items: components["schemas"]["StorageBackendProjection"][];
+        };
         CreateVirtualBucketRequest: {
             virtual_bucket_name: string;
             azure_container: string;
@@ -1203,6 +1256,114 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    listBackendProjections: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Backend metadata for the control UI */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageBackendProjectionListResponse"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    createBackendForUi: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StorageBackendRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageBackendResponse"];
+                };
+            };
+            400: components["responses"]["ValidationRejected"];
+            403: components["responses"]["Forbidden"];
+            413: components["responses"]["ValidationRejected"];
+            415: components["responses"]["ValidationRejected"];
+            422: components["responses"]["ValidationRejected"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    getBackendProjection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: components["parameters"]["Name"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Backend metadata for the control UI */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageBackendProjection"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    updateBackendForUi: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: components["parameters"]["Name"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StorageBackendRequest"];
+            };
+        };
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageBackendResponse"];
+                };
+            };
+            400: components["responses"]["ValidationRejected"];
+            403: components["responses"]["Forbidden"];
+            413: components["responses"]["ValidationRejected"];
+            415: components["responses"]["ValidationRejected"];
+            422: components["responses"]["ValidationRejected"];
+            default: components["responses"]["ControlError"];
+        };
+    };
     publicHealth: {
         parameters: {
             query?: never;

@@ -22,7 +22,7 @@ export const controlQueries = {
   identities: queryOptions({ queryKey: controlKeys.list('identities'), queryFn: async () => envelopeRows(await api<Schema['IdentityProjectionListResponse']>('/admin/ui/identities')) }),
   policies: queryOptions({ queryKey: controlKeys.list('policies'), queryFn: async () => envelopeRows(await api<Schema['PolicyListResponse']>('/admin/policies')) }),
   buckets: queryOptions({ queryKey: controlKeys.list('buckets'), queryFn: async () => arrayRows(await api<Schema['VirtualBucketList']>('/admin/virtual-buckets')) }),
-  backends: queryOptions({ queryKey: controlKeys.list('backends'), queryFn: async () => arrayRows(await api<Schema['StorageBackendList']>('/admin/backends')) }),
+  backends: queryOptions({ queryKey: controlKeys.list('backends'), queryFn: async () => envelopeRows(await api<Schema['StorageBackendProjectionListResponse']>('/admin/ui/backends')) }),
   keys: queryOptions({ queryKey: controlKeys.list('keys'), queryFn: async () => arrayRows(await api<Schema['AdminApiKeyList']>('/admin/api-keys')) }),
   roles: queryOptions({ queryKey: controlKeys.list('roles'), queryFn: async () => { const response = await api<Schema['IamRoleListResponse']>('/admin/roles'); envelopeRows(response); return response } }),
   capabilities: queryOptions({ queryKey: controlKeys.capabilities, queryFn: () => api<Schema['ControlCapabilities']>('/admin/capabilities') }),
