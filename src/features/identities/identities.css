@@ -1,4 +1,5 @@
-.operation-form select {
+.operation-form select,
+.identity-view-filter select {
   width: 100%;
   border: 1px solid #bbc5bf;
   background: #fff;
@@ -7,6 +8,11 @@
   outline: none;
   font: inherit;
   letter-spacing: 0;
+}
+
+.identity-view-filter {
+  width: min(240px, 100%);
+  margin-bottom: 18px;
 }
 
 .operation-form select:focus {

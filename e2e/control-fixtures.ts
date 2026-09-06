@@ -15,6 +15,10 @@ export const health = {
 } satisfies components['schemas']['AdminHealthResponse']
 
 export const collections = {
+  '/admin/ui/virtual-buckets': {
+    items: [{ id: fixtureId, virtual_bucket_name: 'fixture-bucket', azure_container: 'fixturecontainer', credential_id: fixtureId, backend_id: null, endpoint_prefix: null, enabled: true, created_at: timestamp, updated_at: timestamp }],
+    next_after_id: null,
+  } satisfies components['schemas']['VirtualMappingPage'],
   '/admin/credentials': {
     count: 1,
     items: [{ credential_id: fixtureId, s3_access_key: 'fixture-access', azure_account: 'fixtureaccount', access_mode: 'direct', use_managed_identity: true, versioning_enabled: false, default_backend_id: null }],
@@ -43,6 +47,7 @@ export const collections = {
 }
 
 export const emptyCollections = {
+  '/admin/ui/virtual-buckets': { items: [], next_after_id: null },
   '/admin/credentials': { count: 0, items: [] },
   '/admin/ui/identities': { count: 0, items: [] },
   '/admin/policies': { count: 0, items: [] },

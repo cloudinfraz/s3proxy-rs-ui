@@ -4,6 +4,58 @@
  */
 
 export interface paths {
+    "/admin/ui/virtual-buckets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listVirtualMappings"];
+        put?: never;
+        post: operations["createVirtualMapping"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/ui/virtual-buckets/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["getVirtualMapping"];
+        put: operations["updateVirtualMapping"];
+        post?: never;
+        delete: operations["deleteVirtualMapping"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/ui/mapping-backends/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["reviewMappingBackend"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/ui/backends": {
         parameters: {
             query?: never;
@@ -639,6 +691,80 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        VirtualMappingSummary: {
+            /** Format: uuid */
+            id: string;
+            virtual_bucket_name: string;
+            azure_container: string;
+            /** Format: uuid */
+            credential_id: string;
+            /** Format: uuid */
+            backend_id: string | null;
+            endpoint_prefix: string | null;
+            enabled: boolean;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        AdminVirtualMapping: {
+            /** Format: uuid */
+            id: string;
+            virtual_bucket_name: string;
+            azure_container: string;
+            /** Format: uuid */
+            credential_id: string;
+            /** Format: uuid */
+            backend_id: string | null;
+            endpoint_prefix: string | null;
+            enabled: boolean;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            credential_default_backend_id: string | null;
+            impact_token: string;
+        };
+        VirtualMappingPage: {
+            items: components["schemas"]["VirtualMappingSummary"][];
+            /** Format: uuid */
+            next_after_id: string | null;
+        };
+        CreateVirtualMapping: {
+            /** @description Periods and consecutive hyphens are not allowed. */
+            virtual_bucket_name: string;
+            azure_container: string;
+            /** Format: uuid */
+            credential_id: string;
+            /** Format: uuid */
+            backend_id?: string | null;
+            expected_backend_revision?: number | null;
+            endpoint_prefix?: string | null;
+        };
+        UpdateVirtualMapping: {
+            expected_impact_token: string;
+            expected_backend_revision?: number | null;
+            azure_container?: string;
+            /**
+             * Format: uuid
+             * @description Omitted preserves; null inherits; UUID selects a reviewed backend.
+             */
+            backend_id?: string | null;
+            endpoint_prefix?: string | null;
+            enabled?: boolean;
+        };
+        DeleteVirtualMapping: {
+            expected_impact_token: string;
+        };
+        VirtualMappingBackendReview: {
+            /** Format: uuid */
+            id: string;
+            azure_account: string;
+            auth_mode: string;
+            enabled: boolean;
+            revision: number;
+        };
         Error: {
             Code: string;
             Message: string;
@@ -1271,6 +1397,175 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    listVirtualMappings: {
+        parameters: {
+            query?: {
+                after_id?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bounded mapping page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VirtualMappingPage"];
+                };
+            };
+            400: components["responses"]["ControlError"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    createVirtualMapping: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateVirtualMapping"];
+            };
+        };
+        responses: {
+            /** @description Mapping created without modifying an existing mapping or Azure objects */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminVirtualMapping"];
+                };
+            };
+            400: components["responses"]["ControlError"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["ControlError"];
+            503: components["responses"]["ControlError"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    getVirtualMapping: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authoritative mapping review */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminVirtualMapping"];
+                };
+            };
+            400: components["responses"]["ValidationRejected"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["ControlError"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    updateVirtualMapping: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateVirtualMapping"];
+            };
+        };
+        responses: {
+            /** @description Reviewed metadata update; no object movement */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminVirtualMapping"];
+                };
+            };
+            400: components["responses"]["ControlError"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["ControlError"];
+            409: components["responses"]["ControlError"];
+            503: components["responses"]["ControlError"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    deleteVirtualMapping: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeleteVirtualMapping"];
+            };
+        };
+        responses: {
+            /** @description Mapping and scoped policy removed; Azure containers, objects and versions retained */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["ControlError"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["ControlError"];
+            409: components["responses"]["ControlError"];
+            503: components["responses"]["ControlError"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    reviewMappingBackend: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Point backend revision review without reference enumeration */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VirtualMappingBackendReview"];
+                };
+            };
+            400: components["responses"]["ValidationRejected"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["ControlError"];
+            default: components["responses"]["ControlError"];
+        };
+    };
     listBackendProjections: {
         parameters: {
             query?: never;

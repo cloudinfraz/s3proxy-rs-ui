@@ -7,6 +7,7 @@ import { controlKeys, invalidateControl, type ControlResource } from '../../api/
 import { DataTable, ErrorBanner, Modal, Page } from '../../components/control'
 import { display } from '../../components/display'
 import { completionGuard } from '../operations/state'
+import { virtualBucketAliasError } from './validation'
 
 type RecordValue = Record<string, unknown>
 type Field = { key: string; label: string; type?: string; required?: boolean }
@@ -35,6 +36,10 @@ export default function ResourcePage({ resourceName }: { resourceName: string })
     const form = new FormData(event.currentTarget)
     try { for (const field of config.fields) { const value = form.get(field.key); if (value) body[field.key] = field.key === 'document' ? JSON.parse(String(value)) : value } }
     catch { setError(new Error('Policy document must be valid JSON')); return }
+    if (config.resource === 'buckets') {
+      const aliasError = virtualBucketAliasError(body.virtual_bucket_name)
+      if (aliasError) { setError(new Error(aliasError)); return }
+    }
     const request = guard.current.begin()
     setPending(true)
     setError(null)

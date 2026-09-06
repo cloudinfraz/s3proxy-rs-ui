@@ -1,0 +1,5 @@
+.mapping-pagination { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 16px; }
+.mapping-detail { display: grid; gap: 6px; overflow-wrap: anywhere; }
+.mapping-detail dt { font-size: 12px; color: #536159; margin-top: 8px; }
+.mapping-detail dd { margin: 0; font-size: 13px; }
+.mapping-target { font-size: 13px; overflow-wrap: anywhere; }
