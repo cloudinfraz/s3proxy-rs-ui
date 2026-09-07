@@ -1,6 +1,5 @@
-import { Component, useEffect, useState, type ErrorInfo, type ReactNode } from 'react'
-import { AlertTriangle, X } from 'lucide-react'
-import { addApiErrorInterceptor, type ApiError } from '../api/client'
+import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { AlertTriangle } from 'lucide-react'
 
 type ErrorBoundaryProps = { children: ReactNode }
 type ErrorBoundaryState = { failed: boolean }
@@ -24,21 +23,6 @@ class AppErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState>
   }
 }
 
-function shouldPresentGlobally(error: ApiError) {
-  return error.status === 0 || error.status >= 500
-}
-
-function ApiFailureNotice() {
-  const [error, setError] = useState<ApiError | null>(null)
-
-  useEffect(() => addApiErrorInterceptor(nextError => {
-    if (shouldPresentGlobally(nextError)) setError(nextError)
-  }), [])
-
-  if (!error) return null
-  return <div className="global-error-notice" role="alert"><AlertTriangle size={18} /><span>{error.message}</span><button className="icon-button" aria-label="Dismiss service error" title="Dismiss" onClick={() => setError(null)}><X size={17} /></button></div>
-}
-
 export default function AppErrorLayer({ children }: ErrorBoundaryProps) {
-  return <AppErrorBoundary><ApiFailureNotice />{children}</AppErrorBoundary>
+  return <AppErrorBoundary>{children}</AppErrorBoundary>
 }

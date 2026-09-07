@@ -323,25 +323,6 @@ td {
   font-size: 13px;
 }
 
-.global-error-notice {
-  position: fixed;
-  top: 16px;
-  right: 16px;
-  z-index: 100;
-  width: min(420px, calc(100vw - 32px));
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 10px;
-  padding: 11px 12px;
-  border: 1px solid #f0a69d;
-  border-left: 3px solid #b42318;
-  background: #fff;
-  color: #7a271a;
-  box-shadow: 0 12px 30px rgba(63, 20, 14, .16);
-  font-size: 13px;
-}
-
 .fatal-error {
   min-height: 100vh;
   display: grid;
