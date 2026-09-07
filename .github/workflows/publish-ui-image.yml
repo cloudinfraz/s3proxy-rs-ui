@@ -2,6 +2,29 @@ name: Publish UI image
 run-name: "Publish UI image to ${{ inputs.release_environment }}"
 
 on:
+  workflow_call:
+    inputs:
+      release_environment:
+        description: Protected release environment
+        required: true
+        type: string
+      deploy_to_aks:
+        description: Deploy the published image to AKS
+        required: false
+        type: boolean
+        default: false
+      network_policy_enabled:
+        description: Render the UI NetworkPolicy
+        required: false
+        type: boolean
+        default: false
+    outputs:
+      ui_digest:
+        description: Published UI image digest
+        value: ${{ jobs.publish.outputs.ui_digest }}
+      ui_revision:
+        description: Source revision embedded in the UI image
+        value: ${{ jobs.publish.outputs.ui_revision }}
   workflow_dispatch:
     inputs:
       release_environment:
@@ -10,6 +33,16 @@ on:
         type: choice
         options: [staging, production]
         default: staging
+      deploy_to_aks:
+        description: Deploy the published image to AKS
+        required: true
+        type: boolean
+        default: true
+      network_policy_enabled:
+        description: Render the UI NetworkPolicy
+        required: true
+        type: boolean
+        default: false
 
 concurrency:
   group: publish-ui-image-${{ inputs.release_environment }}
@@ -110,3 +143,18 @@ jobs:
           LOGIN_SERVER: ${{ steps.acr.outputs.login_server }}
           UI_DIGEST: ${{ steps.ui.outputs.digest }}
         run: cosign sign --yes "${LOGIN_SERVER}/s3proxy-ui@${UI_DIGEST}"
+
+  deploy:
+    name: Deploy signed UI to ${{ inputs.release_environment }} AKS
+    if: inputs.deploy_to_aks
+    needs: publish
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/deploy-ui.yml
+    with:
+      deployment_environment: ${{ inputs.release_environment }}
+      ui_digest: ${{ needs.publish.outputs.ui_digest }}
+      ui_revision: ${{ needs.publish.outputs.ui_revision }}
+      network_policy_enabled: ${{ inputs.network_policy_enabled }}
+    secrets: inherit

@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: s3proxy-ui
+  labels:
+    app.kubernetes.io/name: s3proxy-rs
+    app.kubernetes.io/component: ui
+    app.kubernetes.io/part-of: s3proxy
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: s3proxy-rs
+    app.kubernetes.io/component: ui
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

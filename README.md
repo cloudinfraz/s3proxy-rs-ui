@@ -61,11 +61,31 @@ The runtime image:
 The fixed upstream DNS name expects the UI to run in the same Kubernetes
 namespace as Service `s3proxy-control`.
 
+### Staging Publication and Deployment
+
+Run **Publish UI image** with the `staging` environment. The workflow builds,
+scans, signs, and publishes an immutable image, then deploys it to AKS by
+default. **Deploy UI** can also deploy an existing digest independently.
+
+The protected `staging` environment requires `AZURE_CLIENT_ID` and
+`AZURE_TENANT_ID` secrets plus these variables:
+
+- `S3PROXY_ACR_NAME`
+- `S3PROXY_AKS_NAME`
+- `S3PROXY_AKS_RG`
+- `S3PROXY_AZURE_SUBSCRIPTION_ID`
+- `S3PROXY_CURL_IMAGE` (digest-pinned)
+
+The Azure identity must trust the GitHub OIDC subject
+`repo:cloudinfraz/s3proxy-rs-ui:environment:staging`. Production requires an
+equivalent environment-specific federated credential and protected configuration.
+
 ## Tests
 
 ```bash
 npm run lint
 npm test
+npm run test:deploy
 npm run build
 npm run test:e2e
 ```

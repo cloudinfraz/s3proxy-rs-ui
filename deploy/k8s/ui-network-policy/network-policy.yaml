@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ui-admin
+  labels:
+    app.kubernetes.io/name: s3proxy-rs
+    app.kubernetes.io/component: ui
+    app.kubernetes.io/part-of: s3proxy
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: s3proxy-rs
+      app.kubernetes.io/component: ui
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              s3proxy.rs/access-admin: "true"
+        - podSelector:
+            matchLabels:
+              s3proxy.rs/access-ui: "true"
+      ports:
+        - protocol: TCP
+          port: 8080

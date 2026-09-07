@@ -49,6 +49,7 @@ jobs:
         run: |
           npm run lint
           npm test
+          npm run test:deploy
           npm run build
 
       - name: Install Chromium
@@ -105,6 +106,9 @@ jobs:
           exit-code: 1
 
       - name: Generate local SBOM
+        run: mkdir -p sbom
+
+      - name: Export local SBOM
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
         with:
           image: s3proxy-ui:ci

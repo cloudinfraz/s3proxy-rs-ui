@@ -1,0 +1,183 @@
+name: Deploy UI
+
+on:
+  workflow_call:
+    inputs:
+      deployment_environment:
+        description: Protected GitHub environment
+        required: true
+        type: string
+      ui_digest:
+        description: Immutable s3proxy-ui sha256 digest
+        required: true
+        type: string
+      ui_revision:
+        description: Source revision embedded in the immutable UI image
+        required: true
+        type: string
+      network_policy_enabled:
+        description: Render the UI NetworkPolicy
+        required: false
+        type: boolean
+        default: false
+  workflow_dispatch:
+    inputs:
+      deployment_environment:
+        description: Protected GitHub environment
+        required: true
+        type: choice
+        options: [staging, production]
+        default: staging
+      ui_digest:
+        description: Immutable s3proxy-ui sha256 digest
+        required: true
+        type: string
+      ui_revision:
+        description: Source revision embedded in the immutable UI image
+        required: true
+        type: string
+      network_policy_enabled:
+        description: Render the UI NetworkPolicy
+        required: true
+        type: boolean
+        default: false
+
+concurrency:
+  group: deploy-ui-${{ inputs.deployment_environment }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: ${{ inputs.deployment_environment }}
+    env:
+      ACR_NAME: ${{ vars.S3PROXY_ACR_NAME }}
+      AKS_NAME: ${{ vars.S3PROXY_AKS_NAME }}
+      AKS_RG: ${{ vars.S3PROXY_AKS_RG }}
+      CURL_IMAGE: ${{ vars.S3PROXY_CURL_IMAGE }}
+      UI_DIGEST: ${{ inputs.ui_digest }}
+      UI_REVISION: ${{ inputs.ui_revision }}
+      NETWORK_POLICY_ENABLED: ${{ inputs.network_policy_enabled }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate protected UI deployment inputs
+        run: |
+          set -euo pipefail
+          for name in ACR_NAME AKS_NAME AKS_RG CURL_IMAGE UI_DIGEST UI_REVISION; do
+            [[ -n "${!name:-}" ]] || { echo "Missing protected value: ${name}" >&2; exit 1; }
+          done
+          [[ "$UI_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "Invalid immutable UI digest" >&2; exit 1; }
+          [[ "$CURL_IMAGE" == *@sha256:* ]] || { echo "S3PROXY_CURL_IMAGE must be digest-pinned" >&2; exit 1; }
+          [[ "$UI_REVISION" =~ ^[0-9a-f]{40}$ ]] || { echo "UI revision must be a full Git commit SHA" >&2; exit 1; }
+
+      - name: Azure login
+        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.S3PROXY_AZURE_SUBSCRIPTION_ID }}
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@829323503d1be3d00ca8346e5391ca0b07a9ab0d # v5.1.0
+
+      - name: Install kubelogin
+        uses: azure/use-kubelogin@0ce7c36141aa27d4934872cf00b0120804c98a29 # v1.3
+        with:
+          kubelogin-version: v0.2.12
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.1.2
+
+      - name: Resolve ACR and AKS context
+        run: |
+          set -euo pipefail
+          echo "ACR_LOGIN_SERVER=${ACR_NAME}.azurecr.io" >> "$GITHUB_ENV"
+          az acr login --name "$ACR_NAME"
+          az aks get-credentials --name "$AKS_NAME" --resource-group "$AKS_RG" --overwrite-existing
+          kubelogin convert-kubeconfig -l azurecli
+
+      - name: Verify immutable UI image signature
+        run: |
+          set -euo pipefail
+          identity='^https://github.com/cloudinfraz/s3proxy-rs-ui/.github/workflows/publish-ui-image.yml@refs/.*$'
+          cosign verify --certificate-identity-regexp "$identity" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            "${ACR_LOGIN_SERVER}/s3proxy-ui@${UI_DIGEST}"
+
+      - name: Verify immutable UI image revision
+        run: |
+          set -euo pipefail
+          image="${ACR_LOGIN_SERVER}/s3proxy-ui@${UI_DIGEST}"
+          docker pull "$image" >/dev/null
+          actual="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image")"
+          [[ "$actual" == "$UI_REVISION" ]] || { echo "Candidate UI image revision mismatch" >&2; exit 1; }
+
+      - name: Verify pre-provisioned namespace
+        run: kubectl get namespace s3proxy >/dev/null
+
+      - name: Prepare deployed UI browser
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install deployed UI browser dependencies
+        run: |
+          npm ci --ignore-scripts --registry=https://registry.npmjs.org/
+          npx playwright install --with-deps chromium
+          mkdir -p target/deploy
+
+      - name: Deploy and verify UI
+        env:
+          OUTPUT_FILE: target/deploy/ui.yaml
+        run: |
+          set -euo pipefail
+          scripts/deploy/render-ui-manifest.sh >/dev/null
+          kubectl apply -f "$OUTPUT_FILE"
+          kubectl -n s3proxy rollout status deployment/s3proxy-ui --timeout=5m
+          expected="${ACR_LOGIN_SERVER}/s3proxy-ui@${UI_DIGEST}"
+          deployed="$(kubectl -n s3proxy get deployment s3proxy-ui -o jsonpath='{.spec.template.spec.containers[?(@.name=="ui")].image}')"
+          [[ "$deployed" == "$expected" ]] || { echo "Deployed UI image digest mismatch" >&2; exit 1; }
+          node scripts/deploy/verify-ui-runtime.mjs "$expected" "$UI_REVISION"
+          kubectl -n s3proxy annotate deployment/s3proxy-ui s3proxy.rs/oci-revision="$UI_REVISION" --overwrite >/dev/null
+          kubectl -n s3proxy run split-ui-check --rm -i --restart=Never \
+            --labels='s3proxy.rs/access-control=true' --image="$CURL_IMAGE" \
+            --command -- curl -fsS http://s3proxy-ui.s3proxy.svc.cluster.local:8080/health
+
+      - name: Run deployed UI browser acceptance
+        env:
+          DEPLOYED_UI_BASE_URL: http://127.0.0.1:18080
+        run: |
+          set -euo pipefail
+          kubectl -n s3proxy port-forward service/s3proxy-ui 18080:8080 >target/deploy/ui-port-forward.log 2>&1 &
+          port_forward_pid=$!
+          trap 'kill "$port_forward_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            kill -0 "$port_forward_pid" 2>/dev/null || { echo "UI port-forward exited" >&2; exit 1; }
+            curl --silent --fail --output /dev/null "$DEPLOYED_UI_BASE_URL/healthz" && break
+            [[ "$attempt" != 30 ]] || { echo "UI port-forward did not become ready" >&2; exit 1; }
+            sleep 1
+          done
+          npx playwright test --config playwright.deployed.config.ts
+
+      - name: Remove UI NetworkPolicy when disabled
+        if: inputs.network_policy_enabled == false
+        run: kubectl -n s3proxy delete networkpolicy allow-ui-admin --ignore-not-found
+
+      - name: Capture UI deployment evidence
+        if: always()
+        run: |
+          mkdir -p target/deploy/ui-evidence
+          kubectl -n s3proxy get deployment,pod,service,networkpolicy -o wide \
+            -l app.kubernetes.io/name=s3proxy-rs,app.kubernetes.io/component=ui \
+            > target/deploy/ui-evidence/resources.txt || true
+          kubectl -n s3proxy get events --sort-by=.lastTimestamp > target/deploy/ui-evidence/events.txt || true
