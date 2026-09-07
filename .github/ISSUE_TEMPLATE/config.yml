@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and usage help
+    url: https://github.com/cloudinfraz/s3proxy-rs-ui/discussions
+    about: Ask questions and discuss usage in GitHub Discussions.
+  - name: Report a security vulnerability
+    url: https://github.com/cloudinfraz/s3proxy-rs-ui/security/advisories/new
+    about: Report vulnerabilities privately through a GitHub Security Advisory.
+  - name: Backend issues
+    url: https://github.com/cloudinfraz/s3proxy-rs/issues
+    about: Report admin API and proxy runtime issues in the backend repository.

@@ -1,0 +1,33 @@
+name: Feature request
+description: Propose a focused improvement to the administration UI
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: checkboxes
+    attributes:
+      label: Preflight
+      options:
+        - label: I searched existing issues and discussions for this proposal.
+          required: true
+        - label: This request belongs to the UI rather than the backend API or proxy runtime.
+          required: true
+  - type: textarea
+    attributes:
+      label: User problem
+      description: Who is affected and what task is difficult today?
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Proposed behavior
+      description: Describe the desired outcome without prescribing unnecessary implementation details.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Alternatives considered
+      description: Describe current workarounds or other approaches.
+  - type: textarea
+    attributes:
+      label: API or deployment impact
+      description: Note any expected backend contract, security, or operational changes.

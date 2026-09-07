@@ -1,0 +1,51 @@
+name: Bug report
+description: Report a reproducible problem in the administration UI
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not report security vulnerabilities here. Use the private process in SECURITY.md.
+  - type: checkboxes
+    attributes:
+      label: Preflight
+      options:
+        - label: I searched existing issues and did not find a duplicate.
+          required: true
+        - label: I removed credentials, private endpoints, and sensitive browser artifacts.
+          required: true
+  - type: textarea
+    attributes:
+      label: Problem
+      description: What happened, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Reproduction
+      description: Provide the smallest reliable sequence using synthetic values.
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: UI revision or image digest
+      placeholder: Full Git revision or sha256 image digest
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Backend revision
+      placeholder: Full s3proxy-rs Git revision
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Browser
+      placeholder: Firefox 130, Chrome 128, Safari 18, etc.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Additional context
+      description: Add sanitized logs or screenshots only when they contain synthetic data.

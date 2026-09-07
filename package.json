@@ -2,6 +2,21 @@
   "name": "s3proxy-rs-ui",
   "private": true,
   "version": "0.0.0",
+  "description": "Standalone administration UI for s3proxy-rs",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cloudinfraz/s3proxy-rs-ui.git"
+  },
+  "bugs": {
+    "url": "https://github.com/cloudinfraz/s3proxy-rs-ui/issues"
+  },
+  "homepage": "https://github.com/cloudinfraz/s3proxy-rs-ui#readme",
+  "engines": {
+    "node": "24.18.0",
+    "npm": "11.16.0"
+  },
+  "packageManager": "npm@11.16.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
