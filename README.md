@@ -150,6 +150,7 @@ testing, contract-update, and pull-request expectations. Participation is
 governed by the [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md).
 
 Questions and usage help are covered by [`SUPPORT.md`](SUPPORT.md).
+Release history is recorded in [`CHANGELOG.md`](CHANGELOG.md).
 
 For security vulnerabilities, do not open a public issue. Follow
 [`SECURITY.md`](SECURITY.md) to report them privately.
