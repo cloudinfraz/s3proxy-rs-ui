@@ -5,6 +5,42 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.4] - 2026-09-08
+
+### Added
+
+- Added an application-level React error boundary with a reload recovery path
+  for unexpected rendering failures.
+- Added centralized, sanitized API error interception with request method and
+  path context while preserving component-owned retry and recovery behavior.
+- Added focused unit coverage for routing, API failures, shared controls, and
+  administration workflows across identities, backends, bucket mappings,
+  policies, IAM roles, temporary credentials, operations, and the shell.
+- Added TypeScript and Vue 3 coding guidelines, including required component,
+  template, and Pinia integration tests.
+- Added React Testing Library, jsdom, Vue Test Utils, and matching Vue 3 compiler
+  dependencies for component testing.
+
+### Changed
+
+- Enforced whole-source unit coverage in CI with minimum 75 percent thresholds
+  for statements, branches, functions, and lines.
+- Expanded CI to run coverage instead of import-only unit execution and ignore
+  generated coverage artifacts.
+- Updated release documentation for release-branch and manual workflow dispatch
+  procedures.
+- Updated endpoint example validation to reject unsafe ASCII control characters
+  without relying on a control-character regular expression.
+
+### Fixed
+
+- Removed duplicate global API alerts that conflicted with contextual component
+  errors and remained visible after successful retries.
+- Isolated API client mocks and browser globals between tests to prevent order-
+  dependent failures.
+- Increased the unit-test timeout for instrumented component tests so coverage
+  execution remains stable in CI.
+
 ## [0.6.3] - 2026-09-07
 
 This is the first documented release of the standalone s3proxy-rs administration
@@ -157,5 +193,6 @@ and release automation previously developed alongside the backend.
 - Policy simulation and configuration review do not perform signed S3 requests,
   Azure storage I/O, or data migration.
 
-[Unreleased]: https://github.com/cloudinfraz/s3proxy-rs-ui/compare/v0.6.3...HEAD
+[Unreleased]: https://github.com/cloudinfraz/s3proxy-rs-ui/compare/v0.6.4...HEAD
+[0.6.4]: https://github.com/cloudinfraz/s3proxy-rs-ui/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/cloudinfraz/s3proxy-rs-ui/releases/tag/v0.6.3
