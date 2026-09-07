@@ -28,7 +28,7 @@ git switch main
 git pull --ff-only origin main
 git switch -c release/v0.6.4
 
-npm version 0.6.4 --no-git-tag-version
+npm version 0.6.4 --no-git-tag-version --allow-same-version
 ```
 
 Move completed entries from `Unreleased` into a dated changelog heading:
