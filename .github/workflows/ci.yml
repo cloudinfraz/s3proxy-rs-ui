@@ -45,10 +45,10 @@ jobs:
           npm run generate:api
           git diff --exit-code -- src/api/schema.d.ts
 
-      - name: Lint and test
+      - name: Lint, coverage, deployment tests, and build
         run: |
           npm run lint
-          npm test
+          npm run test:coverage
           npm run test:deploy
           npm run build
 

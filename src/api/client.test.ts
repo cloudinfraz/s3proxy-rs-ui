@@ -10,6 +10,7 @@ afterEach(() => {
   setCsrfToken(null)
   setProtectedForbiddenHandler(null)
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
 })
 
 describe('browser API client', () => {
