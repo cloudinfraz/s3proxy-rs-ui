@@ -4,6 +4,7 @@ import type { components } from '../src/api/schema'
 
 type Identity = components['schemas']['IdentityProjection']
 const backendId = '00000000-0000-4000-8000-000000000001'
+const record = (page: Page, text: string) => page.getByRole('row').filter({ hasText: text }).or(page.locator('dl').filter({ hasText: text }))
 
 async function directFixture(page: Page) {
   const verifyControl = await mockControlApi(page)
@@ -54,7 +55,7 @@ async function directFixture(page: Page) {
 
 async function noOverflow(page: Page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
-  const dialog = page.getByRole('dialog')
+  const dialog = page.getByRole('dialog').or(page.getByRole('alertdialog'))
   if (await dialog.count()) expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
 }
 
@@ -62,9 +63,9 @@ test('direct metadata list and creation exclude virtual mode and storage request
   const fixture = await directFixture(page)
   await page.goto('/admin/ui/credentials?mode=direct')
   await expect(page.getByRole('heading', { name: 'Direct mappings', exact: true })).toBeVisible()
-  await expect(page.getByRole('row').filter({ hasText: 'fixture-access' })).toBeVisible()
-  await expect(page.getByRole('row').filter({ hasText: 'disabled-direct' })).toBeVisible()
-  await expect(page.getByRole('row').filter({ hasText: 'virtual-access' })).toHaveCount(0)
+  await expect(record(page, 'fixture-access')).toBeVisible()
+  await expect(record(page, 'disabled-direct')).toBeVisible()
+  await expect(record(page, 'virtual-access')).toHaveCount(0)
   await expect(page.getByRole('button', { name: /Rotate|Replace/ })).toHaveCount(0)
   await noOverflow(page)
   await page.screenshot({ path: testInfo.outputPath('direct-list.png'), fullPage: true })
@@ -74,9 +75,9 @@ test('direct metadata list and creation exclude virtual mode and storage request
   await page.getByLabel('Azure account', { exact: true }).fill('createdaccount')
   await page.getByRole('combobox', { name: 'Default backend', exact: true }).selectOption(backendId)
   await page.getByRole('button', { name: 'Add mapping', exact: true }).click()
-  await expect(page.getByRole('dialog')).toContainText('synthetic-direct-secret')
-  await page.getByRole('button', { name: 'Dismiss', exact: true }).click()
-  await expect(page.getByRole('row').filter({ hasText: 'created-direct' })).toBeVisible()
+  await expect(page.getByRole('dialog').or(page.getByRole('alertdialog'))).toContainText('synthetic-direct-secret')
+  await page.getByRole('button', { name: 'I have stored this securely', exact: true }).click()
+  await expect(record(page, 'created-direct')).toBeVisible()
   expect(fixture.mutations).toEqual([{ method: 'POST', path: '/admin/credentials', body: { s3_access_key: '', s3_secret_key: '', azure_account: 'createdaccount', use_managed_identity: true, access_mode: 'direct', versioning_enabled: false, default_backend_id: backendId } }])
   expect(await page.evaluate(() => [localStorage.length, sessionStorage.length])).toEqual([0, 0])
   fixture.verify()
@@ -96,26 +97,26 @@ test('direct configuration and removal preserve failed state and other identitie
   await expect(page.getByLabel('Azure account', { exact: true })).toHaveValue('updatedaccount')
   fixture.failure.update = false
   await page.getByRole('button', { name: 'Save', exact: true }).click()
-  await expect(page.getByRole('dialog')).toHaveCount(0)
-  await expect(page.getByRole('row').filter({ hasText: 'fixture-access' })).toContainText('updatedaccount')
+  await expect(page.getByRole('dialog').or(page.getByRole('alertdialog'))).toHaveCount(0)
+  await expect(record(page, 'fixture-access')).toContainText('updatedaccount')
   expect(fixture.mutations.slice(0, 2)).toEqual(Array.from({ length: 2 }, () => ({ method: 'PUT', path: '/admin/credentials/fixture-access', body: { enabled: true, versioning_enabled: false, default_backend_id: backendId, azure_account: 'updatedaccount' } })))
   await page.getByRole('button', { name: 'Delete fixture-access', exact: true }).click()
-  await expect(page.getByRole('dialog')).toContainText('Revokes this S3 identity')
-  await expect(page.getByRole('dialog')).toContainText('containers, blobs and native versions are retained')
+  await expect(page.getByRole('dialog').or(page.getByRole('alertdialog'))).toContainText('Revokes this S3 identity')
+  await expect(page.getByRole('dialog').or(page.getByRole('alertdialog'))).toContainText('containers, blobs and native versions are retained')
   await noOverflow(page)
   await page.screenshot({ path: testInfo.outputPath('direct-removal.png'), fullPage: true })
   await page.getByRole('button', { name: 'Cancel', exact: true }).click()
   expect(fixture.mutations).toHaveLength(2)
   await page.getByRole('button', { name: 'Delete fixture-access', exact: true }).click()
   fixture.failure.remove = true
-  await page.getByRole('button', { name: 'Remove mapping', exact: true }).click()
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Remove fixture-access', exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('503')
   expect(fixture.rows().some(identity => identity.s3_access_key === 'fixture-access')).toBe(true)
   fixture.failure.remove = false
-  await page.getByRole('button', { name: 'Remove mapping', exact: true }).click()
-  await expect(page.getByRole('dialog')).toHaveCount(0)
-  await expect(page.getByRole('row').filter({ hasText: 'fixture-access' })).toHaveCount(0)
-  await expect(page.getByRole('row').filter({ hasText: 'disabled-direct' })).toBeVisible()
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Remove fixture-access', exact: true }).click()
+  await expect(page.getByRole('dialog').or(page.getByRole('alertdialog'))).toHaveCount(0)
+  await expect(record(page, 'fixture-access')).toHaveCount(0)
+  await expect(record(page, 'disabled-direct')).toBeVisible()
   expect(fixture.rows().some(identity => identity.s3_access_key === 'virtual-access')).toBe(true)
   expect(fixture.mutations.slice(2)).toEqual(Array.from({ length: 2 }, () => ({ method: 'DELETE', path: '/admin/credentials/fixture-access', body: null })))
   fixture.verify()

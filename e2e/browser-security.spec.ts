@@ -43,9 +43,9 @@ test('login and cookie mutation keep credential material out of browser storage'
   await page.getByRole('button', { name: 'Create identity', exact: true }).click()
   await page.getByLabel('Azure account').fill('testaccount')
   await page.getByRole('button', { name: 'Create identity', exact: true }).last().click()
-  await expect.poll(() => mutationCsrf).toBe('csrf-login')
+  await expect.poll(() => mutationCsrf).toBe('csrf-refresh')
   await expect(page.getByRole('dialog')).toContainText('generated-one-time-secret')
-  await page.getByRole('button', { name: 'Dismiss', exact: true }).click()
+  await page.getByRole('button', { name: 'I have stored this securely', exact: true }).click()
 
   const storage = await page.evaluate(() => ({
     local: Object.keys(localStorage),

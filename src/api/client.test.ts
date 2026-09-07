@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { api, hasCsrfToken, login, logout, setCsrfToken } from './client'
+import { ApiError, api, hasCsrfToken, login, logout, setCsrfToken, setProtectedForbiddenHandler } from './client'
 
 const response = (body: unknown, status = 200) => new Response(
   status === 204 ? null : JSON.stringify(body),
@@ -8,6 +8,7 @@ const response = (body: unknown, status = 200) => new Response(
 
 afterEach(() => {
   setCsrfToken(null)
+  setProtectedForbiddenHandler(null)
   vi.restoreAllMocks()
 })
 
@@ -22,9 +23,10 @@ describe('browser API client', () => {
       expires_at: '2026-07-22T00:00:00Z',
     })))
 
-    await login('admin-key-value')
+    const result = await login('admin-key-value')
 
-    expect(hasCsrfToken()).toBe(true)
+    expect(result.csrf_token).toBe('csrf-value')
+    expect(hasCsrfToken()).toBe(false)
     expect(localSet).not.toHaveBeenCalled()
     expect(sessionSet).not.toHaveBeenCalled()
     const [, init] = vi.mocked(fetch).mock.calls[0]
@@ -48,5 +50,71 @@ describe('browser API client', () => {
     setCsrfToken('csrf-value')
     await logout()
     expect(hasCsrfToken()).toBe(false)
+  })
+
+  it.each([
+    ['application/json', JSON.stringify({ code: 'AccessDenied', message: 'credential=secret-value' })],
+    ['application/xml', '<?xml version="1.0"?><Error><Code>AccessDenied</Code><Message>secret-value</Message></Error>'],
+    ['text/plain', 'database detail and secret-value'],
+  ])('renders a bounded safe message instead of a %s response body', async (contentType, body) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body, { status: 403, headers: { 'content-type': contentType } })))
+
+    const error = await api('/admin/capabilities').catch(cause => cause)
+
+    expect(error).toBeInstanceOf(ApiError)
+    expect(error).toMatchObject({ status: 403, message: 'The request was denied. Your session will be verified.' })
+    expect(String(error)).not.toContain('secret-value')
+  })
+
+  it('discards an oversized error body before exposing an error', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('secret-value'.repeat(2_000), { status: 500 })))
+
+    const error = await api('/admin/health').catch(cause => cause)
+
+    expect(error).toMatchObject({ status: 500, message: 'The control service could not complete the request.' })
+    expect(String(error)).not.toContain('secret-value')
+  })
+
+  it('cancels the stream at the byte limit and does not parse a partial code', async () => {
+    const cancel = vi.fn()
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) { controller.enqueue(new Uint8Array(16_385)) },
+      cancel,
+    })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(stream, { status: 500 })))
+    await expect(api('/admin/health')).rejects.toMatchObject({ status: 500, code: null })
+    expect(cancel).toHaveBeenCalledOnce()
+    expect(stream.locked).toBe(true)
+  })
+
+  it('preserves safe status and forbidden handling when reading the body fails', async () => {
+    const forbidden = vi.fn()
+    setProtectedForbiddenHandler(forbidden)
+    const stream = new ReadableStream({ start(controller) { controller.error(new Error('synthetic-private-detail')) } })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(stream, { status: 403 })))
+    await expect(api('/admin/health')).rejects.toMatchObject({ status: 403, message: 'The request was denied. Your session will be verified.' })
+    expect(forbidden).toHaveBeenCalledOnce()
+  })
+
+  it('does not expose transport exception details', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('synthetic-private-detail')))
+    await expect(api('/admin/health')).rejects.toMatchObject({ status: 0, message: 'The control service could not be reached. Retry the request.' })
+  })
+
+  it.each(['Conflict', 'NotFound', 'InvalidArgument'])('preserves the allowlisted %s code', async code => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ code }, 400)))
+    await expect(api('/admin/health')).rejects.toMatchObject({ status: 400, code })
+  })
+
+  it('notifies once for a protected 403 but does not recurse on session endpoints', async () => {
+    const forbidden = vi.fn()
+    setProtectedForbiddenHandler(forbidden)
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => response({ code: 'AccessDenied' }, 403)))
+
+    await expect(api('/admin/capabilities')).rejects.toBeInstanceOf(ApiError)
+    await expect(api('/admin/session')).rejects.toBeInstanceOf(ApiError)
+    await expect(api('/admin/session/login', { method: 'POST', body: '{}' })).rejects.toBeInstanceOf(ApiError)
+
+    expect(forbidden).toHaveBeenCalledTimes(1)
   })
 })

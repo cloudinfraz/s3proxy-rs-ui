@@ -1,24 +1,20 @@
 import { defineConfig } from '@playwright/test'
 import { env } from 'node:process'
 
-env.PLAYWRIGHT_NO_COPY_PROMPT = '1'
+const baseURL = env.DEPLOYED_UI_BASE_URL
+if (!baseURL) throw new Error('DEPLOYED_UI_BASE_URL is required')
 
 export default defineConfig({
-  testDir: './e2e/live',
+  testDir: './e2e/deployed',
   fullyParallel: false,
   workers: 1,
   retries: 0,
   reporter: 'list',
   preserveOutput: 'never',
   use: {
-    baseURL: 'http://127.0.0.1:4174',
+    baseURL,
     trace: 'off',
     screenshot: 'off',
     video: 'off',
-  },
-  webServer: {
-    command: 'npm run preview -- --port 4174 --strictPort',
-    url: 'http://127.0.0.1:4174/admin/ui/login',
-    reuseExistingServer: false,
   },
 })

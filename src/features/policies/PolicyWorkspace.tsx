@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Tabs } from '@radix-ui/themes'
 import { Activity, DatabaseZap, Link, ShieldCheck } from 'lucide-react'
 import { Page } from '../../components/control'
 import BucketPolicies from './BucketPolicies'
@@ -19,10 +20,11 @@ const views: Array<{ id: View; label: string; icon: typeof ShieldCheck }> = [
 export default function PolicyWorkspace() {
   const [view, setView] = useState<View>('managed')
   return <Page title="Authorization policies" subtitle="Review effective S3 authorization metadata without changing Azure storage or routing">
-    <div className="policy-tabs" role="tablist" aria-label="Policy workspace views">{views.map(item => <button key={item.id} role="tab" aria-selected={view === item.id} className={view === item.id ? 'active' : ''} onClick={() => setView(item.id)}><item.icon size={16} />{item.label}</button>)}</div>
-    {view === 'managed' && <ManagedPolicies />}
-    {view === 'identity' && <IdentityPolicies />}
-    {view === 'bucket' && <BucketPolicies />}
-    {view === 'diagnostics' && <PolicyDiagnostics />}
+    <Tabs.Root value={view} onValueChange={value => setView(value as View)}><Tabs.List className="policy-tabs" aria-label="Policy workspace views">{views.map(item => <Tabs.Trigger key={item.id} value={item.id}><item.icon size={16} />{item.label}</Tabs.Trigger>)}</Tabs.List>
+      <Tabs.Content value="managed"><ManagedPolicies /></Tabs.Content>
+      <Tabs.Content value="identity"><IdentityPolicies /></Tabs.Content>
+      <Tabs.Content value="bucket"><BucketPolicies /></Tabs.Content>
+      <Tabs.Content value="diagnostics"><PolicyDiagnostics /></Tabs.Content>
+    </Tabs.Root>
   </Page>
 }

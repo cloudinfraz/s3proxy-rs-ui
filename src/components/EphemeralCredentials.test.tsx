@@ -4,7 +4,7 @@ import { EphemeralCredentialBody } from './EphemeralCredentials'
 
 describe('EphemeralCredentials', () => {
   it('renders one-time material without persistence or copy controls', () => {
-    const markup = renderToStaticMarkup(<EphemeralCredentialBody material={{ accessKey: 'synthetic-access', secretKey: 'synthetic-secret', endpoint: 'https://synthetic.invalid' }} dismiss={() => undefined} />)
+    const markup = renderToStaticMarkup(<EphemeralCredentialBody material={{ accessKey: 'synthetic-access', secretKey: 'synthetic-secret', endpoint: 'https://synthetic.invalid' }} />)
     expect(markup).toContain('synthetic-access')
     expect(markup).toContain('synthetic-secret')
     expect(markup).toContain('https://synthetic.invalid')
@@ -12,7 +12,7 @@ describe('EphemeralCredentials', () => {
   })
 
   it('omits an unavailable endpoint', () => {
-    const markup = renderToStaticMarkup(<EphemeralCredentialBody material={{ accessKey: 'synthetic-access', secretKey: 'synthetic-secret' }} dismiss={() => undefined} />)
+    const markup = renderToStaticMarkup(<EphemeralCredentialBody material={{ accessKey: 'synthetic-access', secretKey: 'synthetic-secret' }} />)
     expect(markup).not.toContain('Endpoint')
   })
 })

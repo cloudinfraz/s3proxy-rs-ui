@@ -23,7 +23,7 @@ import '@fontsource/ibm-plex-mono/latin-500.css'
 import './control.css'
 import './features/shell/shell.css'
 
-const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 10_000 } } })
+const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 10_000, refetchOnWindowFocus: 'always' } } })
 
 export default function ControlApp() {
   return <Theme accentColor="jade" grayColor="sand" radius="small"><QueryClientProvider client={queryClient}><BrowserRouter basename={import.meta.env.BASE_URL}><Routes>

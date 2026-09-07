@@ -1,8 +1,42 @@
-.control-dialog:has(.direct-mapping-details) { max-height: 80dvh; overflow-y: auto; }
-.direct-mapping-details { min-width: 0; overflow-wrap: anywhere; }
-.direct-mapping-details dl { display: grid; gap: 6px; }
-.direct-mapping-details dt { margin-top: 8px; font-size: 12px; color: #536159; }
-.direct-mapping-details dd { margin: 0; font-size: 13px; }
-.direct-mapping-details summary { cursor: pointer; margin-top: 16px; }
-.direct-mapping-details h3 { font-size: 14px; margin: 16px 0 8px; }
-.direct-mapping-details pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; max-width: 100%; }
+.control-dialog:has(.direct-mapping-details) {
+  max-height: 80dvh;
+  overflow-y: auto;
+}
+
+.direct-mapping-details {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.direct-mapping-details dl {
+  display: grid;
+  gap: 6px;
+}
+
+.direct-mapping-details dt {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #536159;
+}
+
+.direct-mapping-details dd {
+  margin: 0;
+  font-size: 13px;
+}
+
+.direct-mapping-details summary {
+  cursor: pointer;
+  margin-top: 16px;
+}
+
+.direct-mapping-details h3 {
+  font-size: 14px;
+  margin: 16px 0 8px;
+}
+
+.direct-mapping-details pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  max-width: 100%;
+}

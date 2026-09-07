@@ -3,7 +3,7 @@ import type { components } from '../src/api/schema'
 import { capabilities as baseCapabilities, mockControlApi } from './control-fixtures'
 
 type Capabilities = components['schemas']['ControlCapabilities']
-type Role = components['schemas']['AdminIamRoleProjection']
+type Role = components['schemas']['AdminIamRolePage']['items'][number]
 
 const firstRole: Role = {
   id: '00000000-0000-4000-8000-000000000074',
@@ -103,7 +103,7 @@ test('UI074-02 shows role limits, pagination, signing services, and placeholder-
   await page.goto('/admin/ui/temporary-credentials')
   await expect(page.getByText('fixed 3600-second default')).toBeVisible()
   await expect(page.getByText('configurable role-specific maximum', { exact: false })).toBeVisible()
-  await expect(page.getByRole('cell', { name: '3600 seconds' })).toBeVisible()
+  await expect(page.getByText('3600 seconds', { exact: true })).toBeVisible()
   await expect(page.getByText('service sts')).toBeVisible()
   await expect(page.getByText('service s3')).toBeVisible()
   const issueCli = page.getByText('AWS CLI: issue credentials').locator('..').locator('..')
@@ -114,8 +114,8 @@ test('UI074-02 shows role limits, pagination, signing services, and placeholder-
   await expect(s3Cli).toContainText('https://data.example.test')
   await expect(page.getByText('AWS SDK for JavaScript v3').locator('..').locator('..')).toContainText('sessionToken')
   await page.getByRole('button', { name: 'Next role page' }).click()
-  await expect(page.getByRole('cell', { name: 'ArchiveWriter' })).toBeVisible()
-  await expect(page.getByRole('cell', { name: '7200 seconds' })).toBeVisible()
+  await expect(page.getByText(/\/ArchiveWriter$/)).toBeVisible()
+  await expect(page.getByText('7200 seconds', { exact: true })).toBeVisible()
   await expect(page.getByText('Controls future issuance and does not independently retire an existing session.')).toBeVisible()
   await expect(page.getByText('Change the permissions evaluated for active sessions.')).toBeVisible()
   expect(fixture.observed.filter(value => value.startsWith('GET /admin/ui/roles'))).toEqual([
@@ -163,17 +163,17 @@ test('UI074-01 exposes loading, request failures, and explicit recovery', async 
   fixture.failures.roles = true
   await page.getByRole('button', { name: 'Refresh', exact: true }).click()
   await expect(page.getByRole('alert')).toHaveCount(2)
-  await expect(page.getByRole('alert').filter({ hasText: 'Runtime capabilities unavailable' })).toBeVisible()
-  await expect(page.getByRole('alert').filter({ hasText: 'Role summaries unavailable' })).toBeVisible()
+  await expect(page.getByRole('alert').first()).toContainText('The control service is temporarily unavailable')
+  await expect(page.getByRole('alert').last()).toContainText('The control service is temporarily unavailable')
   await expect(page.getByRole('heading', { name: 'AssumeRole ready' })).toHaveCount(0)
   await expect(page.getByRole('heading', { name: 'AWS client configuration' })).toHaveCount(0)
 
   fixture.failures.capabilities = false
   fixture.failures.roles = false
-  await page.getByRole('alert').filter({ hasText: 'Runtime capabilities unavailable' }).getByRole('button', { name: 'Retry' }).click()
+  await page.getByRole('alert').first().getByRole('button', { name: 'Retry' }).click()
   await expect(page.getByRole('heading', { name: 'AssumeRole ready' })).toBeVisible()
-  await page.getByRole('alert').filter({ hasText: 'Role summaries unavailable' }).getByRole('button', { name: 'Retry' }).click()
-  await expect(page.getByRole('cell', { name: 'Reader' })).toBeVisible()
+  await page.getByRole('alert').getByRole('button', { name: 'Retry' }).click()
+  await expect(page.getByText(/\/Reader$/)).toBeVisible()
   await expect(page.getByRole('alert')).toHaveCount(0)
   fixture.verify()
 })

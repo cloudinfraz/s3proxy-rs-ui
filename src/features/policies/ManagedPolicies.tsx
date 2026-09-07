@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight, Eye, Pencil, Plus, Trash2, X } from 'lucide-
 import { api, ApiError } from '../../api/client'
 import type { Schema } from '../../api/control'
 import { invalidateControl } from '../../api/query-keys'
-import { DataTable, ErrorBanner, Modal, RefreshButton } from '../../components/control'
+import { DataTable, DestructiveDialog, ErrorBanner, Modal, RefreshButton } from '../../components/control'
 import { createPolicyRequest, deletePolicyRequest, emptyPolicyDocument, formatPolicyDocument, policyKeys, updatePolicyRequest, validationRequest, type PolicyDetail, type PolicySummary } from './policy-state'
 
 type Operation = 'create' | 'edit' | 'delete'
@@ -95,7 +95,12 @@ function PolicyDialog({ operation, initial, close, changed }: { operation: Opera
     } finally { setPending(false) }
   }
 
-  return <Modal title={review ? `Confirm: ${title}` : title} description="This changes S3 authorization metadata only. Azure containers, blobs, and routing are unchanged." onClose={() => { if (!pending) close() }}>
+  if (operation === 'delete' && review && review !== true) return <DestructiveDialog title={title} description="Permanently removes this managed policy after authoritative attachment impact review. Azure containers, blobs, and routing are unchanged." confirmLabel={`Delete ${review.policy.name}`} pending={pending} onClose={() => setReview(null)} onConfirm={() => { void persist() }}>
+    {error && <ErrorBanner error={error} />}
+    <dl className="policy-detail-grid"><dt>Name</dt><dd>{review.policy.name}</dd><dt>Reviewed revision</dt><dd>{review.policy.revision}</dd><dt>Identity impact</dt><dd>{review.policy.credential_attachment_count} attachments</dd><dt>Role impact</dt><dd>{review.policy.role_attachment_count} attachments and active sessions</dd></dl>
+  </DestructiveDialog>
+
+  return <Modal title={review ? `Confirm: ${title}` : title} description="This changes S3 authorization metadata only. Azure containers, blobs, and routing are unchanged." onClose={close} pending={pending}>
     {error && <ErrorBanner error={error} retry={stale ? () => { void prepare() } : undefined} />}
     {stale && <p className="policy-notice" role="status">The review was stale. Authoritative state was refreshed; your unsaved draft is preserved for another review.</p>}
     {review ? <><dl className="policy-detail-grid"><dt>Name</dt><dd>{operation === 'create' ? draftName : review === true ? name : review.policy.name}</dd>{operation !== 'delete' && <><dt>Description</dt><dd>{description || 'None'}</dd><dt>Validated bytes</dt><dd>{validation?.json_bytes ?? 'Unavailable'}</dd><dt>Statements</dt><dd>{validation?.statements ?? 'Unavailable'}</dd></>}{review !== true && <><dt>Reviewed revision</dt><dd>{review.policy.revision}</dd><dt>Identity impact</dt><dd>{review.policy.credential_attachment_count} attachments</dd><dt>Role impact</dt><dd>{review.policy.role_attachment_count} attachments and active sessions</dd></>}</dl><div className="dialog-actions"><button disabled={pending} onClick={() => setReview(null)}>Back</button><button className="primary" disabled={pending} onClick={() => { void persist() }}>{pending ? 'Applying...' : 'Confirm change'}</button></div></>

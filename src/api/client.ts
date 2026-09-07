@@ -4,14 +4,40 @@ export type LoginResponse = paths['/admin/session/login']['post']['responses']['
 
 export class ApiError extends Error {
   readonly status: number
+  readonly code: string | null
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, code: string | null = null) {
     super(message)
     this.status = status
+    this.code = code
   }
 }
 
 let csrfToken: string | null = null
+let protectedForbiddenHandler: (() => void) | null = null
+
+const statusMessages: Readonly<Record<number, string>> = {
+  400: 'The request is invalid. Review the entered values and try again.',
+  403: 'The request was denied. Your session will be verified.',
+  404: 'The requested resource no longer exists. Refresh and try again.',
+  409: 'The resource changed. Refresh it before trying again.',
+  422: 'The request contains invalid values. Review the form and try again.',
+  429: 'Too many requests were made. Wait and try again.',
+  500: 'The control service could not complete the request.',
+  501: 'This operation is not supported.',
+  503: 'The control service is temporarily unavailable. Retry the request.',
+}
+
+const safeCodes = new Set([
+  'AccessDenied',
+  'Conflict',
+  'InvalidArgument',
+  'InvalidRequest',
+  'NotFound',
+  'NotImplemented',
+  'ServiceUnavailable',
+  'SlowDown',
+])
 
 export function setCsrfToken(token: string | null) {
   csrfToken = token
@@ -19,6 +45,53 @@ export function setCsrfToken(token: string | null) {
 
 export function hasCsrfToken() {
   return csrfToken !== null
+}
+
+export function setProtectedForbiddenHandler(handler: (() => void) | null) {
+  protectedForbiddenHandler = handler
+}
+
+function safeErrorCode(response: Response, body: string): string | null {
+  const contentType = response.headers.get('content-type') ?? ''
+  if (contentType.includes('application/json')) {
+    try {
+      const value = JSON.parse(body) as { code?: unknown; Code?: unknown }
+      const code = typeof value.code === 'string' ? value.code : value.Code
+      return typeof code === 'string' && safeCodes.has(code) ? code : null
+    } catch {
+      return null
+    }
+  }
+  if ((contentType.includes('xml') || body.trimStart().startsWith('<?xml')) && typeof DOMParser !== 'undefined') {
+    const code = new DOMParser().parseFromString(body, 'application/xml').querySelector('Code')?.textContent
+    return code && safeCodes.has(code) ? code : null
+  }
+  return null
+}
+
+async function readBoundedText(response: Response, maximumBytes = 16_384) {
+  if (!response.body) return ''
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let total = 0
+  let result = ''
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) return result + decoder.decode()
+    total += value.byteLength
+    if (total > maximumBytes) {
+      await reader.cancel()
+      return ''
+    }
+    result += decoder.decode(value, { stream: true })
+  }
+}
+
+async function toApiError(response: Response) {
+  const body = await readBoundedText(response).catch(() => '')
+  const code = safeErrorCode(response, body)
+  const message = statusMessages[response.status] ?? `The request failed (HTTP ${response.status}).`
+  return new ApiError(response.status, message, code)
 }
 
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -38,29 +111,23 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     headers,
     credentials: 'same-origin',
     cache: 'no-store',
-  })
+  }).catch(() => { throw new ApiError(0, 'The control service could not be reached. Retry the request.') })
   if (!response.ok) {
-    const body = await response.text()
-    let message = body || response.statusText
-    try {
-      const json = JSON.parse(body) as { message?: string; Message?: string }
-      message = json.message ?? json.Message ?? message
-    } catch {
-      // Keep non-JSON server response.
+    const error = await toApiError(response)
+    if (response.status === 403 && path !== '/admin/session' && path !== '/admin/session/login') {
+      protectedForbiddenHandler?.()
     }
-    throw new ApiError(response.status, message)
+    throw error
   }
   if (response.status === 204) return undefined as T
   return response.json() as Promise<T>
 }
 
 export async function login(apiKey: string): Promise<LoginResponse> {
-  const response = await api<LoginResponse>('/admin/session/login', {
+  return api<LoginResponse>('/admin/session/login', {
     method: 'POST',
     body: JSON.stringify({ api_key: apiKey }),
   })
-  setCsrfToken(response.csrf_token)
-  return response
 }
 
 export async function logout() {

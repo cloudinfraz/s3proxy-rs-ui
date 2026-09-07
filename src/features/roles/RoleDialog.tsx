@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { api, ApiError } from '../../api/client'
 import { controlQueries, type Schema } from '../../api/control'
 import { controlKeys, invalidateControl } from '../../api/query-keys'
-import { ErrorBanner, Modal } from '../../components/control'
+import { DestructiveDialog, ErrorBanner, Modal } from '../../components/control'
 import { completionGuard } from '../operations/state'
 import { createRoleRequest, mutationRequest, retainedLabel, roleDraft, validateRoleDraft, type RoleDetail, type RoleDraft, type RoleLimits, type RoleOperation, type RolePolicy } from './role-state'
 import TrustEditor from './TrustEditor'
@@ -100,7 +100,9 @@ export default function RoleDialog({ operation, initial, limits, close, changed 
   }
 
   const policyOptions = operation === 'detach' ? initial?.policies : policies.data?.items.filter(policy => !initial?.policies.some(attached => attached.id === policy.id))
-  return <Modal title={review ? `Confirm: ${titles[operation]}` : titles[operation]} description={impacts[operation]} onClose={() => { if (!pending) close() }}>
+  const destructiveReview = Boolean(review) && (operation === 'retire' || operation === 'delete' || operation === 'detach' || (operation === 'enabled' && !draft.enabled))
+  const confirmLabel = operation === 'retire' ? 'Retire this batch' : operation === 'delete' ? `Delete ${initial?.role.role_name ?? 'role'}` : operation === 'detach' ? `Detach ${review?.policy?.name ?? 'policy'}` : `Disable ${initial?.role.role_name ?? 'role'}`
+  const content = <>
     {error && <ErrorBanner error={error} />}
     {needsIdentities && identities.isError && <ErrorBanner error={new Error('Identity metadata unavailable')} retry={() => { void identities.refetch() }} />}
     {operation === 'attach' && policies.isError && <ErrorBanner error={new Error('Policy metadata unavailable')} retry={() => { void policies.refetch() }} />}
@@ -113,7 +115,7 @@ export default function RoleDialog({ operation, initial, limits, close, changed 
         {review.policy && <><dt>Policy</dt><dd>{review.policy.name}</dd><dt>Policy revision</dt><dd>{review.policy.revision}</dd></>}
         {(operation === 'retire' || operation === 'delete') && review.detail && <><dt>Retained sessions</dt><dd>{retainedLabel(review.detail.retained_sessions)}</dd><dt>Role status</dt><dd>{review.detail.role.enabled ? 'Enabled' : 'Disabled'}</dd></>}
         {operation === 'retire' && <><dt>Maximum this batch</dt><dd>{draft.batch}</dd></>}
-      </dl><div className="dialog-actions"><button disabled={pending} onClick={() => setReview(null)}>Back</button><button className="primary" disabled={pending} onClick={() => { void persist() }}>{pending ? 'Applying...' : operation === 'retire' ? 'Retire this batch' : 'Confirm change'}</button></div></>
+      </dl>{!destructiveReview && <div className="dialog-actions"><button disabled={pending} onClick={() => setReview(null)}>Back</button><button className="primary" disabled={pending} onClick={() => { void persist() }}>{pending ? 'Applying...' : 'Confirm change'}</button></div>}</>
         : <form className="operation-form" onSubmit={event => { void prepare(event) }}>
           {operation === 'create' && <><label>Account ID<input required pattern="[0-9]{12}" maxLength={12} value={draft.account} onChange={event => { update('account', event.target.value); update('trust', draft.trust.map(statement => ({ ...statement, principals: [] }))) }} /></label><label>Role path<input required value={draft.path} maxLength={512} onChange={event => update('path', event.target.value)} /></label><label>Role name<input required maxLength={64} value={draft.name} onChange={event => update('name', event.target.value)} /></label><label>Resource owner<select required value={draft.owner} onChange={event => update('owner', event.target.value)}><option value="">Select identity</option>{identities.data?.map(identity => <option key={identity.credential_id} value={identity.credential_id} disabled={!identity.enabled}>{identity.s3_access_key}</option>)}</select></label></>}
           {(operation === 'create' || operation === 'settings') && <label>Maximum duration (seconds)<input type="number" required min={limits.min_duration_seconds} max={limits.max_duration_seconds} step={1} value={draft.duration} onChange={event => update('duration', event.target.value)} /></label>}
@@ -124,5 +126,7 @@ export default function RoleDialog({ operation, initial, limits, close, changed 
           {operation === 'retire' && <label>Maximum rows this batch<input type="number" required min={1} max={limits.max_retirement_batch} step={1} value={draft.batch} onChange={event => update('batch', event.target.value)} /></label>}
           <div className="dialog-actions"><button type="button" disabled={pending} onClick={close}>Cancel</button><button className="primary" disabled={pending || !dependenciesReady}>{pending ? 'Refreshing review...' : 'Review change'}</button></div>
         </form>}
-  </Modal>
+  </>
+  if (destructiveReview) return <DestructiveDialog title={titles[operation]} description={impacts[operation]} confirmLabel={confirmLabel} pending={pending} onClose={() => setReview(null)} onConfirm={() => { void persist() }}>{content}</DestructiveDialog>
+  return <Modal title={review ? `Confirm: ${titles[operation]}` : titles[operation]} description={impacts[operation]} onClose={close} pending={pending}>{content}</Modal>
 }
