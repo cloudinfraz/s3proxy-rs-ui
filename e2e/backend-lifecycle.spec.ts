@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import type { components } from '../src/api/schema'
-import { mockControlApi } from './control-fixtures'
+import { mockControlApi, navigateTo } from './control-fixtures'
 
 const fixtureId = '00000000-0000-4000-8000-000000000001'
 const selectedClientId = '00000000-0000-4000-8000-000000000071'
@@ -37,7 +37,13 @@ test('UI071-01 creates no-selector and user-assigned Managed Identity backends',
     return route.fallback()
   })
 
-  await page.goto('/admin/ui/backends')
+  const document = await page.goto('/admin/ui/azure-backends')
+  expect(document?.headers()['content-type']).toContain('text/html')
+  await expect(page.getByRole('cell', { name: 'fixture-backend', exact: true })).toBeVisible()
+  await page.reload()
+  await expect(page.getByRole('cell', { name: 'fixture-backend', exact: true })).toBeVisible()
+  await navigateTo(page, 'Azure backends')
+  await expect(page).toHaveURL(/\/admin\/ui\/azure-backends$/)
   await page.getByRole('button', { name: 'Register backend' }).click()
   await expect(page.getByLabel('Authentication').getByRole('option')).toHaveCount(1)
   await expect(page.getByLabel('Authentication')).toHaveValue('managed_identity')
@@ -114,7 +120,7 @@ test('UI071-02 recovers from duplicate create and guards referenced changes', as
       : route.fulfill({ status: 204 })
   })
 
-  await page.goto('/admin/ui/backends')
+  await page.goto('/admin/ui/azure-backends')
   await page.getByRole('button', { name: 'Register backend' }).click()
   await page.getByLabel('Name').fill('fixture-backend')
   await page.getByLabel('Azure account').fill('duplicateaccount')
@@ -166,7 +172,7 @@ test('UI071-04 inspects safe details for unavailable backend modes', async ({ pa
     if (route.request().isNavigationRequest() || route.request().method() !== 'GET') return route.fallback()
     return route.fulfill({ json: { count: items.length, items } satisfies components['schemas']['StorageBackendProjectionListResponse'] })
   })
-  await page.goto('/admin/ui/backends')
+  await page.goto('/admin/ui/azure-backends')
   for (const backend of items) {
     await expect(page.getByRole('button', { name: `Edit ${backend.name}` })).toBeDisabled()
     await page.getByRole('button', { name: `View ${backend.name}` }).click()

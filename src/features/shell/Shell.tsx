@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router'
 import { Dialog } from '@radix-ui/themes'
-import { Activity, Box, CircleGauge, Database, FileKey, KeyRound, LogOut, Menu, ScrollText, ServerCog, ShieldCheck, X } from 'lucide-react'
+import { Activity, Box, CircleGauge, Clock, Database, FileKey, KeyRound, LogOut, Menu, ScrollText, ServerCog, ShieldCheck, X } from 'lucide-react'
 import { api, ApiError, logout, setCsrfToken } from '../../api/client'
 import { controlQueries, type Schema } from '../../api/control'
 import { controlKeys } from '../../api/query-keys'
@@ -10,8 +10,8 @@ import { ErrorBanner } from '../../components/control'
 
 const groups = [
   { label: 'Overview', links: [{ to: '/', label: 'Overview', icon: CircleGauge }] },
-  { label: 'Access', links: [{ to: '/credentials', label: 'S3 identities', icon: KeyRound }] },
-  { label: 'Storage', links: [{ to: '/backends', label: 'Azure backends', icon: Database }, { to: '/buckets', label: 'Bucket routing', icon: Box }] },
+  { label: 'Access', links: [{ to: '/credentials', label: 'S3 identities', icon: KeyRound }, { to: '/temporary-credentials', label: 'Temporary credentials', icon: Clock }] },
+  { label: 'Storage', links: [{ to: '/azure-backends', label: 'Azure backends', icon: Database }, { to: '/buckets', label: 'Bucket routing', icon: Box }] },
   { label: 'Authorization', links: [{ to: '/policies', label: 'Policies', icon: ShieldCheck }, { to: '/iam-roles', label: 'IAM roles', icon: ShieldCheck }] },
   { label: 'Operations', links: [{ to: '/keys', label: 'Admin keys', icon: FileKey }, { to: '/audit', label: 'Audit', icon: ScrollText }, { to: '/health', label: 'Health', icon: Activity }] },
 ]

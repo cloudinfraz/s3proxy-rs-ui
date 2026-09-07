@@ -17,6 +17,16 @@ npm run dev
 The browser application is rooted at `/admin/ui/` and uses same-origin
 `/admin/*` requests for session cookies and CSRF protection.
 
+The Azure backends page is `/admin/ui/azure-backends`. Update old browser
+bookmarks: `/admin/ui/backends` is reserved for the JSON API, including its
+child routes. Vite and Nginx proxy those API requests before the SPA fallback.
+Deploy a rebuilt UI image to apply both the page and Nginx routing changes;
+changing only the control-plane image does not update this standalone UI.
+
+Bucket routing remains at `/admin/ui/buckets`. Its JSON APIs are
+`/admin/ui/virtual-buckets` (including child routes) and
+`/admin/ui/mapping-backends/:id`; both are proxied before the SPA fallback.
+
 ## Container Image
 
 Build from the repository root:

@@ -26,12 +26,12 @@ export function deriveReadiness(input: ReadinessInput): Finding[] {
   function checkBackend(id: string, code: string) {
     if (!input.backends) return
     const backend = backends.get(id)
-    if (!backend) add(`${code}-missing-backend`, 'A routing reference points to a missing backend', '/backends')
-    else if (!backend.enabled) add(`${code}-disabled-backend`, `Referenced backend ${backend.name} is disabled`, '/backends')
-    else if (capabilities && !capabilities.usable_registry_auth_modes.includes(backend.auth_mode)) add(`${code}-unsupported-backend`, `Referenced backend ${backend.name} uses an unavailable authentication mode`, '/backends')
+    if (!backend) add(`${code}-missing-backend`, 'A routing reference points to a missing backend', '/azure-backends')
+    else if (!backend.enabled) add(`${code}-disabled-backend`, `Referenced backend ${backend.name} is disabled`, '/azure-backends')
+    else if (capabilities && !capabilities.usable_registry_auth_modes.includes(backend.auth_mode)) add(`${code}-unsupported-backend`, `Referenced backend ${backend.name} uses an unavailable authentication mode`, '/azure-backends')
   }
   for (const backend of input.backends ?? []) {
-    if (backend.enabled && capabilities && !capabilities.usable_registry_auth_modes.includes(backend.auth_mode)) add(`backend-${backend.id}-unsupported`, `Backend ${backend.name} authentication is not usable`, '/backends')
+    if (backend.enabled && capabilities && !capabilities.usable_registry_auth_modes.includes(backend.auth_mode)) add(`backend-${backend.id}-unsupported`, `Backend ${backend.name} authentication is not usable`, '/azure-backends')
   }
   for (const identity of input.identities ?? []) {
     const code = `identity-${identity.credential_id ?? 'unidentified'}`

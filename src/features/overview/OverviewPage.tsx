@@ -17,7 +17,7 @@ export default function OverviewPage() {
   const counts = [
     { label: 'S3 identities', href: '/credentials', query: identities },
     { label: 'Bucket routing', href: '/buckets', query: buckets },
-    { label: 'Azure backends', href: '/backends', query: backends },
+    { label: 'Azure backends', href: '/azure-backends', query: backends },
     { label: 'Policies', href: '/policies', query: policies },
   ]
   const findings = deriveReadiness({ capabilities: capabilities.data, identities: identities.data, buckets: buckets.data, backends: backends.data, keys: keys.data, roles: roles.data?.next_after_id === null ? roles.data.items : undefined, now: Date.now() })

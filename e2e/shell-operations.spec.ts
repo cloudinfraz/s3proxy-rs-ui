@@ -40,7 +40,10 @@ test('UI069-03 keyboard navigation and unavailable capability states', async ({ 
   await page.route('**/admin/capabilities', route => route.fulfill({ json: { ...capabilities, sts_enabled: true } }))
   await page.goto('/admin/ui/')
   await expect(page.getByText('AssumeRole configuration is incomplete')).toBeVisible()
-  await expect(page.getByRole('link', { name: /AssumeRole|Temporary credentials/ })).toHaveCount(0)
+  await navigateTo(page, 'Temporary credentials')
+  await expect(page.getByRole('heading', { name: 'AssumeRole partially configured' })).toBeVisible()
+  await page.goBack()
+  await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible()
   const menu = page.getByRole('button', { name: 'Open navigation' })
   if (await menu.isVisible()) {
     await menu.focus()

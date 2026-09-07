@@ -7,7 +7,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '^/admin/ui/(roles(?:/|$|\\?)|role-policies(?:$|\\?)|identities(?:$|\\?))': { target: 'http://127.0.0.1:8080', changeOrigin: false },
+      '^/admin/ui/(backends(?:/|$|\\?)|virtual-buckets(?:/|$|\\?)|mapping-backends/|roles(?:/|$|\\?)|role-policies(?:$|\\?)|identities(?:$|\\?))': { target: 'http://127.0.0.1:8080', changeOrigin: false },
       '^/admin/(?!ui)': { target: 'http://127.0.0.1:8080', changeOrigin: false },
       '/health': 'http://127.0.0.1:8080',
     },
