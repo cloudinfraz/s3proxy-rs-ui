@@ -13,6 +13,7 @@ import VirtualMappingsPage from './features/buckets/VirtualMappingsPage'
 import RolesPage from './features/roles/RolesPage'
 import TemporaryCredentialsPage from './features/sts/TemporaryCredentialsPage'
 import PolicyWorkspace from './features/policies/PolicyWorkspace'
+import AppErrorLayer from './components/AppErrorLayer'
 import '@radix-ui/themes/styles.css'
 import '@fontsource/manrope/latin-400.css'
 import '@fontsource/manrope/latin-500.css'
@@ -26,7 +27,7 @@ import './features/shell/shell.css'
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 10_000, refetchOnWindowFocus: 'always' } } })
 
 export default function ControlApp() {
-  return <Theme accentColor="jade" grayColor="sand" radius="small"><QueryClientProvider client={queryClient}><BrowserRouter basename={import.meta.env.BASE_URL}><Routes>
+  return <Theme accentColor="jade" grayColor="sand" radius="small"><AppErrorLayer><QueryClientProvider client={queryClient}><BrowserRouter basename={import.meta.env.BASE_URL}><Routes>
     <Route path="/login" element={<LoginPage />} />
     <Route element={<Shell />}>
       <Route index element={<OverviewPage />} />
@@ -41,5 +42,5 @@ export default function ControlApp() {
       <Route path="health" element={<HealthPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Route>
-  </Routes></BrowserRouter></QueryClientProvider></Theme>
+  </Routes></BrowserRouter></QueryClientProvider></AppErrorLayer></Theme>
 }

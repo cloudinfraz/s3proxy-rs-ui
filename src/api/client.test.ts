@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, api, hasCsrfToken, login, logout, setCsrfToken, setProtectedForbiddenHandler } from './client'
+import { addApiErrorInterceptor, ApiError, api, hasCsrfToken, login, logout, setCsrfToken, setProtectedForbiddenHandler } from './client'
 
 const response = (body: unknown, status = 200) => new Response(
   status === 204 ? null : JSON.stringify(body),
@@ -10,6 +10,7 @@ afterEach(() => {
   setCsrfToken(null)
   setProtectedForbiddenHandler(null)
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
 })
 
 describe('browser API client', () => {
@@ -116,5 +117,24 @@ describe('browser API client', () => {
     await expect(api('/admin/session/login', { method: 'POST', body: '{}' })).rejects.toBeInstanceOf(ApiError)
 
     expect(forbidden).toHaveBeenCalledTimes(1)
+  })
+
+  it('intercepts sanitized CSRF, transport, and response errors with request context', async () => {
+    const interceptor = vi.fn()
+    const remove = addApiErrorInterceptor(interceptor)
+
+    await expect(api('/admin/api-keys', { method: 'POST' })).rejects.toBeInstanceOf(ApiError)
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('private transport detail')))
+    await expect(api('/admin/health')).rejects.toBeInstanceOf(ApiError)
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ message: 'private response detail' }, 503)))
+    await expect(api('/admin/health')).rejects.toBeInstanceOf(ApiError)
+    remove()
+
+    expect(interceptor).toHaveBeenCalledTimes(3)
+    expect(interceptor.mock.calls).toEqual([
+      [expect.objectContaining({ status: 403 }), { path: '/admin/api-keys', method: 'POST' }],
+      [expect.objectContaining({ status: 0, message: 'The control service could not be reached. Retry the request.' }), { path: '/admin/health', method: 'GET' }],
+      [expect.objectContaining({ status: 503, message: 'The control service is temporarily unavailable. Retry the request.' }), { path: '/admin/health', method: 'GET' }],
+    ])
   })
 })

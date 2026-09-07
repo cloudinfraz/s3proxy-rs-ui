@@ -30,6 +30,17 @@ describe('role limits and trust inputs', () => {
     expect(trustError(draft.account, repeated)).toContain('Duplicate')
     expect(trustError(draft.account, [{ ...draft.trust[0], conditions: [{ operator: 'Bool', key: 'aws:SecureTransport', value: 'yes' }] }])).toContain('true or false')
   })
+
+  it('reports malformed create, trust, duration, and policy fields', () => {
+    expect(trustError('123', draft.trust)).toContain('12 digits')
+    expect(trustError(draft.account, [{ ...draft.trust[0], conditions: [{ operator: 'StringEquals', key: 'unsupported', value: 'value' }] }])).toContain('Unsupported')
+    expect(trustError(draft.account, [{ ...draft.trust[0], conditions: [{ operator: 'StringEquals', key: 'sts:ExternalId', value: '' }] }])).toContain('requires a new value')
+    expect(validateRoleDraft('create', { ...draft, name: 'invalid name' }, limits)).toContain('Role name')
+    expect(validateRoleDraft('create', { ...draft, path: 'missing-slashes' }, limits)).toContain('Role path')
+    expect(validateRoleDraft('create', { ...draft, owner: '' }, limits)).toContain('resource owner')
+    expect(validateRoleDraft('settings', { ...draft, duration: '3600.5' }, limits)).toContain('Duration')
+    expect(validateRoleDraft('attach', { ...draft, policy: '' }, limits)).toContain('policy')
+  })
 })
 
 describe('reviewed role actions', () => {
@@ -58,5 +69,7 @@ describe('reviewed role actions', () => {
       expect(() => mutationRequest(action, changed, detail)).toThrow('unavailable')
       expect(mutationRequest(action, changed, detail, selected).body).toEqual({ expected_impact_token: detail.impact_token, change: { policy_id: owner, expected_policy_revision: 8 } })
     }
+    expect(mutationRequest('attach', { ...draft, policy: owner }, detail, selected).method).toBe('POST')
+    expect(mutationRequest('detach', { ...draft, policy: owner }, detail, selected).method).toBe('DELETE')
   })
 })

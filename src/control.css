@@ -323,6 +323,22 @@ td {
   font-size: 13px;
 }
 
+.fatal-error {
+  min-height: 100vh;
+  display: grid;
+  place-content: center;
+  justify-items: start;
+  gap: 12px;
+  padding: 32px;
+  background: #f7f9f7;
+  color: #24352d;
+}
+
+.fatal-error h1,
+.fatal-error p {
+  margin: 0;
+}
+
 .dialog-backdrop {
   position: fixed;
   inset: 0;
