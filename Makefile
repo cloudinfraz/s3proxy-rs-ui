@@ -28,6 +28,7 @@ ui-check: install
 	npm run lint
 	npm test
 	npm run test:deploy
+	npm run test:release
 	npm run build
 	npm run test:e2e
 

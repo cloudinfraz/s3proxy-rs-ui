@@ -25,6 +25,7 @@
     "lint": "oxlint",
     "test": "vitest run src",
     "test:deploy": "node --test scripts/deploy/*.test.mjs && scripts/deploy/render-ui-manifest.test.sh",
+    "test:release": "node --test scripts/release/*.test.mjs",
     "test:e2e": "playwright test",
     "test:e2e:live": "playwright test --config playwright.live.config.ts",
     "preview": "vite preview --host 127.0.0.1"
