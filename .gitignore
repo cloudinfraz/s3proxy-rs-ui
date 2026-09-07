@@ -25,4 +25,4 @@ test-results
 *.njsproj
 *.sln
 *.sw?
-target/release/release-notes.md
+target
