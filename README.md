@@ -143,6 +143,10 @@ required by the workflow.
 See [`docs/deployment.md`](docs/deployment.md) for manifest rendering,
 prerequisites, network policy behavior, and release workflow configuration.
 
+Public releases are prepared through reviewed `release/vX.Y.Z` branches. See
+[`docs/releasing.md`](docs/releasing.md) for versioning, automated GHCR and
+GitHub Release publication, signing, and attached artifacts.
+
 ## Contributing
 
 Contributions are welcome. Read [`CONTRIBUTING.md`](CONTRIBUTING.md) for setup,

@@ -82,6 +82,10 @@ Pull requests should:
 Maintainers may ask for a change to be split when unrelated concerns make it
 difficult to review safely.
 
+Release preparation uses a dedicated `release/vX.Y.Z` branch and the process in
+[`docs/releasing.md`](docs/releasing.md). Release tags are created by automation
+after merge and must not be pushed from the preparation branch.
+
 ## Review and licensing
 
 All changes require review and must pass the repository's required checks.

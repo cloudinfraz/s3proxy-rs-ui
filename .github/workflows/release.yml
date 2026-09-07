@@ -1,0 +1,261 @@
+name: Release
+
+run-name: Release ${{ inputs.version || github.head_ref }}
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, closed]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to publish without the v prefix
+        required: true
+        type: string
+
+concurrency:
+  group: release-${{ github.event.pull_request.number || inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate release candidate
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (startsWith(github.event.pull_request.head.ref, 'release/v') &&
+       (github.event.action != 'closed' || github.event.pull_request.merged == true))
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      tag: ${{ steps.release.outputs.tag }}
+    steps:
+      - name: Checkout release revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+
+      - name: Resolve and validate release metadata
+        id: release
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+          RELEASE_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            version="$REQUESTED_VERSION"
+          else
+            [[ "$RELEASE_BRANCH" =~ ^release/v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+              echo "Release branches must be named release/vX.Y.Z" >&2
+              exit 1
+            }
+            version="${RELEASE_BRANCH#release/v}"
+          fi
+          node scripts/release/prepare-release.mjs "$version"
+
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts --registry=https://registry.npmjs.org/
+
+      - name: Audit dependencies
+        run: npm audit --audit-level=high --registry=https://registry.npmjs.org/
+
+      - name: Validate generated API contract
+        run: |
+          set -euo pipefail
+          expected="$(node -e "console.log(require('./contracts/backend-contract.json').openapi_sha256)")"
+          actual="$(sha256sum contracts/admin-openapi.json | awk '{print $1}')"
+          [[ "$actual" == "$expected" ]] || {
+            echo "Pinned OpenAPI checksum does not match backend-contract.json" >&2
+            exit 1
+          }
+          npm run generate:api
+          git diff --exit-code -- src/api/schema.d.ts
+
+      - name: Lint, test, and build
+        run: |
+          npm run lint
+          npm test
+          npm run test:deploy
+          npm run test:release
+          npm run build
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser acceptance
+        run: npm run test:e2e
+
+      - name: Package static distribution
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          source_date_epoch="$(git show -s --format=%ct HEAD)"
+          tar --sort=name --mtime="@${source_date_epoch}" --owner=0 --group=0 \
+            --numeric-owner -czf "target/release/s3proxy-rs-ui-v${VERSION}.tar.gz" -C dist .
+          sha256sum "target/release/s3proxy-rs-ui-v${VERSION}.tar.gz"
+
+      - name: Verify candidate runtime image
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          UI_EXPECTED_REVISION: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+          UI_IMAGE: s3proxy-ui:release-candidate
+        run: |
+          docker build \
+            --build-arg "OCI_REVISION=${UI_EXPECTED_REVISION}" \
+            --build-arg "OCI_VERSION=${VERSION}" \
+            --tag "$UI_IMAGE" .
+          scripts/verify-ui-image.sh
+
+  publish:
+    name: Publish release
+    needs: validate
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.action == 'closed' && github.event.pull_request.merged == true)
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      VERSION: ${{ needs.validate.outputs.version }}
+      TAG: ${{ needs.validate.outputs.tag }}
+      IMAGE_NAME: ghcr.io/${{ github.repository }}
+      RELEASE_REVISION: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+    steps:
+      - name: Checkout release revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+
+      - name: Verify revision is merged to main
+        run: |
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor HEAD origin/main || {
+            echo "Release revision must already be contained in origin/main" >&2
+            exit 1
+          }
+
+      - name: Reject an existing GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "GitHub release ${TAG} already exists; publish a new patch version" >&2
+            exit 1
+          fi
+
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Build release assets
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --registry=https://registry.npmjs.org/
+          npm run build
+          node scripts/release/prepare-release.mjs "$VERSION"
+          source_date_epoch="$(git show -s --format=%ct HEAD)"
+          tar --sort=name --mtime="@${source_date_epoch}" --owner=0 --group=0 \
+            --numeric-owner -czf "target/release/s3proxy-rs-ui-v${VERSION}.tar.gz" -C dist .
+
+      - name: Log in to GitHub Container Registry
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: echo "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      - name: Build and publish immutable image
+        id: image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ env.TAG }}
+            ${{ env.IMAGE_NAME }}:${{ env.RELEASE_REVISION }}
+            ${{ env.IMAGE_NAME }}:latest
+          provenance: mode=max
+          sbom: true
+          build-args: |
+            OCI_REVISION=${{ env.RELEASE_REVISION }}
+            OCI_VERSION=${{ env.VERSION }}
+
+      - name: Pull and verify published image
+        env:
+          UI_IMAGE: ${{ env.IMAGE_NAME }}@${{ steps.image.outputs.digest }}
+          UI_EXPECTED_REVISION: ${{ env.RELEASE_REVISION }}
+        run: |
+          docker pull "$UI_IMAGE"
+          scripts/verify-ui-image.sh
+
+      - name: Scan published image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}@${{ steps.image.outputs.digest }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: 1
+
+      - name: Export SPDX SBOM
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        with:
+          image: ${{ env.IMAGE_NAME }}@${{ steps.image.outputs.digest }}
+          output-file: target/release/s3proxy-rs-ui-v${{ env.VERSION }}.spdx.json
+          upload-artifact: false
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.1.2
+
+      - name: Sign immutable image
+        env:
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+        run: cosign sign --yes "${IMAGE_NAME}@${IMAGE_DIGEST}"
+
+      - name: Create checksums and artifact summary
+        env:
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          set -euo pipefail
+          cd target/release
+          sha256sum "s3proxy-rs-ui-v${VERSION}.tar.gz" \
+            "s3proxy-rs-ui-v${VERSION}.spdx.json" > SHA256SUMS
+          cat >> release-notes.md <<EOF
+
+          ### Published artifacts
+
+          - Static UI package: \`s3proxy-rs-ui-v${VERSION}.tar.gz\`
+          - Container image: \`${IMAGE_NAME}@${IMAGE_DIGEST}\`
+          - SPDX SBOM and SHA-256 checksums attached to this release
+          EOF
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" \
+            "target/release/s3proxy-rs-ui-v${VERSION}.tar.gz" \
+            "target/release/s3proxy-rs-ui-v${VERSION}.spdx.json" \
+            "target/release/SHA256SUMS" \
+            --target "$RELEASE_REVISION" \
+            --title "s3proxy-rs UI ${TAG}" \
+            --notes-file target/release/release-notes.md
