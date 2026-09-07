@@ -4,6 +4,158 @@
  */
 
 export interface paths {
+    "/admin/ui/policies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listAdminPolicies"];
+        put?: never;
+        post: operations["createAdminPolicy"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/ui/policies/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["validateAdminPolicyDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/ui/policies/preflight": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["preflightAdminPolicies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/ui/policies/simulate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["simulateAdminIdentityPolicies"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/ui/policies/{policy_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                policy_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["getAdminPolicy"];
+        put: operations["updateReviewedAdminPolicy"];
+        post?: never;
+        delete: operations["deleteReviewedAdminPolicy"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/ui/identities/{credential_id}/policies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                credential_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["listAdminIdentityPolicies"];
+        put?: never;
+        post: operations["attachReviewedAdminIdentityPolicy"];
+        delete: operations["detachReviewedAdminIdentityPolicy"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/ui/bucket-policies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listAdminBucketPolicies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/ui/bucket-policies/direct/{bucket}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bucket: string;
+            };
+            cookie?: never;
+        };
+        get: operations["getAdminDirectBucketPolicy"];
+        put: operations["updateReviewedAdminDirectBucketPolicy"];
+        post?: never;
+        delete: operations["deleteReviewedAdminDirectBucketPolicy"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/ui/bucket-policies/virtual/{bucket_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bucket_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["getAdminVirtualBucketPolicy"];
+        put: operations["updateReviewedAdminVirtualBucketPolicy"];
+        post?: never;
+        delete: operations["deleteReviewedAdminVirtualBucketPolicy"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/ui/roles": {
         parameters: {
             query?: never;
@@ -1016,6 +1168,191 @@ export interface components {
             enabled: boolean;
             revision: number;
         };
+        AdminPolicySummary: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            description: string | null;
+            revision: number;
+            built_in: boolean;
+            deletable: boolean;
+            credential_attachment_count: number;
+            role_attachment_count: number;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        AdminPolicyPage: {
+            items: components["schemas"]["AdminPolicySummary"][];
+            /** Format: uuid */
+            next_after_id: string | null;
+            /** @constant */
+            default_page_size: 100;
+            /** @constant */
+            max_page_size: 200;
+        };
+        AdminPolicyDetail: {
+            policy: components["schemas"]["AdminPolicySummary"];
+            document: components["schemas"]["JsonValue"];
+            impact_token: string;
+        };
+        AdminPolicyCreateRequest: {
+            name: string;
+            document: components["schemas"]["JsonValue"];
+            description?: string | null;
+        };
+        AdminPolicyUpdate: {
+            document?: components["schemas"]["JsonValue"];
+            /** @description Omitted preserves the current description; null clears it; a string replaces it. */
+            description?: string | null;
+        };
+        ReviewPolicyUpdateRequest: {
+            expected_impact_token: string;
+            change: components["schemas"]["AdminPolicyUpdate"];
+        };
+        ReviewPolicyDeleteRequest: {
+            expected_impact_token: string;
+        };
+        AdminPolicyMutationResult: {
+            changed: boolean;
+            deleted: boolean;
+            detail: components["schemas"]["AdminPolicyDetail"] | null;
+        };
+        AdminIdentityPolicyAttachment: {
+            /** Format: uuid */
+            policy_id: string;
+            policy_name: string;
+            policy_revision: number;
+            /** Format: date-time */
+            attached_at: string;
+        };
+        AdminIdentityPolicyDetail: {
+            /** Format: uuid */
+            credential_id: string;
+            credential_revision: number;
+            attachments: components["schemas"]["AdminIdentityPolicyAttachment"][];
+            impact_token: string;
+        };
+        AdminIdentityPolicyPage: {
+            /** Format: uuid */
+            credential_id: string;
+            credential_revision: number;
+            items: components["schemas"]["AdminIdentityPolicyAttachment"][];
+            /** Format: uuid */
+            next_after_id: string | null;
+            impact_token: string;
+            /** @constant */
+            default_page_size: 100;
+            /** @constant */
+            max_page_size: 200;
+        };
+        ReviewedPolicyReference: {
+            /** Format: uuid */
+            policy_id: string;
+            expected_policy_revision: number;
+        };
+        ReviewCredentialPolicyRequest: {
+            expected_impact_token: string;
+            expected_credential_revision: number;
+            policy: components["schemas"]["ReviewedPolicyReference"];
+        };
+        AdminIdentityPolicyMutationResult: {
+            changed: boolean;
+            detail: components["schemas"]["AdminIdentityPolicyDetail"];
+        };
+        AdminDirectBucketPolicyScope: {
+            /** @constant */
+            kind: "direct";
+            bucket: string;
+        };
+        AdminVirtualBucketPolicyScope: {
+            /** @constant */
+            kind: "virtual";
+            /** Format: uuid */
+            bucket_id: string;
+            bucket: string;
+            /** Format: uuid */
+            credential_id: string;
+        };
+        AdminBucketPolicyScope: components["schemas"]["AdminDirectBucketPolicyScope"] | components["schemas"]["AdminVirtualBucketPolicyScope"];
+        AdminBucketPolicySummary: {
+            scope: components["schemas"]["AdminBucketPolicyScope"];
+            revision: number;
+            /** Format: date-time */
+            updated_at: string;
+            review_token: string;
+        };
+        AdminBucketPolicyPage: {
+            items: components["schemas"]["AdminBucketPolicySummary"][];
+            next_after_key: string | null;
+            /** @constant */
+            default_page_size: 100;
+            /** @constant */
+            max_page_size: 200;
+        };
+        AdminBucketPolicyDetail: {
+            policy: components["schemas"]["AdminBucketPolicySummary"];
+            document: components["schemas"]["JsonValue"];
+        };
+        ReviewBucketPolicyMutationRequest: {
+            expected_review_token: string;
+            /** @description Required for update and omitted for delete. */
+            document?: components["schemas"]["JsonValue"];
+        };
+        AdminBucketPolicyMutationResult: {
+            changed: boolean;
+            deleted: boolean;
+            detail: components["schemas"]["AdminBucketPolicyDetail"] | null;
+        };
+        /** @enum {string} */
+        AdminPolicyDocumentKind: "managed_policy" | "bucket_policy";
+        AdminValidatePolicyDraftRequest: {
+            kind: components["schemas"]["AdminPolicyDocumentKind"];
+            document: components["schemas"]["JsonValue"];
+        };
+        AdminPolicyValidationViolation: {
+            field: string;
+            code: string;
+            message: string;
+        };
+        AdminPolicyDraftValidationResponse: {
+            valid: boolean;
+            violations: components["schemas"]["AdminPolicyValidationViolation"][];
+            json_bytes: number;
+            statements: number;
+            compiled_bytes: number;
+        };
+        AdminPolicyPreflightViolation: {
+            /** @enum {string} */
+            kind: "managed_policy" | "direct_bucket_policy" | "virtual_bucket_policy";
+            /** Format: uuid */
+            stable_id: string | null;
+            name: string;
+            reasons: string[];
+        };
+        AdminPolicyPreflightResponse: {
+            items: components["schemas"]["AdminPolicyPreflightViolation"][];
+            returned: number;
+            truncated: boolean;
+            limit: number;
+        };
+        AdminPolicySimulationRequest: {
+            /** Format: uuid */
+            credential_id: string;
+            action: string;
+            resource: string;
+            /** @default {} */
+            conditions: {
+                [key: string]: string;
+            };
+        };
+        /** @enum {string} */
+        AdminPolicySimulationEffect: "Allow" | "ExplicitDeny" | "ImplicitDeny";
+        AdminPolicySimulationResponse: {
+            allowed: boolean;
+            effect: components["schemas"]["AdminPolicySimulationEffect"];
+            matched_sid: string | null;
+            evaluated_policies: number;
+        };
         Error: {
             Code: string;
             Message: string;
@@ -1648,6 +1985,522 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    listAdminPolicies: {
+        parameters: {
+            query?: {
+                after_id?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bounded managed-policy review page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminPolicyPage"];
+                };
+            };
+            400: components["responses"]["ControlError"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    createAdminPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminPolicyCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Managed policy created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminPolicyDetail"];
+                };
+            };
+            400: components["responses"]["ControlError"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["ControlError"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    validateAdminPolicyDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminValidatePolicyDraftRequest"];
+            };
+        };
+        responses: {
+            /** @description Side-effect-free policy draft validation */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminPolicyDraftValidationResponse"];
+                };
+            };
+            400: components["responses"]["ControlError"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    preflightAdminPolicies: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bounded persisted-policy guardrail violations */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminPolicyPreflightResponse"];
+                };
+            };
+            400: components["responses"]["ControlError"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    simulateAdminIdentityPolicies: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminPolicySimulationRequest"];
+            };
+        };
+        responses: {
+            /** @description Read-only effective-policy decision */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminPolicySimulationResponse"];
+                };
+            };
+            400: components["responses"]["ControlError"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["ControlError"];
+            503: components["responses"]["ControlError"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    getAdminPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                policy_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authoritative managed-policy review */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminPolicyDetail"];
+                };
+            };
+            400: components["responses"]["ControlError"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["ControlError"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    updateReviewedAdminPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                policy_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewPolicyUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Reviewed managed-policy update */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminPolicyMutationResult"];
+                };
+            };
+            400: components["responses"]["ControlError"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["ControlError"];
+            409: components["responses"]["ControlError"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    deleteReviewedAdminPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                policy_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewPolicyDeleteRequest"];
+            };
+        };
+        responses: {
+            /** @description Reviewed managed-policy deletion */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminPolicyMutationResult"];
+                };
+            };
+            400: components["responses"]["ControlError"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["ControlError"];
+            409: components["responses"]["ControlError"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    listAdminIdentityPolicies: {
+        parameters: {
+            query?: {
+                after_id?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                credential_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bounded identity policy relationships */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminIdentityPolicyPage"];
+                };
+            };
+            400: components["responses"]["ControlError"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["ControlError"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    attachReviewedAdminIdentityPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                credential_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewCredentialPolicyRequest"];
+            };
+        };
+        responses: {
+            /** @description Reviewed identity policy attachment */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminIdentityPolicyMutationResult"];
+                };
+            };
+            400: components["responses"]["ControlError"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["ControlError"];
+            409: components["responses"]["ControlError"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    detachReviewedAdminIdentityPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                credential_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewCredentialPolicyRequest"];
+            };
+        };
+        responses: {
+            /** @description Reviewed identity policy detachment */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminIdentityPolicyMutationResult"];
+                };
+            };
+            400: components["responses"]["ControlError"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["ControlError"];
+            409: components["responses"]["ControlError"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    listAdminBucketPolicies: {
+        parameters: {
+            query?: {
+                after_key?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bounded explicit-scope bucket-policy page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminBucketPolicyPage"];
+                };
+            };
+            400: components["responses"]["ControlError"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    getAdminDirectBucketPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bucket: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authoritative direct bucket-policy review */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminBucketPolicyDetail"];
+                };
+            };
+            400: components["responses"]["ControlError"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["ControlError"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    updateReviewedAdminDirectBucketPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bucket: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewBucketPolicyMutationRequest"];
+            };
+        };
+        responses: {
+            /** @description Reviewed direct bucket-policy update */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminBucketPolicyMutationResult"];
+                };
+            };
+            400: components["responses"]["ControlError"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["ControlError"];
+            409: components["responses"]["ControlError"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    deleteReviewedAdminDirectBucketPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bucket: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewBucketPolicyMutationRequest"];
+            };
+        };
+        responses: {
+            /** @description Reviewed direct bucket-policy deletion */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminBucketPolicyMutationResult"];
+                };
+            };
+            400: components["responses"]["ControlError"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["ControlError"];
+            409: components["responses"]["ControlError"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    getAdminVirtualBucketPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bucket_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authoritative virtual bucket-policy review */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminBucketPolicyDetail"];
+                };
+            };
+            400: components["responses"]["ControlError"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["ControlError"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    updateReviewedAdminVirtualBucketPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bucket_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewBucketPolicyMutationRequest"];
+            };
+        };
+        responses: {
+            /** @description Reviewed virtual bucket-policy update */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminBucketPolicyMutationResult"];
+                };
+            };
+            400: components["responses"]["ControlError"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["ControlError"];
+            409: components["responses"]["ControlError"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    deleteReviewedAdminVirtualBucketPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bucket_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewBucketPolicyMutationRequest"];
+            };
+        };
+        responses: {
+            /** @description Reviewed virtual bucket-policy deletion */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminBucketPolicyMutationResult"];
+                };
+            };
+            400: components["responses"]["ControlError"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["ControlError"];
+            409: components["responses"]["ControlError"];
+            default: components["responses"]["ControlError"];
+        };
+    };
     listAdminRoles: {
         parameters: {
             query?: {

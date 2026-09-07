@@ -31,6 +31,12 @@ export const collections = {
     count: 1,
     items: [{ id: fixtureId, name: 'fixture-policy', document: { Version: '2012-10-17', Statement: [] }, description: null, created_at: timestamp, updated_at: timestamp }],
   } satisfies components['schemas']['PolicyListResponse'],
+  '/admin/ui/policies': {
+    items: [{ id: fixtureId, name: 'fixture-policy', description: null, revision: 0, built_in: false, deletable: true, credential_attachment_count: 0, role_attachment_count: 0, updated_at: timestamp }],
+    next_after_id: null,
+    default_page_size: 100,
+    max_page_size: 200,
+  } satisfies components['schemas']['AdminPolicyPage'],
   '/admin/backends': [
     { id: fixtureId, name: 'fixture-backend', azure_account: 'fixtureaccount', auth_mode: 'managed_identity', managed_identity_client_id: null, user_delegation_sas_enabled: false, has_secret_ref: false, region_label: null, enabled: true },
   ] satisfies components['schemas']['StorageBackendList'],
@@ -51,6 +57,7 @@ export const emptyCollections = {
   '/admin/credentials': { count: 0, items: [] },
   '/admin/ui/identities': { count: 0, items: [] },
   '/admin/policies': { count: 0, items: [] },
+  '/admin/ui/policies': { items: [], next_after_id: null, default_page_size: 100, max_page_size: 200 },
   '/admin/backends': [],
   '/admin/ui/backends': { count: 0, items: [] },
   '/admin/virtual-buckets': [],

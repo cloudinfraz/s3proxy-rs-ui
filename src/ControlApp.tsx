@@ -7,12 +7,12 @@ import OverviewPage from './features/overview/OverviewPage'
 import AdminKeysPage from './features/operations/AdminKeysPage'
 import AuditPage from './features/operations/AuditPage'
 import HealthPage from './features/operations/HealthPage'
-import ResourcePage from './features/resources/ResourcePage'
 import IdentitiesPage from './features/identities/IdentitiesPage'
 import BackendsPage from './features/backends/BackendsPage'
 import VirtualMappingsPage from './features/buckets/VirtualMappingsPage'
 import RolesPage from './features/roles/RolesPage'
 import TemporaryCredentialsPage from './features/sts/TemporaryCredentialsPage'
+import PolicyWorkspace from './features/policies/PolicyWorkspace'
 import '@radix-ui/themes/styles.css'
 import '@fontsource/manrope/latin-400.css'
 import '@fontsource/manrope/latin-500.css'
@@ -33,7 +33,7 @@ export default function ControlApp() {
       <Route path="credentials" element={<IdentitiesPage />} />
       <Route path="azure-backends" element={<BackendsPage />} />
       <Route path="buckets" element={<VirtualMappingsPage />} />
-      <Route path="policies" element={<ResourcePage resourceName="policies" />} />
+      <Route path="policies" element={<PolicyWorkspace />} />
       <Route path="iam-roles" element={<RolesPage />} />
       <Route path="temporary-credentials" element={<TemporaryCredentialsPage />} />
       <Route path="keys" element={<AdminKeysPage />} />
