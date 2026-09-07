@@ -13,8 +13,12 @@ export class ApiError extends Error {
   }
 }
 
+export type ApiErrorContext = Readonly<{ path: string; method: string }>
+export type ApiErrorInterceptor = (error: ApiError, context: ApiErrorContext) => void
+
 let csrfToken: string | null = null
 let protectedForbiddenHandler: (() => void) | null = null
+const apiErrorInterceptors = new Set<ApiErrorInterceptor>()
 
 const statusMessages: Readonly<Record<number, string>> = {
   400: 'The request is invalid. Review the entered values and try again.',
@@ -49,6 +53,18 @@ export function hasCsrfToken() {
 
 export function setProtectedForbiddenHandler(handler: (() => void) | null) {
   protectedForbiddenHandler = handler
+}
+
+export function addApiErrorInterceptor(interceptor: ApiErrorInterceptor) {
+  apiErrorInterceptors.add(interceptor)
+  return () => { apiErrorInterceptors.delete(interceptor) }
+}
+
+function interceptApiError(error: ApiError, context: ApiErrorContext) {
+  for (const interceptor of apiErrorInterceptors) {
+    try { interceptor(error, context) } catch { continue }
+  }
+  return error
 }
 
 function safeErrorCode(response: Response, body: string): string | null {
@@ -96,13 +112,14 @@ async function toApiError(response: Response) {
 
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const method = (init.method ?? 'GET').toUpperCase()
+  const context = { path, method }
   const mutating = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)
   const headers = new Headers(init.headers)
   if (init.body && !headers.has('content-type')) {
     headers.set('content-type', 'application/json')
   }
   if (mutating && path !== '/admin/session/login') {
-    if (!csrfToken) throw new ApiError(403, 'The browser session has no CSRF token. Sign in again.')
+    if (!csrfToken) throw interceptApiError(new ApiError(403, 'The browser session has no CSRF token. Sign in again.'), context)
     headers.set('x-csrf-token', csrfToken)
   }
 
@@ -111,13 +128,15 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     headers,
     credentials: 'same-origin',
     cache: 'no-store',
-  }).catch(() => { throw new ApiError(0, 'The control service could not be reached. Retry the request.') })
+  }).catch(() => {
+    throw interceptApiError(new ApiError(0, 'The control service could not be reached. Retry the request.'), context)
+  })
   if (!response.ok) {
     const error = await toApiError(response)
     if (response.status === 403 && path !== '/admin/session' && path !== '/admin/session/login') {
       protectedForbiddenHandler?.()
     }
-    throw error
+    throw interceptApiError(error, context)
   }
   if (response.status === 204) return undefined as T
   return response.json() as Promise<T>

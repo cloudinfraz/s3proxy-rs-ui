@@ -21,7 +21,10 @@ export function directTarget(input: { identity: Identity; backends?: readonly Ba
 }
 
 export function directListExamples(endpoint: string | null | undefined) {
-  if (!endpoint || endpoint.trim() !== endpoint || /[\u0000-\u0020\u007f]/.test(endpoint)) return undefined
+  if (!endpoint || endpoint.trim() !== endpoint || Array.from(endpoint).some(character => {
+    const codePoint = character.codePointAt(0)
+    return codePoint !== undefined && (codePoint <= 0x20 || codePoint === 0x7f)
+  })) return undefined
   try {
     const parsed = new URL(endpoint)
     if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password || parsed.search || parsed.hash) return undefined
