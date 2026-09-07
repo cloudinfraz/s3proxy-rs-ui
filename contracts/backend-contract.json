@@ -1,0 +1,5 @@
+{
+  "backend_repository": "cloudinfraz/s3proxy-rs",
+  "backend_revision": "7d16a4b49d7e5f9aea1e4dda03205d2afc4844c9",
+  "openapi_sha256": "003ca61d57a70126e9092486b5e9c94a9080de6cd57944fd3a88062db1f903be"
+}

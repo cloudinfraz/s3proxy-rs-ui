@@ -1,11 +1,11 @@
 {
-  "name": "ui",
+  "name": "s3proxy-rs-ui",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "generate:api": "openapi-typescript ../src/admin/openapi.json -o src/api/schema.d.ts",
+    "generate:api": "openapi-typescript contracts/admin-openapi.json -o src/api/schema.d.ts",
     "build": "npm run generate:api && tsc -b && vite build",
     "lint": "oxlint",
     "test": "vitest run src",

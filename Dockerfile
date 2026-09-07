@@ -2,7 +2,7 @@ ARG UI_RUNTIME_IMAGE="quay.io/nginx/nginx-unprivileged:stable-alpine@sha256:4427
 
 FROM ${UI_RUNTIME_IMAGE}
 
-ARG OCI_SOURCE="https://github.com/cloudinfraz/s3proxy-rs"
+ARG OCI_SOURCE="https://github.com/cloudinfraz/s3proxy-rs-ui"
 ARG OCI_REVISION="unknown"
 ARG OCI_VERSION="0.0.0"
 
