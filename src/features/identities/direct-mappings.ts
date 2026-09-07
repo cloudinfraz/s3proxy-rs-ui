@@ -9,7 +9,7 @@ export function createDirectMappingPayload(input: Omit<IdentityCreateInput, 'acc
   return createIdentityPayload({ ...input, accessMode: 'direct' })
 }
 
-export function updateDirectMappingPayload(input: { identity: Schema['IdentityProjection']; azureAccount: string; defaultBackendId: string; enabled: boolean; versioningEnabled: boolean }): Schema['UpdateCredentialRequest'] {
+export function updateDirectMappingPayload(input: { identity: Schema['IdentityProjection']; azureAccount: string; defaultBackendId: string; enabled: boolean | null; versioningEnabled: boolean }): Schema['UpdateCredentialRequest'] {
   if (input.identity.access_mode !== 'direct') throw new Error('Only direct mappings can be configured here.')
   const payload = updateIdentityPayload(input)
   if (input.azureAccount !== input.identity.azure_account) {

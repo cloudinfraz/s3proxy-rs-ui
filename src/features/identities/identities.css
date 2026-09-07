@@ -51,3 +51,12 @@
   font: 13px 'IBM Plex Mono', monospace;
   overflow-wrap: anywhere;
 }
+
+.identity-details dd {
+  margin: 4px 0 14px;
+  overflow-wrap: anywhere;
+}
+
+.identity-details dt {
+  font-weight: 600;
+}

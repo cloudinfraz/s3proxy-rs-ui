@@ -8,7 +8,7 @@ import { invalidateControl } from '../../api/query-keys'
 import { DataTable, DestructiveDialog, ErrorBanner, Modal, Page, RefreshButton } from '../../components/control'
 import { EphemeralCredentials, type EphemeralCredentialMaterial } from '../../components/EphemeralCredentials'
 import { completionGuard } from '../operations/state'
-import { createIdentityPayload, replacementIdentityPayload, updateIdentityPayload } from './payloads'
+import { createIdentityPayload, identityBackendOptions, replacementIdentityDraft, updateIdentityPayload } from './payloads'
 import { createDirectMappingPayload, directMappingRemovalDescription, directMappingRows, updateDirectMappingPayload } from './direct-mappings'
 import './identities.css'
 import DirectMappingDetails from './DirectMappingDetails'
@@ -58,6 +58,11 @@ export default function IdentitiesPage() {
     event.preventDefault()
     if (pending) return
     const form = new FormData(event.currentTarget)
+    const backendId = (event.currentTarget.elements.namedItem('default_backend_id') as HTMLSelectElement).value
+    if (backendId && !(!backends.isError && backends.data?.some(backend => backend.id === backendId && backend.enabled))) {
+      setError(new Error('Select an enabled backend or the legacy account route.'))
+      return
+    }
     const request = begin()
     try {
       const result = await api<Schema['CredentialCreatedResponse']>('/admin/credentials', {
@@ -66,12 +71,13 @@ export default function IdentitiesPage() {
           azureAccount: String(form.get('azure_account')),
           accessMode: String(form.get('access_mode')) as Schema['CredentialAccessMode'],
           versioningEnabled: form.get('versioning_enabled') === 'on',
-          defaultBackendId: String(form.get('default_backend_id') ?? ''),
+          defaultBackendId: backendId,
         })),
       })
       void invalidateControl(queryClient)
       if (!guard.current.current(request)) return
       setCreating(false)
+      setAction(null)
       setOneTime({ accessKey: result.s3_access_key, secretKey: result.s3_secret_key, endpoint: result.s3_endpoint })
     } catch (cause) { report(cause, 'Identity creation', request) }
     finally { if (guard.current.current(request)) setPending(false) }
@@ -84,12 +90,13 @@ export default function IdentitiesPage() {
     try {
       if (action.kind === 'edit') {
         const form = new FormData(event?.currentTarget)
+        const selectedBackend = String(form.get('default_backend_id') ?? '')
         const input = {
           identity: action.identity,
           azureAccount: String(form.get('azure_account') ?? action.identity.azure_account),
-          enabled: form.get('enabled') === 'on',
+          enabled: action.identity.enabled === null ? null : form.get('enabled') === 'on',
           versioningEnabled: form.get('versioning_enabled') === 'on',
-          defaultBackendId: String(form.get('default_backend_id') ?? ''),
+          defaultBackendId: backendOptions.some(backend => backend.id === selectedBackend && !backend.disabled) ? selectedBackend : '',
         }
         await api(`/admin/credentials/${encodeURIComponent(action.identity.s3_access_key)}`, {
           method: 'PUT',
@@ -103,11 +110,6 @@ export default function IdentitiesPage() {
         if (!guard.current.current(request)) return
         setAction(null)
         setOneTime({ accessKey: result.s3_access_key, secretKey: result.s3_secret_key })
-      } else {
-        const result = await api<Schema['CredentialCreatedResponse']>('/admin/credentials', { method: 'POST', body: JSON.stringify(replacementIdentityPayload(action.identity)) })
-        if (!guard.current.current(request)) return
-        setAction(null)
-        setOneTime({ accessKey: result.s3_access_key, secretKey: result.s3_secret_key, endpoint: result.s3_endpoint })
       }
       void invalidateControl(queryClient)
       if (guard.current.current(request) && action.kind !== 'rotate' && action.kind !== 'replace') dismiss()
@@ -115,7 +117,9 @@ export default function IdentitiesPage() {
     finally { if (guard.current.current(request)) setPending(false) }
   }
 
-  const enabledBackends = (backends.data ?? []).filter(backend => backend.enabled)
+  const draft = action?.kind === 'replace' ? replacementIdentityDraft(action.identity) : undefined
+  const backendOptions = identityBackendOptions(backends.isError ? undefined : backends.data, action?.identity.default_backend_id ?? '')
+  const selectedIdentity = identities.isError ? undefined : identities.data?.find(identity => (identity.credential_id ?? identity.s3_access_key) === detailsKey)
   const counts = (identity: Identity) => identity.virtual_bucket_count === null || identity.policy_attachment_count === null
     ? 'Unavailable'
     : `${identity.virtual_bucket_count} routes / ${identity.policy_attachment_count} policies`
@@ -129,11 +133,22 @@ export default function IdentitiesPage() {
       { label: 'Azure account', value: identity => identity.azure_account },
       { label: 'Status', value: identity => identity.enabled === null ? 'Unavailable' : identity.enabled ? 'Enabled' : 'Disabled' },
       { label: 'Dependencies', value: counts },
-      { label: 'Actions', value: identity => <div className="row-actions">{directMappingsOnly && <button className="icon-button" title="View direct mapping details" aria-label={`View ${identity.s3_access_key}`} onClick={() => { dismiss(); setDetailsKey(identity.credential_id ?? identity.s3_access_key) }}><Eye size={16} /></button>}<button className="icon-button" title={directMappingsOnly ? 'Configure mapping' : 'Edit identity'} aria-label={`Edit ${identity.s3_access_key}`} onClick={() => { dismiss(); setAction({ identity, kind: 'edit' }) }}><Pencil size={16} /></button>{!directMappingsOnly && <><button className="icon-button" title="Rotate secret" aria-label={`Rotate ${identity.s3_access_key}`} disabled={!identity.credential_id} onClick={() => { dismiss(); setAction({ identity, kind: 'rotate' }) }}><RotateCw size={16} /></button><button className="icon-button" title="Create replacement" aria-label={`Replace ${identity.s3_access_key}`} onClick={() => { dismiss(); setAction({ identity, kind: 'replace' }) }}><KeyRound size={16} /></button></>}<button className="icon-button danger" title={directMappingsOnly ? 'Remove mapping' : 'Delete identity'} aria-label={`Delete ${identity.s3_access_key}`} onClick={() => { dismiss(); setAction({ identity, kind: 'delete' }) }}><Trash2 size={16} /></button></div> },
+      { label: 'Actions', value: identity => <div className="row-actions"><button className="icon-button" title={directMappingsOnly ? 'View direct mapping details' : 'View identity details'} aria-label={`View ${identity.s3_access_key}`} onClick={() => { dismiss(); setDetailsKey(identity.credential_id ?? identity.s3_access_key) }}><Eye size={16} /></button><button className="icon-button" title={directMappingsOnly ? 'Configure mapping' : 'Edit identity'} aria-label={`Edit ${identity.s3_access_key}`} onClick={() => { dismiss(); setAction({ identity, kind: 'edit' }) }}><Pencil size={16} /></button>{!directMappingsOnly && <><button className="icon-button" title="Rotate secret" aria-label={`Rotate ${identity.s3_access_key}`} disabled={!identity.credential_id} onClick={() => { dismiss(); setAction({ identity, kind: 'rotate' }) }}><RotateCw size={16} /></button><button className="icon-button" title="Create replacement" aria-label={`Replace ${identity.s3_access_key}`} onClick={() => { dismiss(); setAction({ identity, kind: 'replace' }) }}><KeyRound size={16} /></button></>}<button className="icon-button danger" title={directMappingsOnly ? 'Remove mapping' : 'Delete identity'} aria-label={`Delete ${identity.s3_access_key}`} onClick={() => { dismiss(); setAction({ identity, kind: 'delete' }) }}><Trash2 size={16} /></button></div> },
     ]} />}
-    {creating && <Modal title={directMappingsOnly ? 'Add direct mapping' : 'Create S3 identity'} description="Creates metadata only and uses Managed Identity for Azure access." onClose={dismiss} pending={pending}><form className="operation-form" onSubmit={create}><label>Azure account<input name="azure_account" required autoComplete="off" /></label>{directMappingsOnly ? <input type="hidden" name="access_mode" value="direct" /> : <label>Mode<select name="access_mode" defaultValue="direct"><option value="direct">Direct</option><option value="virtual">Virtual</option></select></label>}<label>Default backend<select name="default_backend_id" defaultValue=""><option value="">Legacy account route</option>{enabledBackends.map(backend => <option key={backend.id} value={backend.id}>{backend.name}</option>)}</select></label><label className="checkbox-field"><input name="versioning_enabled" type="checkbox" /> Versioning enabled</label>{error && <ErrorBanner error={error} />}<div className="dialog-actions"><button type="button" disabled={pending} onClick={dismiss}>Cancel</button><button className="primary" disabled={pending}>{pending ? 'Creating...' : directMappingsOnly ? 'Add mapping' : 'Create identity'}</button></div></form></Modal>}
-    {action?.kind === 'edit' && <Modal title={directMappingsOnly ? 'Configure direct mapping' : 'Edit identity'} description="Access key, mode and secret are not changed by this form." onClose={dismiss} pending={pending}><form className="operation-form" onSubmit={confirm}>{directMappingsOnly && <label>Azure account<input name="azure_account" required pattern="[a-z0-9]{3,24}" readOnly={!action.identity.use_managed_identity} defaultValue={action.identity.azure_account} /></label>}<label>Default backend<select name="default_backend_id" defaultValue={action.identity.default_backend_id ?? ''}><option value="">Keep current selection</option>{enabledBackends.map(backend => <option key={backend.id} value={backend.id}>{backend.name}</option>)}</select></label><label className="checkbox-field"><input name="enabled" type="checkbox" defaultChecked={action.identity.enabled ?? true} /> Enabled</label><label className="checkbox-field"><input name="versioning_enabled" type="checkbox" defaultChecked={action.identity.versioning_enabled} /> Versioning enabled</label>{error && <ErrorBanner error={error} />}<div className="dialog-actions"><button type="button" disabled={pending} onClick={dismiss}>Cancel</button><button className="primary" disabled={pending}>{pending ? 'Saving...' : 'Save'}</button></div></form></Modal>}
-      {action && action.kind !== 'edit' && <DestructiveDialog title={action.kind === 'rotate' ? 'Rotate secret' : action.kind === 'replace' ? 'Create replacement' : directMappingsOnly ? 'Remove direct mapping' : 'Delete identity'} description={action.kind === 'delete' ? directMappingsOnly ? directMappingRemovalDescription(action.identity) : `Revokes this identity and removes ${counts(action.identity)}. Azure containers and blobs are retained.` : action.kind === 'replace' ? 'Creates a new identity with safe settings only. Existing mappings and policies are not copied, and the original remains active.' : 'Immediately invalidates the current secret and parent-revision temporary credentials.'} confirmLabel={`${action.kind === 'rotate' ? 'Rotate' : action.kind === 'replace' ? 'Replace' : directMappingsOnly ? 'Remove' : 'Delete'} ${action.identity.s3_access_key}`} pending={pending} onClose={dismiss} onConfirm={() => { void confirm() }}><p className="confirmation-name">{action.identity.s3_access_key}</p>{error && <ErrorBanner error={error} />}</DestructiveDialog>}
+    {(creating || draft) && <Modal title={draft ? 'Create replacement' : directMappingsOnly ? 'Add direct mapping' : 'Create S3 identity'} description={draft ? 'Creates new credentials from reviewed settings. Mappings and policies are not copied; the original identity is unchanged.' : 'Creates metadata only and uses Managed Identity for Azure access.'} onClose={dismiss} pending={pending}><form className="operation-form" onSubmit={create}><label>Azure account<input name="azure_account" required pattern="[a-z0-9]{3,24}" autoComplete="off" defaultValue={draft?.azureAccount ?? ''} /></label>{directMappingsOnly ? <input type="hidden" name="access_mode" value="direct" /> : <div><label htmlFor="identity-create-mode">Mode</label><select id="identity-create-mode" name="access_mode" defaultValue={draft?.accessMode ?? 'direct'}><option value="direct">Direct</option><option value="virtual">Virtual</option></select></div>}<label>Default backend<select name="default_backend_id" defaultValue={draft?.defaultBackendId ?? ''}><option value="">Legacy account route</option>{backendOptions.map(backend => <option key={backend.id} value={backend.id} disabled={backend.disabled}>{backend.label}</option>)}</select></label><label className="checkbox-field"><input name="versioning_enabled" type="checkbox" defaultChecked={draft?.versioningEnabled ?? false} /> Versioning enabled</label>{error && <ErrorBanner error={error} />}<div className="dialog-actions"><button type="button" disabled={pending} onClick={dismiss}>Cancel</button><button className="primary" disabled={pending}>{pending ? 'Creating...' : draft ? 'Create replacement' : directMappingsOnly ? 'Add mapping' : 'Create identity'}</button></div></form></Modal>}
+    {action?.kind === 'edit' && <Modal title={directMappingsOnly ? 'Configure direct mapping' : 'Edit identity'} description="Access key, mode and secret are not changed by this form." onClose={dismiss} pending={pending}><form className="operation-form" onSubmit={confirm}>{directMappingsOnly && <label>Azure account<input name="azure_account" required pattern="[a-z0-9]{3,24}" readOnly={!action.identity.use_managed_identity} defaultValue={action.identity.azure_account} /></label>}<label>Default backend<select name="default_backend_id" defaultValue={action.identity.default_backend_id ?? ''}><option value="">Keep current selection</option>{backendOptions.map(backend => <option key={backend.id} value={backend.id} disabled={backend.disabled}>{backend.label}</option>)}</select></label><label className="checkbox-field"><input name="enabled" type="checkbox" disabled={action.identity.enabled === null} defaultChecked={action.identity.enabled === true} /> {action.identity.enabled === null ? 'Enabled state unavailable' : 'Enabled'}</label><label className="checkbox-field"><input name="versioning_enabled" type="checkbox" defaultChecked={action.identity.versioning_enabled} /> Versioning enabled</label>{error && <ErrorBanner error={error} />}<div className="dialog-actions"><button type="button" disabled={pending} onClick={dismiss}>Cancel</button><button className="primary" disabled={pending}>{pending ? 'Saving...' : 'Save'}</button></div></form></Modal>}
+      {action && (action.kind === 'rotate' || action.kind === 'delete') && <DestructiveDialog title={action.kind === 'rotate' ? 'Rotate secret' : directMappingsOnly ? 'Remove direct mapping' : 'Delete identity'} description={action.kind === 'delete' ? directMappingsOnly ? directMappingRemovalDescription(action.identity) : `Revokes this identity and removes ${counts(action.identity)}. Azure containers and blobs are retained.` : 'Immediately invalidates the current secret and parent-revision temporary credentials.'} confirmLabel={`${action.kind === 'rotate' ? 'Rotate' : directMappingsOnly ? 'Remove' : 'Delete'} ${action.identity.s3_access_key}`} pending={pending} onClose={dismiss} onConfirm={() => { void confirm() }}><p className="confirmation-name">{action.identity.s3_access_key}</p>{error && <ErrorBanner error={error} />}</DestructiveDialog>}
+    {detailsKey && !directMappingsOnly && <Modal title="Identity details" description="Read-only identity metadata and control-plane dependencies." onClose={dismiss}>{selectedIdentity ? <dl className="identity-details">
+      <dt>Identity ID</dt><dd>{selectedIdentity.credential_id ?? 'Unavailable'}</dd>
+      <dt>Access key</dt><dd>{selectedIdentity.s3_access_key}</dd>
+      <dt>Mode</dt><dd>{selectedIdentity.access_mode}</dd>
+      <dt>Status</dt><dd>{selectedIdentity.enabled === null ? 'Unavailable' : selectedIdentity.enabled ? 'Enabled' : 'Disabled'}</dd>
+      <dt>Azure account</dt><dd>{selectedIdentity.azure_account}</dd>
+      <dt>Default backend</dt><dd>{selectedIdentity.default_backend_id ?? 'Legacy account route'}</dd>
+      <dt>Versioning</dt><dd>{selectedIdentity.versioning_enabled ? 'Enabled' : 'Disabled'}</dd>
+      <dt>Virtual mappings</dt><dd>{selectedIdentity.virtual_bucket_count ?? 'Unavailable'}</dd>
+      <dt>Policy attachments</dt><dd>{selectedIdentity.policy_attachment_count ?? 'Unavailable'}</dd>
+    </dl> : <p role="status">Identity metadata unavailable.</p>}<RefreshButton pending={identities.isFetching} refresh={() => { void identities.refetch() }} /></Modal>}
     {detailsKey && directMappingsOnly && <DirectMappingDetails
       identity={identities.isError ? undefined : identities.data?.find(identity => (identity.credential_id ?? identity.s3_access_key) === detailsKey)}
       backends={backends.isError ? undefined : backends.data}
