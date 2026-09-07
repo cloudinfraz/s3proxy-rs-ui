@@ -52,9 +52,61 @@ triggers the release-candidate gate, which validates metadata and the API
 contract, runs all local checks and browser acceptance, creates a reproducible
 static archive, and verifies the runtime image.
 
-## Publish
+## Trigger a release
 
-Merge the approved release pull request. The merged event automatically:
+### Release branch trigger
+
+Create the pull request after pushing the prepared branch:
+
+```bash
+gh pr create \
+   --base main \
+   --head release/v0.6.4 \
+   --title "release: v0.6.4" \
+   --body "Prepare s3proxy-rs UI v0.6.4."
+```
+
+Opening or updating the pull request runs **Validate release candidate** but
+does not publish anything. Review the changes and wait for all required checks
+to pass.
+
+Merge the pull request to trigger publication automatically:
+
+```bash
+gh pr merge --merge --delete-branch
+```
+
+The workflow uses the pull request's merged event and publishes from the merge
+commit on `main`. Do not manually create or push a version tag.
+
+### Manual trigger
+
+Use manual dispatch only when the version metadata and dated changelog entry are
+already merged into `main`, such as when retrying a failed publication.
+
+From GitHub, open **Actions > Release > Run workflow**, select `main`, enter the
+version without the `v` prefix, and choose **Run workflow**.
+
+The equivalent GitHub CLI commands are:
+
+```bash
+gh workflow run release.yml --ref main -f version=0.6.4
+gh run list --workflow release.yml --event workflow_dispatch --limit 1
+```
+
+After the new run ID appears, monitor it with:
+
+```bash
+gh run watch RUN_ID --exit-status
+```
+
+Manual dispatch verifies that the selected revision belongs to `main` and that
+the requested version, package, lockfile, and changelog entry agree. It cannot
+publish an unmerged feature-branch revision.
+
+## Published output
+
+The publication job automatically:
 
 1. Repeats release validation at the merged revision.
 2. Confirms that revision is contained in `origin/main`.
@@ -73,15 +125,12 @@ Each GitHub Release contains:
 - release notes extracted from `CHANGELOG.md`;
 - the signed GHCR image digest in the release notes.
 
-## Publish v0.6.3
+## v0.6.3 bootstrap release
 
-Version `0.6.3` was merged before the release workflow existed and did not use a
-`release/v0.6.3` branch. After this workflow is merged into `main`, open
-**Actions > Release > Run workflow**, select `main`, enter `0.6.3`, and run it.
-
-Manual dispatch still verifies that the selected revision belongs to `main` and
-that the package, lockfile, and changelog versions agree. It cannot publish an
-unmerged feature-branch revision.
+Version `0.6.3` was published by manual dispatch because its metadata was merged
+before the release workflow existed. Its release page is
+[`v0.6.3`](https://github.com/cloudinfraz/s3proxy-rs-ui/releases/tag/v0.6.3).
+Future versions should use the release branch trigger.
 
 ## Failure and retry behavior
 
