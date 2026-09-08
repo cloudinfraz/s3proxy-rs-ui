@@ -1,4 +1,4 @@
-import { api, ApiError, setCsrfToken } from '../../api/client'
+import { ApiError, getSession, setCsrfToken } from '../../api/client'
 
 export type SessionValue = {
   authenticated: boolean
@@ -7,7 +7,7 @@ export type SessionValue = {
 }
 
 export async function readSession({ signal, isTerminated }: { signal: AbortSignal; isTerminated: () => boolean }) {
-  const value = await api<SessionValue>('/admin/session', { signal })
+  const value = await getSession(signal)
   if (!value.authenticated) throw new ApiError(403, 'Sign in again.')
   if (!signal.aborted && !isTerminated()) setCsrfToken(value.csrf_token)
   return { authenticated: value.authenticated, expires_at: value.expires_at }

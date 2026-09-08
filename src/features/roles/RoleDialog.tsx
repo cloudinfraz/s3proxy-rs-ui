@@ -94,7 +94,17 @@ export default function RoleDialog({ operation, initial, limits, close, changed 
       if (guard.current.current(request)) {
         setError(new Error(cause instanceof Error ? cause.message : 'Role change failed'))
         setReview(null)
-        if (cause instanceof ApiError && cause.status === 409) void invalidateControl(client)
+        if (cause instanceof ApiError && cause.status === 409) {
+          await invalidateControl(client)
+          if (initial && guard.current.current(request)) {
+            try {
+              const latest = await api<RoleDetail>(`/admin/ui/roles/${encodeURIComponent(initial.role.id)}`)
+              if (guard.current.current(request)) changed(latest)
+            } catch {
+              if (guard.current.current(request)) setError(new Error('The role changed, but current details could not be refreshed.'))
+            }
+          }
+        }
       }
     } finally { if (guard.current.current(request)) setPending(false) }
   }

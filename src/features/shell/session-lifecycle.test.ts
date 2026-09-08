@@ -57,6 +57,17 @@ describe('session lifecycle', () => {
     expect(hasCsrfToken()).toBe(false)
   })
 
+  it.each([
+    { authenticated: true, csrf_token: '', expires_at: session.expires_at },
+    { authenticated: true, csrf_token: session.csrf_token, expires_at: 'invalid' },
+    { authenticated: 'true', csrf_token: session.csrf_token, expires_at: session.expires_at },
+  ])('rejects malformed authenticated session data', async body => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(body)))
+
+    await expect(readSession({ signal: new AbortController().signal, isTerminated: () => false })).rejects.toMatchObject({ status: 502 })
+    expect(hasCsrfToken()).toBe(false)
+  })
+
   it('computes a bounded expiry delay and fails closed for invalid timestamps', () => {
     expect(millisecondsUntilExpiry('2030-01-01', 0)).toBe(2_147_483_647)
     expect(millisecondsUntilExpiry('2026-09-07T12:00:10Z', Date.parse('2026-09-07T12:00:00Z'))).toBe(10_000)

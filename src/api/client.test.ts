@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { addApiErrorInterceptor, ApiError, api, hasCsrfToken, login, logout, setCsrfToken, setProtectedForbiddenHandler } from './client'
+import { addApiErrorInterceptor, ApiError, api, getSession, hasCsrfToken, login, logout, setCsrfToken, setProtectedForbiddenHandler } from './client'
 
 const response = (body: unknown, status = 200) => new Response(
   status === 204 ? null : JSON.stringify(body),
@@ -33,6 +33,23 @@ describe('browser API client', () => {
     const [, init] = vi.mocked(fetch).mock.calls[0]
     expect(init?.body).toBe(JSON.stringify({ api_key: 'admin-key-value' }))
     expect(init?.credentials).toBe('same-origin')
+  })
+
+  it.each([
+    {},
+    { csrf_token: '', expires_at: '2030-01-01T00:00:00Z' },
+    { csrf_token: 'csrf-value', expires_at: 'invalid' },
+  ])('rejects malformed successful login data without installing a session', async body => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response(body)))
+
+    await expect(login('admin-key')).rejects.toMatchObject({ status: 502 })
+    expect(hasCsrfToken()).toBe(false)
+  })
+
+  it('validates successful session data before returning it', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ authenticated: true, csrf_token: 'csrf-value', expires_at: null })))
+
+    await expect(getSession()).rejects.toMatchObject({ status: 502 })
   })
 
   it('requires and sends the in-memory CSRF token for mutations', async () => {

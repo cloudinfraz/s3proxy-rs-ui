@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, Link as LinkIcon, Unlink } from 'lucide-react'
 import { Link } from 'react-router'
@@ -20,6 +20,7 @@ export default function IdentityPolicies() {
   const [attachmentCursors, setAttachmentCursors] = useState<Array<string | null>>([null])
   const attachmentCursor = attachmentCursors[attachmentCursors.length - 1]
   const relationships = useQuery({ queryKey: policyKeys.identity(credentialId, attachmentCursor), enabled: credentialId.length > 0, queryFn: () => api<Schema['AdminIdentityPolicyPage']>(`/admin/ui/identities/${encodeURIComponent(credentialId)}/policies?limit=100${attachmentCursor ? `&after_id=${encodeURIComponent(attachmentCursor)}` : ''}`) })
+  const selectedCredential = useRef(credentialId)
   const [policyId, setPolicyId] = useState('')
   const [review, setReview] = useState<Review | null>(null)
   const [error, setError] = useState<Error | null>(null)
@@ -27,9 +28,11 @@ export default function IdentityPolicies() {
 
   async function prepare(operation: 'attach' | 'detach', attachment?: IdentityPolicyAttachment) {
     if (!credentialId || pending) return
+    const reviewedCredential = credentialId
     setPending(true); setError(null)
     try {
-      const detail = await api<Schema['AdminIdentityPolicyPage']>(`/admin/ui/identities/${encodeURIComponent(credentialId)}/policies?limit=100`)
+      const detail = await api<Schema['AdminIdentityPolicyPage']>(`/admin/ui/identities/${encodeURIComponent(reviewedCredential)}/policies?limit=100`)
+      if (selectedCredential.current !== reviewedCredential) return
       const policy = operation === 'attach' ? policies.data?.items.find(item => item.id === policyId) : attachment
       if (!policy) throw new Error('Select an available policy')
       identityPolicyRequest(detail, policy); setReview({ operation, detail, policy })
@@ -53,7 +56,7 @@ export default function IdentityPolicies() {
   const reviewPolicyName = review ? 'name' in review.policy ? review.policy.name : review.policy.policy_name : ''
   const reviewPolicyRevision = review ? 'revision' in review.policy ? review.policy.revision : review.policy.policy_revision : 0
   return <section className="policy-section" aria-labelledby="identity-policy-title"><div className="section-heading"><div><h2 id="identity-policy-title">Identity attachments</h2><p>Attach managed policies by stable credential and policy ID. Changes affect the identity's current effective permissions.</p></div><RefreshButton pending={relationships.isFetching} refresh={() => { void relationships.refetch() }} /></div>
-    <label className="policy-selector">Identity<select value={credentialId} onChange={event => { setCredentialId(event.target.value); setPolicyId(''); setPolicyCursors([null]); setAttachmentCursors([null]); setReview(null); setError(null) }}><option value="">Select identity</option>{identities.data?.filter(identity => identity.credential_id).map(identity => <option key={identity.credential_id!} value={identity.credential_id!}>{identity.s3_access_key}</option>)}</select></label>
+    <label className="policy-selector">Identity<select value={credentialId} onChange={event => { selectedCredential.current = event.target.value; setCredentialId(event.target.value); setPolicyId(''); setPolicyCursors([null]); setAttachmentCursors([null]); setReview(null); setError(null) }}><option value="">Select identity</option>{identities.data?.filter(identity => identity.credential_id).map(identity => <option key={identity.credential_id!} value={identity.credential_id!}>{identity.s3_access_key}</option>)}</select></label>
     {identities.isError && <ErrorBanner error={new Error('Identity metadata unavailable')} retry={() => { void identities.refetch() }} />}
     {policies.isError && <ErrorBanner error={new Error('Managed policy metadata unavailable')} retry={() => { void policies.refetch() }} />}
     {relationships.isError && <ErrorBanner error={relationships.error} retry={() => { void relationships.refetch() }} />}

@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useQuery } from '@tanstack/react-query'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { api } from '../../api/client'
+import { api, ApiError } from '../../api/client'
 import type { Schema } from '../../api/control'
 import RoleDialog from './RoleDialog'
 
@@ -68,6 +68,21 @@ describe('RoleDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Confirm change' }))
     await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('update rejected'))
     expect(screen.getByRole('dialog', { name: 'Change duration' })).toBeTruthy()
+  })
+
+  it('refreshes locally owned role details after a mutation conflict', async () => {
+    const latest = { ...detail, role: { ...role, max_session_duration_seconds: 7200, lifecycle_revision: 2 } }
+    vi.mocked(api).mockResolvedValueOnce(detail).mockRejectedValueOnce(new ApiError(409, 'The resource changed.')).mockResolvedValueOnce(latest)
+    const changed = vi.fn()
+    render(<RoleDialog operation="settings" initial={detail} limits={limits} close={vi.fn()} changed={changed} />)
+    fireEvent.change(screen.getByLabelText('Maximum duration (seconds)'), { target: { value: '7200' } })
+    fireEvent.submit(screen.getByRole('button', { name: 'Review change' }).closest('form')!)
+    expect(await screen.findByText('3600 to 7200 seconds')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm change' }))
+
+    await waitFor(() => expect(changed).toHaveBeenCalledWith(latest))
+    expect(api).toHaveBeenLastCalledWith('/admin/ui/roles/role-id')
   })
 
   it('rejects create review when the selected owner becomes unavailable', async () => {

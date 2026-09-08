@@ -54,6 +54,25 @@ describe('IdentityPolicies', () => {
     await waitFor(() => expect(api).toHaveBeenCalledWith(`/admin/ui/identities/${credentialId}/policies`, expect.objectContaining({ method: 'POST' })))
   })
 
+  it('does not reopen a delayed review after selecting another identity', async () => {
+    const secondCredentialId = '22222222-2222-4222-8222-222222222222'
+    mockQueries(query([...identityResponse.items, { credential_id: secondCredentialId, s3_access_key: 'IDENTITY_TWO', enabled: true }]))
+    let release: (value: typeof relationship) => void = () => {}
+    vi.mocked(api).mockImplementationOnce(() => new Promise(resolve => { release = resolve }))
+    renderView()
+    const selector = await screen.findByLabelText('Identity')
+    fireEvent.change(selector, { target: { value: credentialId } })
+    fireEvent.change(await screen.findByLabelText('Managed policy'), { target: { value: policy.id } })
+    fireEvent.click(screen.getByRole('button', { name: /Review attachment/ }))
+
+    fireEvent.change(selector, { target: { value: secondCredentialId } })
+    release(relationship)
+
+    await waitFor(() => expect(api).toHaveBeenCalledOnce())
+    expect(selector).toHaveProperty('value', secondCredentialId)
+    expect(screen.queryByRole('dialog', { name: 'Confirm: attach policy' })).toBeNull()
+  })
+
   it('excludes attached policies and completes a reviewed detach', async () => {
     const attachment = { policy_id: policy.id, policy_name: policy.name, policy_revision: policy.revision, attached_at: '2026-01-01T00:00:00Z' }
     const attachedRelationship = { ...relationship, items: [attachment] }

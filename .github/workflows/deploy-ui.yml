@@ -124,6 +124,10 @@ jobs:
       - name: Verify pre-provisioned namespace
         run: kubectl get namespace s3proxy >/dev/null
 
+      - name: Remove UI NetworkPolicy when disabled
+        if: inputs.network_policy_enabled == false
+        run: kubectl -n s3proxy delete networkpolicy allow-ui-admin --ignore-not-found
+
       - name: Prepare deployed UI browser
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -168,10 +172,6 @@ jobs:
             sleep 1
           done
           npx playwright test --config playwright.deployed.config.ts
-
-      - name: Remove UI NetworkPolicy when disabled
-        if: inputs.network_policy_enabled == false
-        run: kubectl -n s3proxy delete networkpolicy allow-ui-admin --ignore-not-found
 
       - name: Capture UI deployment evidence
         if: always()

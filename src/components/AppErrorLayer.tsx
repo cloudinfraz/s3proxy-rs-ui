@@ -1,4 +1,4 @@
-import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { Component, type ReactNode } from 'react'
 import { AlertTriangle } from 'lucide-react'
 
 type ErrorBoundaryProps = { children: ReactNode }
@@ -11,8 +11,8 @@ class AppErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState>
     return { failed: true }
   }
 
-  componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error('Application render failed', error, info.componentStack)
+  componentDidCatch() {
+    console.error('Application render failed')
   }
 
   render() {

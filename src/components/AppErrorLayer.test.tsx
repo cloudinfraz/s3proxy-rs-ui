@@ -19,13 +19,16 @@ describe('AppErrorLayer', () => {
   })
 
   it('renders a recovery screen when a descendant fails to render', () => {
-    vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    function BrokenView(): never { throw new Error('private render detail') }
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const secret = 'synthetic-render-secret'
+    function BrokenView(): never { throw new Error(secret) }
 
     render(<AppErrorLayer><BrokenView /></AppErrorLayer>)
 
     expect(screen.getByRole('alert').textContent).toContain('The control interface could not be displayed')
     expect(screen.getByRole('button', { name: 'Reload' })).toBeTruthy()
-    expect(screen.queryByText('private render detail')).toBeNull()
+    expect(screen.queryByText(secret)).toBeNull()
+    expect(JSON.stringify(consoleError.mock.calls)).not.toContain(secret)
+    expect(consoleError).toHaveBeenCalledWith('Application render failed')
   })
 })

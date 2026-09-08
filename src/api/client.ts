@@ -1,6 +1,7 @@
 import type { paths } from './schema'
 
 export type LoginResponse = paths['/admin/session/login']['post']['responses']['200']['content']['application/json']
+export type SessionResponse = paths['/admin/session']['get']['responses']['200']['content']['application/json']
 
 export class ApiError extends Error {
   readonly status: number
@@ -142,11 +143,34 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   return response.json() as Promise<T>
 }
 
+function invalidSessionResponse(): ApiError {
+  return new ApiError(502, 'The control service returned an invalid session response.')
+}
+
+function parseSessionCredentials(value: unknown): LoginResponse {
+  if (!value || typeof value !== 'object') throw invalidSessionResponse()
+  const token = Reflect.get(value, 'csrf_token')
+  const expiresAt = Reflect.get(value, 'expires_at')
+  if (typeof token !== 'string' || token.trim() === '') throw invalidSessionResponse()
+  if (typeof expiresAt !== 'string' || !Number.isFinite(Date.parse(expiresAt))) throw invalidSessionResponse()
+  return { csrf_token: token, expires_at: expiresAt }
+}
+
 export async function login(apiKey: string): Promise<LoginResponse> {
-  return api<LoginResponse>('/admin/session/login', {
+  const value = await api<unknown>('/admin/session/login', {
     method: 'POST',
     body: JSON.stringify({ api_key: apiKey }),
   })
+  return parseSessionCredentials(value)
+}
+
+export async function getSession(signal?: AbortSignal): Promise<SessionResponse> {
+  const value = await api<unknown>('/admin/session', { signal })
+  if (!value || typeof value !== 'object') throw invalidSessionResponse()
+  const authenticated = Reflect.get(value, 'authenticated')
+  if (typeof authenticated !== 'boolean') throw invalidSessionResponse()
+  if (!authenticated) return { authenticated, csrf_token: '', expires_at: '' }
+  return { authenticated, ...parseSessionCredentials(value) }
 }
 
 export async function logout() {
