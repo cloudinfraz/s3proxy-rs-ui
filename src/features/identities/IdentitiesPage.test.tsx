@@ -6,6 +6,7 @@ import { useSearchParams } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../../api/client'
 import type { Schema } from '../../api/control'
+import { invalidateControl } from '../../api/query-keys'
 import IdentitiesPage from './IdentitiesPage'
 
 const routerMocks = vi.hoisted(() => ({ navigate: vi.fn(), setSearchParams: vi.fn() }))
@@ -14,7 +15,7 @@ vi.mock('@tanstack/react-query', async importOriginal => ({ ...(await importOrig
 vi.mock('react-router', () => ({ useNavigate: () => routerMocks.navigate, useSearchParams: vi.fn() }))
 vi.mock('../../api/client', () => ({ api: vi.fn(), ApiError: class extends Error { status = 500 } }))
 vi.mock('../../api/query-keys', async importOriginal => ({ ...(await importOriginal<typeof import('../../api/query-keys')>()), invalidateControl: vi.fn() }))
-vi.mock('../../components/EphemeralCredentials', () => ({ EphemeralCredentials: ({ material, dismiss, acknowledgeLabel = 'I have stored this securely' }: { material: { accessKey: string; secretKey: string }; dismiss: () => void; acknowledgeLabel?: string }) => <div><p>created credentials {material.accessKey} {material.secretKey}</p><button onClick={dismiss}>{acknowledgeLabel}</button></div> }))
+vi.mock('../../components/EphemeralCredentials', () => ({ EphemeralCredentials: ({ material, dismiss, acknowledgeLabel = 'I have stored this securely', pending }: { material: { accessKey: string; secretKey: string }; dismiss: () => void; acknowledgeLabel?: string; pending?: boolean }) => <div><p>created credentials {material.accessKey} {material.secretKey}</p><button disabled={pending} onClick={dismiss}>{acknowledgeLabel}</button></div> }))
 vi.mock('./DirectMappingDetails', () => ({ default: () => <p>direct mapping detail</p> }))
 vi.mock('../../components/control', () => ({
   Page: ({ title, action, children }: { title: string; action: ReactNode; children: ReactNode }) => <main><h1>{title}</h1>{action}{children}</main>,
@@ -124,5 +125,27 @@ describe('IdentitiesPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close dialog' }))
     fireEvent.click(screen.getByRole('button', { name: 'Create identity' }))
     expect(screen.getByLabelText('Mode')).toHaveProperty('value', 'direct')
+  })
+
+  it('blocks mapping continuation until identity invalidation settles', async () => {
+    const credentialId = '22222222-2222-4222-8222-222222222222'
+    let releaseRefresh: () => void = () => undefined
+    vi.mocked(invalidateControl).mockReturnValue(new Promise<void>(resolve => { releaseRefresh = resolve }))
+    vi.mocked(useSearchParams).mockReturnValue([new URLSearchParams('create=virtual&return=buckets'), routerMocks.setSearchParams] as never)
+    mockQueries(query({ data: [] }))
+    vi.mocked(api).mockResolvedValueOnce({ credential_id: credentialId, s3_access_key: 'GENERATED_ACCESS', s3_secret_key: 'generated-secret', s3_endpoint: 'https://example.test', azure_account: 'newaccount', access_mode: 'virtual', use_managed_identity: true, default_backend_id: null })
+    render(<IdentitiesPage />)
+
+    const dialog = await screen.findByRole('dialog', { name: 'Create S3 identity' })
+    fireEvent.change(within(dialog).getByLabelText('Azure account'), { target: { value: 'newaccount' } })
+    fireEvent.submit(within(dialog).getByRole('button', { name: 'Create identity' }).closest('form')!)
+
+    const acknowledge = await screen.findByRole('button', { name: 'I stored these securely; continue' })
+    expect(acknowledge).toHaveProperty('disabled', true)
+    expect(routerMocks.navigate).not.toHaveBeenCalled()
+    releaseRefresh()
+    await waitFor(() => expect(acknowledge).toHaveProperty('disabled', false))
+    fireEvent.click(acknowledge)
+    expect(routerMocks.navigate).toHaveBeenCalledWith(`/buckets?create=mapping&identity=${credentialId}`)
   })
 })

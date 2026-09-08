@@ -17,6 +17,7 @@ describe('credential mapping workflow', () => {
     expect(path).toBe(`/buckets?create=mapping&identity=${credentialId}`)
     expect(requestedMappingIdentity(new URLSearchParams(path?.split('?')[1]))).toBe(credentialId)
     expect(mappingCreationPath('not-a-uuid')).toBeNull()
+    expect(mappingCreationPath('018f6b5c-7c9a-7d2e-8f31-4b2c6d8e9f10')).not.toBeNull()
     expect(requestedMappingIdentity(new URLSearchParams('create=mapping&identity=not-a-uuid'))).toBeNull()
     expect(requestedMappingIdentity(new URLSearchParams(`create=mapping&identity=${credentialId}&extra=unsafe`))).toBeNull()
   })

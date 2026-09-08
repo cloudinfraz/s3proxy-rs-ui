@@ -84,13 +84,15 @@ export default function IdentitiesPage() {
           defaultBackendId: backendId,
         })),
       })
-      void invalidateControl(queryClient)
       if (!guard.current.current(request)) return
       if (!result.s3_access_key || !result.s3_secret_key) throw new Error('The server did not return one-time credentials')
       if (virtualMappingWorkflow.current && (result.access_mode !== 'virtual' || !mappingCreationPath(result.credential_id))) throw new Error('The server did not return a virtual identity for bucket routing')
+      const refreshBeforeHandoff = virtualMappingWorkflow.current
       setCreating(false)
       setAction(null)
       setOneTime({ credentialId: result.credential_id, accessMode: result.access_mode, accessKey: result.s3_access_key, secretKey: result.s3_secret_key, endpoint: result.s3_endpoint })
+      if (refreshBeforeHandoff) await invalidateControl(queryClient)
+      else void invalidateControl(queryClient)
     } catch (cause) { report(cause, 'Identity creation', request) }
     finally { if (guard.current.current(request)) setPending(false) }
   }
@@ -176,6 +178,6 @@ export default function IdentitiesPage() {
       capabilities={capabilities.isError ? undefined : capabilities.data}
       onClose={dismiss}
     />}
-    {oneTime && <EphemeralCredentials material={oneTime} dismiss={acknowledgeCredentials} acknowledgeLabel={virtualMappingWorkflow.current ? 'I stored these securely; continue' : undefined} />}
+    {oneTime && <EphemeralCredentials material={oneTime} dismiss={acknowledgeCredentials} acknowledgeLabel={virtualMappingWorkflow.current ? 'I stored these securely; continue' : undefined} pending={virtualMappingWorkflow.current && pending} />}
   </Page>
 }

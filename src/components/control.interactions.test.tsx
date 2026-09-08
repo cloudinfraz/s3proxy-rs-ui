@@ -60,4 +60,18 @@ describe('shared control interactions', () => {
     fireEvent.click(acknowledge)
     expect(dismiss).toHaveBeenCalledOnce()
   })
+
+  it('keeps focus inside pending credential dialogs then focuses acknowledgement', async () => {
+    const dismiss = vi.fn()
+    const view = render(<EphemeralCredentials material={{ accessKey: 'temporary-access', secretKey: 'temporary-secret' }} dismiss={dismiss} pending />)
+
+    const dialog = screen.getByRole('dialog')
+    const pending = screen.getByRole('button', { name: 'Refreshing identities...' })
+    await waitFor(() => expect(document.activeElement).toBe(dialog))
+    expect(pending).toHaveProperty('disabled', true)
+
+    view.rerender(<EphemeralCredentials material={{ accessKey: 'temporary-access', secretKey: 'temporary-secret' }} dismiss={dismiss} />)
+    const acknowledge = screen.getByRole('button', { name: 'I have stored this securely' })
+    await waitFor(() => expect(document.activeElement).toBe(acknowledge))
+  })
 })

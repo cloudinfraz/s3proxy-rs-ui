@@ -43,7 +43,7 @@ export default function VirtualMappingsPage() {
   const context: RoutingContext | null = identities.data && backends.data && capabilities.data && !identities.isError && !backends.isError && !capabilities.isError
     ? reviewedRoutingContext({ identities: identities.data, backends: backends.data, capabilities: capabilities.data }, selected) : null
   useEffect(() => {
-    if (!mappingIntent || !context || consumedMappingIntent.current === mappingIntent) return
+    if (!mappingIntent || !context || identities.isFetching || consumedMappingIntent.current === mappingIntent) return
     consumedMappingIntent.current = mappingIntent
     const requestedIdentity = requestedIdentityId
       ? identities.data?.find(identity => identity.credential_id === requestedIdentityId && identity.access_mode === 'virtual' && identity.enabled)
@@ -57,7 +57,7 @@ export default function VirtualMappingsPage() {
     setDraft({ ...mappingDraft(), owner: requestedIdentity?.credential_id ?? '' })
     setError(requestedIdentity ? null : new Error('The requested identity is unavailable. Select an enabled virtual identity.'))
     setOperation('create')
-  }, [context, identities.data, mappingIntent, requestedIdentityId, setSearchParams])
+  }, [context, identities.data, identities.isFetching, mappingIntent, requestedIdentityId, setSearchParams])
 
   function dismiss() {
     guard.current.cancel(); setOperation(null); setSelected(null); setReview(null); setPending(false); setError(null); setStale(false)
@@ -135,7 +135,7 @@ export default function VirtualMappingsPage() {
       { label: 'Actions', value: (row: Summary) => <div className="row-actions"><button className="icon-button" title="View mapping details" aria-label={`View ${row.virtual_bucket_name}`} onClick={() => { void open('detail', row.id) }}><Eye size={16} /></button><button className="icon-button" title="Edit mapping" aria-label={`Edit ${row.virtual_bucket_name}`} disabled={!context} onClick={() => { void open('edit', row.id) }}><Pencil size={16} /></button><button className="icon-button danger" title="Remove mapping" aria-label={`Remove ${row.virtual_bucket_name}`} onClick={() => { void open('delete', row.id) }}><Trash2 size={16} /></button></div> },
     ]} />}
     <div className="mapping-pagination"><button className="icon-button" title="Previous page" aria-label="Previous page" disabled={cursors.length === 1 || mappings.isFetching} onClick={() => setCursors(current => current.slice(0, -1))}><ChevronLeft size={16} /></button><span>Page {cursors.length}</span><button className="icon-button" title="Next page" aria-label="Next page" disabled={!mappings.data?.next_after_id || mappings.isFetching} onClick={() => { if (mappings.data?.next_after_id) setCursors(current => [...current, mappings.data.next_after_id]) }}><ChevronRight size={16} /></button></div>
-    {operation && operation !== 'delete' && <Modal title={title} description={operation === 'edit' ? 'Container, backend, prefix, and status may change. Alias and identity ownership remain fixed.' : 'Routing metadata only. Changes do not move data or verify Azure access.'} onClose={dismiss} pending={pending}>
+    {operation && operation !== 'delete' && <Modal title={title} description={operation === 'edit' ? 'Container, backend, prefix, and status may change. Alias and identity ownership remain fixed; changing ownership requires a new mapping.' : 'Routing metadata only. Changes do not move data or verify Azure access.'} onClose={dismiss} pending={pending}>
       {error && <ErrorBanner error={error} />}
       {stale ? <div className="dialog-actions"><button disabled={pending} onClick={dismiss}>Cancel</button><button className="primary" disabled={pending} onClick={() => { if (selected) void open('edit', selected.id); else { dismiss(); void invalidateControl(client) } }}>Reload and review</button></div>
         : (operation === 'create' || (operation === 'edit' && selected)) && !review ? <form className="operation-form" onSubmit={event => { void prepare(event) }}>

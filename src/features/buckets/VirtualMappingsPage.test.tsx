@@ -121,11 +121,11 @@ afterEach(() => {
 
 describe('VirtualMappingsPage', () => {
   it('renders loading, retryable error, data, and pagination states', () => {
-    mappingsQuery = state(undefined, { isPending: true })
+    mappingsQuery = { data: undefined, isPending: true, isFetching: false, isError: false, error: null, refetch: vi.fn() }
     const view = renderPage()
     expect(screen.getByRole('status').textContent).toContain('Loading...')
 
-    mappingsQuery = state(undefined, { isError: true, error: new Error('mapping list failed') })
+    mappingsQuery = { data: undefined, isPending: false, isFetching: false, isError: true, error: new Error('mapping list failed'), refetch: vi.fn() }
     view.rerender(<VirtualMappingsPage />)
     expect(screen.getByRole('alert').textContent).toContain('mapping list failed')
     fireEvent.click(screen.getByRole('button', { name: /retry/i }))
@@ -231,8 +231,12 @@ describe('VirtualMappingsPage', () => {
 
   it('preselects an enabled virtual identity from a safe mapping handoff', async () => {
     const credentialId = '22222222-2222-4222-8222-222222222222'
+    identitiesQuery = state([], { isFetching: true })
+    const view = renderPage(`/buckets?create=mapping&identity=${credentialId}`)
+    expect(screen.queryByRole('dialog', { name: 'Add bucket routing' })).toBeNull()
+
     identitiesQuery = state([{ ...identity, credential_id: credentialId }])
-    renderPage(`/buckets?create=mapping&identity=${credentialId}`)
+    view.rerender(<VirtualMappingsPage />)
 
     const dialog = await screen.findByRole('dialog', { name: 'Add bucket routing' })
     expect(within(dialog).getByLabelText('Identity')).toHaveProperty('value', credentialId)
