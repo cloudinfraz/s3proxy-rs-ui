@@ -10,8 +10,9 @@ import { invalidateControl } from '../../api/query-keys'
 import IdentitiesPage from './IdentitiesPage'
 
 const routerMocks = vi.hoisted(() => ({ navigate: vi.fn(), setSearchParams: vi.fn() }))
+const queryClientMocks = vi.hoisted(() => ({ invalidateQueries: vi.fn(), setQueryData: vi.fn() }))
 
-vi.mock('@tanstack/react-query', async importOriginal => ({ ...(await importOriginal<typeof import('@tanstack/react-query')>()), useQuery: vi.fn(), useQueryClient: () => ({ invalidateQueries: vi.fn() }) }))
+vi.mock('@tanstack/react-query', async importOriginal => ({ ...(await importOriginal<typeof import('@tanstack/react-query')>()), useQuery: vi.fn(), useQueryClient: () => queryClientMocks }))
 vi.mock('react-router', () => ({ useNavigate: () => routerMocks.navigate, useSearchParams: vi.fn() }))
 vi.mock('../../api/client', () => ({ api: vi.fn(), ApiError: class extends Error { status = 500 } }))
 vi.mock('../../api/query-keys', async importOriginal => ({ ...(await importOriginal<typeof import('../../api/query-keys')>()), invalidateControl: vi.fn() }))
@@ -111,9 +112,43 @@ describe('IdentitiesPage', () => {
       body: JSON.stringify({ s3_access_key: '', s3_secret_key: '', azure_account: 'newaccount', use_managed_identity: true, access_mode: 'virtual', versioning_enabled: false, default_backend_id: null }),
     }))
     expect(await screen.findByText(/generated-secret/)).toBeTruthy()
+    routerMocks.navigate.mockImplementationOnce(() => {
+      expect(screen.queryByText(/generated-secret/)).toBeNull()
+    })
     fireEvent.click(screen.getByRole('button', { name: 'I stored these securely; continue' }))
     expect(screen.queryByText(/generated-secret/)).toBeNull()
-    expect(routerMocks.navigate).toHaveBeenCalledWith(`/buckets?create=mapping&identity=${credentialId}`)
+    expect(queryClientMocks.setQueryData).not.toHaveBeenCalled()
+    expect(routerMocks.navigate).toHaveBeenCalledWith(`/buckets?create=mapping&credential_id=${credentialId}`)
+  })
+
+  it.each([
+    ['blank access key', { s3_access_key: '   ' }],
+    ['blank secret key', { s3_secret_key: '   ' }],
+    ['invalid credential UUID', { credential_id: 'not-a-uuid' }],
+    ['non-virtual access mode', { access_mode: 'direct' }],
+  ])('rejects a virtual credential response with %s', async (_case, override) => {
+    vi.mocked(useSearchParams).mockReturnValue([new URLSearchParams('create=virtual&return=buckets'), routerMocks.setSearchParams] as never)
+    mockQueries(query({ data: [] }))
+    vi.mocked(api).mockResolvedValueOnce({
+      credential_id: '22222222-2222-4222-8222-222222222222',
+      s3_access_key: 'GENERATED_ACCESS',
+      s3_secret_key: 'generated-secret',
+      s3_endpoint: 'https://example.test',
+      azure_account: 'newaccount',
+      access_mode: 'virtual',
+      use_managed_identity: true,
+      default_backend_id: null,
+      ...override,
+    })
+    render(<IdentitiesPage />)
+
+    const dialog = await screen.findByRole('dialog', { name: 'Create S3 identity' })
+    fireEvent.change(within(dialog).getByLabelText('Azure account'), { target: { value: 'newaccount' } })
+    fireEvent.submit(within(dialog).getByRole('button', { name: 'Create identity' }).closest('form')!)
+
+    expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'Identity creation failed')
+    expect(screen.queryByText(/created credentials/)).toBeNull()
+    expect(routerMocks.navigate).not.toHaveBeenCalled()
   })
 
   it('clears the mapping continuation when virtual identity creation is cancelled', async () => {
@@ -146,6 +181,6 @@ describe('IdentitiesPage', () => {
     releaseRefresh()
     await waitFor(() => expect(acknowledge).toHaveProperty('disabled', false))
     fireEvent.click(acknowledge)
-    expect(routerMocks.navigate).toHaveBeenCalledWith(`/buckets?create=mapping&identity=${credentialId}`)
+    expect(routerMocks.navigate).toHaveBeenCalledWith(`/buckets?create=mapping&credential_id=${credentialId}`)
   })
 })

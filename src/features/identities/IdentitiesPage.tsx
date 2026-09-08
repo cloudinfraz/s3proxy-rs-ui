@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { flushSync } from 'react-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router'
 import { Eye, KeyRound, Pencil, Plus, RotateCw, Trash2 } from 'lucide-react'
@@ -10,7 +11,7 @@ import { EphemeralCredentials, type EphemeralCredentialMaterial } from '../../co
 import { completionGuard } from '../operations/state'
 import { createIdentityPayload, identityBackendOptions, replacementIdentityDraft, updateIdentityPayload } from './payloads'
 import { createDirectMappingPayload, directMappingRemovalDescription, directMappingRows, updateDirectMappingPayload } from './direct-mappings'
-import { mappingCreationPath, requestsVirtualIdentity } from './credential-mapping-workflow'
+import { isNonBlank, isValidCredentialId, mappingCreationPath, requestsVirtualIdentity } from './credential-mapping-workflow'
 import './identities.css'
 import DirectMappingDetails from './DirectMappingDetails'
 
@@ -85,8 +86,8 @@ export default function IdentitiesPage() {
         })),
       })
       if (!guard.current.current(request)) return
-      if (!result.s3_access_key || !result.s3_secret_key) throw new Error('The server did not return one-time credentials')
-      if (virtualMappingWorkflow.current && (result.access_mode !== 'virtual' || !mappingCreationPath(result.credential_id))) throw new Error('The server did not return a virtual identity for bucket routing')
+      if (!isNonBlank(result.s3_access_key) || !isNonBlank(result.s3_secret_key)) throw new Error('The server did not return one-time credentials')
+      if (virtualMappingWorkflow.current && (result.access_mode !== 'virtual' || !isValidCredentialId(result.credential_id))) throw new Error('The server did not return a virtual identity for bucket routing')
       const refreshBeforeHandoff = virtualMappingWorkflow.current
       setCreating(false)
       setAction(null)
@@ -143,7 +144,7 @@ export default function IdentitiesPage() {
     const destination = virtualMappingWorkflow.current && oneTime.accessMode === 'virtual'
       ? mappingCreationPath(oneTime.credentialId)
       : null
-    dismiss()
+    flushSync(dismiss)
     if (destination) navigate(destination)
   }
 

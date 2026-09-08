@@ -4,6 +4,10 @@ import { emptyCollections, mockControlApi } from './control-fixtures'
 test('login and cookie mutation keep credential material out of browser storage', async ({ page }) => {
   const verifyRequests = await mockControlApi(page, true)
   let mutationCsrf: string | null = null
+  const outboundRequests: string[] = []
+  page.on('request', request => {
+    outboundRequests.push(`${request.url()}\n${request.postData() ?? ''}`)
+  })
   const emptyLists = [
     '/admin/credentials', '/admin/ui/identities', '/admin/virtual-buckets', '/admin/backends', '/admin/policies', '/admin/api-keys',
   ]
@@ -56,5 +60,9 @@ test('login and cookie mutation keep credential material out of browser storage'
   expect(storage.session).toEqual([])
   expect(storage.body).not.toContain('browser-test-admin-key')
   expect(storage.body).not.toContain('generated-one-time-secret')
+  expect(page.url()).not.toContain('generated-access')
+  expect(page.url()).not.toContain('generated-one-time-secret')
+  expect(JSON.stringify(outboundRequests)).not.toContain('generated-access')
+  expect(JSON.stringify(outboundRequests)).not.toContain('generated-one-time-secret')
   verifyRequests()
 })

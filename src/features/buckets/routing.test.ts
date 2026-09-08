@@ -36,7 +36,7 @@ describe('mapping payloads', () => {
     expect(updateMappingPayload(mappingDraft(mapping), mapping)).toEqual({ expected_impact_token: mapping.impact_token })
     expect(updateMappingPayload({ ...mappingDraft(mapping), backend: '', prefix: '', enabled: false }, mapping)).toEqual({ expected_impact_token: mapping.impact_token, backend_id: null, endpoint_prefix: null, enabled: false })
     expect(updateMappingPayload({ ...mappingDraft(mapping), backend: 'default' }, mapping, 4)).toEqual({ expected_impact_token: mapping.impact_token, backend_id: 'default', expected_backend_revision: 4 })
-    expect(createMappingPayload(mappingDraft(mapping), 4)).toMatchObject({ virtual_bucket_name: 'reports-alias', azure_container: 'reports-physical', expected_backend_revision: 4 })
+    expect(createMappingPayload(mappingDraft(mapping), 4)).toEqual({ virtual_bucket_name: 'reports-alias', azure_container: 'reports-physical', credential_id: 'owner', backend_id: 'override', endpoint_prefix: 'reports', expected_backend_revision: 4 })
   })
   it('validates independent alias/container and virtual ownership without normalizing', () => {
     expect(draftError(mappingDraft(mapping), context)).toBeUndefined()
@@ -45,6 +45,7 @@ describe('mapping payloads', () => {
     for (const prefix of ['https://host', 'a.b', 'label\n']) expect(draftError({ ...mappingDraft(mapping), prefix }, context)).toBeTruthy()
     expect(draftError(mappingDraft(mapping), { ...context, identities: [{ ...identity, access_mode: 'direct' }] })).toContain('virtual')
     expect(draftError({ ...mappingDraft(mapping), alias: 'another-alias' }, context, mapping)).toContain('cannot change')
+    expect(draftError({ ...mappingDraft(mapping), owner: 'another-owner' }, context, mapping)).toContain('cannot change')
   })
 })
 

@@ -195,6 +195,9 @@ describe('VirtualMappingsPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit photos' }))
     await screen.findByDisplayValue('photos-container')
+    expect(screen.getByLabelText('S3 bucket')).toHaveProperty('readOnly', true)
+    expect(screen.getByLabelText('Identity')).toHaveProperty('disabled', true)
+    expect(screen.getByText(/changing ownership requires a new mapping/i)).toBeTruthy()
     fireEvent.change(screen.getByLabelText('Azure container'), { target: { value: 'updated-container' } })
     fireEvent.click(screen.getByRole('button', { name: 'Review changes' }))
     expect(await screen.findByRole('dialog', { name: 'Confirm mapping change' })).toBeTruthy()
@@ -204,6 +207,26 @@ describe('VirtualMappingsPage', () => {
       method: 'PUT',
       body: JSON.stringify({ expected_impact_token: 'impact-token', azure_container: 'updated-container' }),
     }))
+  })
+
+  it('requires authoritative reload after a stale mapping edit', async () => {
+    vi.mocked(api)
+      .mockResolvedValueOnce(mapping)
+      .mockRejectedValueOnce(new ApiError(409, 'mapping changed'))
+      .mockResolvedValueOnce(mapping)
+    renderPage()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit photos' }))
+    await screen.findByDisplayValue('photos-container')
+    fireEvent.change(screen.getByLabelText('Azure container'), { target: { value: 'updated-container' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Review changes' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirm change' }))
+
+    expect(await screen.findByRole('dialog', { name: 'Mapping review expired' })).toBeTruthy()
+    expect(screen.getByRole('alert').textContent).toContain('mapping changed')
+    fireEvent.click(screen.getByRole('button', { name: 'Reload and review' }))
+    await waitFor(() => expect(api).toHaveBeenNthCalledWith(3, '/admin/ui/virtual-buckets/mapping-id'))
+    expect(await screen.findByRole('dialog', { name: 'Edit mapping' })).toBeTruthy()
   })
 
   it('reports a stale delete and succeeds after reopening the authoritative record', async () => {
@@ -232,7 +255,7 @@ describe('VirtualMappingsPage', () => {
   it('preselects an enabled virtual identity from a safe mapping handoff', async () => {
     const credentialId = '22222222-2222-4222-8222-222222222222'
     identitiesQuery = state([], { isFetching: true })
-    const view = renderPage(`/buckets?create=mapping&identity=${credentialId}`)
+    const view = renderPage(`/buckets?create=mapping&credential_id=${credentialId}`)
     expect(screen.queryByRole('dialog', { name: 'Add bucket routing' })).toBeNull()
 
     identitiesQuery = state([{ ...identity, credential_id: credentialId }])
@@ -241,13 +264,49 @@ describe('VirtualMappingsPage', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Add bucket routing' })
     expect(within(dialog).getByLabelText('Identity')).toHaveProperty('value', credentialId)
     expect(screen.getByRole('link', { name: 'Create virtual identity', hidden: true }).getAttribute('href')).toBe('/credentials?create=virtual&return=buckets')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+    view.rerender(<VirtualMappingsPage />)
+    expect(screen.queryByRole('dialog', { name: 'Add bucket routing' })).toBeNull()
   })
 
   it('opens a recoverable mapping form when a credential handoff is invalid', async () => {
-    renderPage('/buckets?create=mapping&identity=not-a-uuid')
+    renderPage('/buckets?create=mapping&credential_id=not-a-uuid')
 
     const dialog = await screen.findByRole('dialog', { name: 'Add bucket routing' })
     expect(within(dialog).getByRole('alert').textContent).toContain('Select an enabled virtual identity')
     expect(within(dialog).getByLabelText('Identity')).toHaveProperty('value', '')
+  })
+
+  it.each([
+    ['missing', []],
+    ['disabled', [{ ...identity, credential_id: '22222222-2222-4222-8222-222222222222', enabled: false }]],
+    ['non-virtual', [{ ...identity, credential_id: '22222222-2222-4222-8222-222222222222', access_mode: 'direct' as const }]],
+  ])('keeps mapping creation usable for a %s handed-off identity', async (_case, availableIdentities) => {
+    const credentialId = '22222222-2222-4222-8222-222222222222'
+    identitiesQuery = state(availableIdentities)
+    renderPage(`/buckets?create=mapping&credential_id=${credentialId}`)
+
+    const dialog = await screen.findByRole('dialog', { name: 'Add bucket routing' })
+    expect(within(dialog).getByRole('alert').textContent).toContain('Select an enabled virtual identity')
+    expect(within(dialog).getByLabelText('Identity')).toHaveProperty('value', '')
+    expect(within(dialog).getByRole('button', { name: 'Review changes' })).toBeTruthy()
+  })
+
+  it('retries mapping creation without recreating or deleting the identity', async () => {
+    vi.mocked(api).mockRejectedValueOnce(new Error('mapping create failed')).mockResolvedValueOnce(mapping)
+    renderPage()
+
+    fireEvent.click(screen.getByRole('button', { name: /add bucket routing/i }))
+    fireEvent.change(screen.getByLabelText('S3 bucket'), { target: { value: 'new-photos' } })
+    fireEvent.change(screen.getByLabelText('Azure container'), { target: { value: 'new-container' } })
+    fireEvent.change(screen.getByLabelText('Identity'), { target: { value: 'identity-id' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Review changes' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirm change' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('mapping create failed')
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm change' }))
+    await waitFor(() => expect(invalidateControl).toHaveBeenCalledOnce())
+    expect(api).toHaveBeenCalledTimes(2)
+    for (const [path] of vi.mocked(api).mock.calls) expect(path).toBe('/admin/ui/virtual-buckets')
   })
 })
