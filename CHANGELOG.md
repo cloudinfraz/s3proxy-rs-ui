@@ -5,10 +5,21 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.6.4] - 2026-09-08
+## [Unreleased]
+
+## [0.6.4] - 2026-09-07
 
 ### Added
 
+- Added a Bucket routing workflow that creates server-generated virtual S3
+  identities, displays credentials once, and continues directly to mapping
+  creation using a credential-ID-only handoff.
+- Added recovery for failed session revocation that blocks sign-in and protected
+  routes until the browser verifies revocation or a retry succeeds.
+- Added repository-local Spec Kit skills for specification, clarification,
+  planning, task generation, implementation, analysis, and Git integration.
+- Added desktop and mobile browser coverage for credential handoff, mapping
+  updates, failed logout recovery, and release security boundaries.
 - Added an application-level React error boundary with a reload recovery path
   for unexpected rendering failures.
 - Added centralized, sanitized API error interception with request method and
@@ -23,6 +34,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- Restricted credential-to-mapping return URLs to a single allowlisted
+  `credential_id` parameter and authoritative enabled virtual identities.
+- Made mapping edits preserve immutable aliases and owners while submitting only
+  reviewed mutable fields with current concurrency metadata.
+- Isolated pending revocation state per browser tab and sanitized recovery
+  failures before presenting retry actions.
 - Enforced whole-source unit coverage in CI with minimum 75 percent thresholds
   for statements, branches, functions, and lines.
 - Expanded CI to run coverage instead of import-only unit execution and ignore
@@ -34,12 +51,33 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- Rejected malformed, whitespace-only, UUID-invalid, and non-virtual generated
+  credential responses before disclosure or mapping handoff.
+- Cleared one-time credential plaintext synchronously before navigation and kept
+  generated access and secret keys out of query caches and request payloads.
+- Improved session-expiry routing, role-dialog validation, identity-policy error
+  recovery, and application error-boundary handling.
 - Removed duplicate global API alerts that conflicted with contextual component
   errors and remained visible after successful retries.
 - Isolated API client mocks and browser globals between tests to prevent order-
   dependent failures.
 - Increased the unit-test timeout for instrumented component tests so coverage
   execution remains stable in CI.
+
+### Security
+
+- Added browser assertions that generated credentials do not remain in URLs,
+  local storage, session storage, the DOM after acknowledgement, or outbound
+  request URLs and bodies.
+- Prevented access to protected content while session revocation is unresolved,
+  including across reloads and direct navigation attempts.
+
+### Deployment
+
+- Removed a disabled UI NetworkPolicy before deployment verification so stale
+  policy state cannot affect rollout health checks.
+- Excluded repository metadata, environment files, coverage output, and Docker
+  build definitions from the runtime image build context.
 
 ## [0.6.3] - 2026-09-07
 
