@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { controlKeys } from '../../api/query-keys'
 import LoginPage from './LoginPage'
+import { SessionRevocationProvider } from './revocation'
 
 const clientMocks = vi.hoisted(() => ({
   login: vi.fn(),
@@ -22,12 +23,12 @@ function renderLogin() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={['/login']}>
+      <SessionRevocationProvider><MemoryRouter initialEntries={['/login']}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/" element={<h1>Overview destination</h1>} />
         </Routes>
-      </MemoryRouter>
+      </MemoryRouter></SessionRevocationProvider>
     </QueryClientProvider>,
   )
   return client

@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, RefreshCw } from 'lucide-react'
 import cloudinfrazLogo from '../../assets/cloudinfraz-logo.png'
 import { login, setCsrfToken } from '../../api/client'
 import { controlKeys } from '../../api/query-keys'
 import { ErrorBanner } from '../../components/control'
 import { completionGuard } from '../operations/state'
+import { useSessionRevocation } from './revocation-context'
 
 export default function LoginPage() {
   const [apiKey, setApiKey] = useState('')
@@ -14,6 +15,7 @@ export default function LoginPage() {
   const [error, setError] = useState<Error | null>(null)
   const client = useQueryClient()
   const navigate = useNavigate()
+  const revocation = useSessionRevocation()
   const guard = useRef(completionGuard())
   useEffect(() => { const owner = guard.current; return () => owner.cancel() }, [])
   async function submit(event: FormEvent) {
@@ -39,11 +41,16 @@ export default function LoginPage() {
       <img src={cloudinfrazLogo} alt="CloudInfraz" width={64} height={64} />
       <strong>s3proxy control</strong>
     </div>
-    <form className="login-panel" onSubmit={submit}>
+    {revocation.status !== 'idle' ? <section className="login-panel" aria-labelledby="revocation-heading">
+      <h1 id="revocation-heading">Session revocation pending</h1>
+      {revocation.status === 'failed'
+        ? <div className="error-banner" role="alert"><span>{revocation.error.message}</span><button type="button" onClick={() => { void revocation.retry() }}><RefreshCw size={15} /> Retry revocation</button></div>
+        : <div className="error-banner" role="status"><span>Confirming server-side revocation...</span><button type="button" disabled><RefreshCw className="refreshing" size={15} /> Retrying...</button></div>}
+    </section> : <form className="login-panel" onSubmit={submit}>
       <h1>Sign in</h1>
       <label>Admin API key<input autoFocus type="password" autoComplete="current-password" value={apiKey} onChange={event => setApiKey(event.target.value)} required /></label>
       {error && <ErrorBanner error={error} />}
       <button className="primary" disabled={pending}>{pending ? 'Signing in...' : 'Continue'}<ChevronRight size={17} /></button>
-    </form>
+    </form>}
   </main>
 }

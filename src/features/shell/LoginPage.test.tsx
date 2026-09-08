@@ -3,11 +3,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router'
 import { expect, it } from 'vitest'
 import LoginPage from './LoginPage'
+import { SessionRevocationProvider } from './revocation'
 
 it('renders the local CloudInfraz logo with a labelled, unchanged sign-in form', () => {
   const html = renderToStaticMarkup(
     <QueryClientProvider client={new QueryClient()}>
-      <MemoryRouter><LoginPage /></MemoryRouter>
+      <SessionRevocationProvider><MemoryRouter><LoginPage /></MemoryRouter></SessionRevocationProvider>
     </QueryClientProvider>,
   )
 

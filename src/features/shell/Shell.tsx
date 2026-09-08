@@ -8,6 +8,7 @@ import { controlQueries } from '../../api/control'
 import { controlKeys } from '../../api/query-keys'
 import { ErrorBanner } from '../../components/control'
 import { millisecondsUntilExpiry, readSession } from './session-lifecycle'
+import { useSessionRevocation } from './revocation-context'
 
 const groups = [
   { label: 'Overview', links: [{ to: '/', label: 'Overview', icon: CircleGauge }] },
@@ -24,7 +25,7 @@ function Navigation({ close }: { close?: () => void }) {
 export default function Shell() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
-  const [logoutError, setLogoutError] = useState<Error | null>(null)
+  const revocation = useSessionRevocation()
   const client = useQueryClient()
   const navigate = useNavigate()
   const location = useLocation()
@@ -70,9 +71,8 @@ export default function Shell() {
     terminated.current = true
     setSigningOut(true)
     setMenuOpen(false)
-    setLogoutError(null)
     try { await logout() }
-    catch { setLogoutError(new Error('The server could not confirm revocation. Local session data was cleared.')) }
+    catch { revocation.markFailed() }
     finally {
       terminated.current = true
       setCsrfToken(null)
@@ -87,5 +87,5 @@ export default function Shell() {
       event.preventDefault()
       document.querySelector<HTMLElement>('#main-content h1')?.focus()
     }
-  }}><div className="dialog-heading"><Dialog.Title>s3proxy</Dialog.Title><Dialog.Close><button className="icon-button" aria-label="Close navigation"><X size={18} /></button></Dialog.Close></div><Dialog.Description className="visually-hidden">Control navigation</Dialog.Description><Navigation close={() => setMenuOpen(false)} />{exit}</Dialog.Content></Dialog.Root><div><span className="environment-dot" />{capabilities.data ? `${capabilities.data.plane} plane` : 'Plane unavailable'}</div><span className="session-status">Session protected</span></header>{logoutError && <ErrorBanner error={logoutError} retry={() => { void signOut() }} />}{!signingOut && <Outlet key={location.pathname} />}</main></div>
+  }}><div className="dialog-heading"><Dialog.Title>s3proxy</Dialog.Title><Dialog.Close><button className="icon-button" aria-label="Close navigation"><X size={18} /></button></Dialog.Close></div><Dialog.Description className="visually-hidden">Control navigation</Dialog.Description><Navigation close={() => setMenuOpen(false)} />{exit}</Dialog.Content></Dialog.Root><div><span className="environment-dot" />{capabilities.data ? `${capabilities.data.plane} plane` : 'Plane unavailable'}</div><span className="session-status">Session protected</span></header>{!signingOut && <Outlet key={location.pathname} />}</main></div>
 }

@@ -104,6 +104,46 @@ test('UI076-01 confirmed revocation clears protected content and redirects', asy
   verify()
 })
 
+test('UI078-01 failed logout blocks protected access until revocation retry succeeds', async ({ page }) => {
+  const verify = await mockControlApi(page)
+  let deletions = 0
+  const deletionTokens: string[] = []
+  await page.route('**/admin/session', route => {
+    if (route.request().method() === 'DELETE') {
+      deletions += 1
+      deletionTokens.push(route.request().headers()['x-csrf-token'])
+      return deletions === 1
+        ? route.fulfill({ status: 503, body: 'synthetic-private-revocation-error' })
+        : route.fulfill({ status: 204 })
+    }
+    return route.fulfill({ json: { authenticated: true, csrf_token: 'synthetic-recovery-csrf', expires_at: '2099-01-01T00:00:00Z' } })
+  })
+  await page.goto('/admin/ui/keys')
+  await expect(page.getByText('fixture-admin', { exact: true })).toBeVisible()
+  const menu = page.getByRole('button', { name: 'Open navigation' })
+  if (await menu.isVisible()) await menu.click()
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click()
+
+  await expect(page).toHaveURL(/\/login$/)
+  await expect(page.getByRole('heading', { name: 'Session revocation pending' })).toBeVisible()
+  await expect(page.getByRole('textbox', { name: 'Admin API key' })).toHaveCount(0)
+  await expect(page.getByText('fixture-admin', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('synthetic-private-revocation-error')).toHaveCount(0)
+
+  await page.reload()
+  await expect(page.getByRole('heading', { name: 'Session revocation pending' })).toBeVisible()
+  await page.goto('/admin/ui/keys')
+  await expect(page).toHaveURL(/\/login$/)
+  await expect(page.getByText('fixture-admin', { exact: true })).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'Retry revocation' }).click()
+  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
+  expect(deletions).toBe(2)
+  expect(deletionTokens).toEqual(['synthetic-recovery-csrf', 'synthetic-recovery-csrf'])
+  expect(await page.evaluate(() => [localStorage.length, sessionStorage.length])).toEqual([0, 0])
+  verify()
+})
+
 test('UI076-01 direct unauthenticated navigation never renders protected records', async ({ page }) => {
   const verify = await mockControlApi(page)
   await page.route('**/admin/session', route => route.fulfill({ status: 403 }))
