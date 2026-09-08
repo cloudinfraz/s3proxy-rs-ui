@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { controlKeys } from '../../api/query-keys'
@@ -9,13 +9,17 @@ import LoginPage from './LoginPage'
 import { SessionRevocationProvider } from './revocation'
 
 const clientMocks = vi.hoisted(() => ({
+  getSession: vi.fn(),
   login: vi.fn(),
+  logout: vi.fn(),
   setCsrfToken: vi.fn(),
 }))
 
 vi.mock('../../api/client', async importOriginal => ({
   ...await importOriginal<typeof import('../../api/client')>(),
+  getSession: clientMocks.getSession,
   login: clientMocks.login,
+  logout: clientMocks.logout,
   setCsrfToken: clientMocks.setCsrfToken,
 }))
 
@@ -36,11 +40,14 @@ function renderLogin() {
 
 afterEach(() => {
   cleanup()
+  window.sessionStorage.clear()
   vi.clearAllMocks()
 })
 
 beforeEach(() => {
+  clientMocks.getSession.mockReset()
   clientMocks.login.mockReset()
+  clientMocks.logout.mockReset()
 })
 
 describe('LoginPage interactions', () => {
@@ -75,5 +82,36 @@ describe('LoginPage interactions', () => {
       expect(button.disabled).toBe(false)
     })
     expect(clientMocks.setCsrfToken).not.toHaveBeenCalled()
+  })
+
+  it('replaces sign-in with a sanitized warning while revocation is unresolved', () => {
+    window.sessionStorage.setItem('s3proxy.pending-session-revocation', 'private-marker-detail')
+
+    renderLogin()
+
+    expect(screen.getByRole('heading', { name: 'Session revocation pending' })).toBeTruthy()
+    expect(screen.queryByLabelText('Admin API key')).toBeNull()
+    expect(screen.queryByText('private-marker-detail')).toBeNull()
+    expect(clientMocks.login).not.toHaveBeenCalled()
+  })
+
+  it('disables duplicate retry and restores the retry action after failure', async () => {
+    let rejectSession: (reason?: unknown) => void = () => {}
+    clientMocks.getSession.mockReturnValue(new Promise((_resolve, reject) => { rejectSession = reject }))
+    window.sessionStorage.setItem('s3proxy.pending-session-revocation', 'pending')
+    renderLogin()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry revocation' }))
+
+    const retrying = await screen.findByRole('button', { name: 'Retrying...' })
+    if (!(retrying instanceof HTMLButtonElement)) throw new Error('Expected the retry button')
+    expect(retrying.disabled).toBe(true)
+    fireEvent.click(retrying)
+    expect(clientMocks.getSession).toHaveBeenCalledOnce()
+
+    await act(async () => { rejectSession(new Error('private verification failure')) })
+    expect(await screen.findByRole('button', { name: 'Retry revocation' })).toBeTruthy()
+    expect(screen.queryByLabelText('Admin API key')).toBeNull()
+    expect(screen.queryByText('private verification failure')).toBeNull()
   })
 })

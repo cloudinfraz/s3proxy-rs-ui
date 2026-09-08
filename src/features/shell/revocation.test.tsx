@@ -40,9 +40,44 @@ beforeEach(() => {
   apiMocks.setCsrfToken.mockReset()
 })
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.restoreAllMocks()
+})
 
 describe('session revocation recovery', () => {
+  it('fails closed when a pending marker contains an unexpected value', () => {
+    window.sessionStorage.setItem('s3proxy.pending-session-revocation', 'corrupted')
+
+    renderProbe()
+
+    expect(screen.getByText('failed')).toBeTruthy()
+    expect(screen.getByText(/protected access remains blocked/i)).toBeTruthy()
+  })
+
+  it('fails closed when pending marker storage cannot be read', () => {
+    const getItem = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('storage unavailable')
+    })
+
+    renderProbe()
+
+    expect(screen.getByText('failed')).toBeTruthy()
+    getItem.mockRestore()
+  })
+
+  it('keeps the current document blocked when a pending marker cannot be written', () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('storage unavailable')
+    })
+    renderProbe()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fail' }))
+
+    expect(screen.getByText('failed')).toBeTruthy()
+    expect(window.sessionStorage.length).toBe(0)
+  })
+
   it('retains failed revocation state across provider remounts without storing secrets', () => {
     const view = render(<SessionRevocationProvider><Probe /></SessionRevocationProvider>)
     fireEvent.click(screen.getByRole('button', { name: 'Fail' }))
@@ -67,6 +102,7 @@ describe('session revocation recovery', () => {
     expect(apiMocks.setCsrfToken).toHaveBeenNthCalledWith(1, null)
     expect(apiMocks.setCsrfToken).toHaveBeenNthCalledWith(2, 'fresh-csrf')
     expect(apiMocks.logout).toHaveBeenCalledOnce()
+    expect(apiMocks.getSession.mock.invocationCallOrder[0]).toBeLessThan(apiMocks.logout.mock.invocationCallOrder[0])
     expect(apiMocks.setCsrfToken).toHaveBeenLastCalledWith(null)
     expect(screen.getByText('idle')).toBeTruthy()
     expect(window.sessionStorage.length).toBe(0)
@@ -82,6 +118,33 @@ describe('session revocation recovery', () => {
     expect(apiMocks.logout).not.toHaveBeenCalled()
     expect(screen.getByText('idle')).toBeTruthy()
     expect(window.sessionStorage.length).toBe(0)
+  })
+
+  it('accepts an authoritative unauthenticated payload without deleting again', async () => {
+    apiMocks.getSession.mockResolvedValue({ authenticated: false, csrf_token: '', expires_at: '' })
+    renderProbe()
+    fireEvent.click(screen.getByRole('button', { name: 'Fail' }))
+
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Retry' })) })
+
+    expect(apiMocks.logout).not.toHaveBeenCalled()
+    expect(apiMocks.setCsrfToken).toHaveBeenLastCalledWith(null)
+    expect(screen.getByText('idle')).toBeTruthy()
+    expect(window.sessionStorage.length).toBe(0)
+  })
+
+  it('retains pending state and clears retry CSRF when deletion fails', async () => {
+    apiMocks.getSession.mockResolvedValue({ authenticated: true, csrf_token: 'fresh-csrf', expires_at: '2099-01-01T00:00:00Z' })
+    apiMocks.logout.mockRejectedValue(new Error('private deletion failure'))
+    renderProbe()
+    fireEvent.click(screen.getByRole('button', { name: 'Fail' }))
+
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Retry' })) })
+
+    expect(screen.getByText('failed')).toBeTruthy()
+    expect(screen.queryByText('private deletion failure')).toBeNull()
+    expect(window.sessionStorage.getItem('s3proxy.pending-session-revocation')).toBe('pending')
+    expect(apiMocks.setCsrfToken).toHaveBeenLastCalledWith(null)
   })
 
   it('remains blocked and retryable when verification fails', async () => {

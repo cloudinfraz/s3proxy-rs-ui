@@ -52,6 +52,19 @@ describe('browser API client', () => {
     await expect(getSession()).rejects.toMatchObject({ status: 502 })
   })
 
+  it('returns validated authoritative session data without installing its CSRF token', async () => {
+    const session = { authenticated: true, csrf_token: 'verification-csrf', expires_at: '2030-01-01T00:00:00Z' }
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response(session)))
+
+    await expect(getSession()).resolves.toEqual(session)
+
+    expect(hasCsrfToken()).toBe(false)
+    const [path, init] = vi.mocked(fetch).mock.calls[0]
+    expect(path).toBe('/admin/session')
+    expect(init?.credentials).toBe('same-origin')
+    expect(init?.cache).toBe('no-store')
+  })
+
   it('requires and sends the in-memory CSRF token for mutations', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response(undefined, 204)))
     await expect(api('/admin/api-keys/key', { method: 'DELETE' })).rejects.toThrow('no CSRF token')

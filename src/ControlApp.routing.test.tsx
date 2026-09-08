@@ -20,6 +20,7 @@ vi.mock('./features/policies/PolicyWorkspace', () => ({ default: () => <h1>Polic
 
 afterEach(() => {
   cleanup()
+  window.sessionStorage.clear()
   window.history.replaceState(null, '', '/')
 })
 
@@ -41,5 +42,27 @@ describe('ControlApp routing', () => {
 
     expect(await screen.findByRole('heading', { name: 'Overview route' })).toBeTruthy()
     expect(window.location.pathname).toBe('/')
+  })
+
+  it.each([
+    ['/', 'Overview route'],
+    ['/credentials', 'Identities route'],
+    ['/azure-backends', 'Backends route'],
+    ['/buckets', 'Buckets route'],
+    ['/policies', 'Policies route'],
+    ['/iam-roles', 'Roles route'],
+    ['/temporary-credentials', 'Temporary credentials route'],
+    ['/keys', 'Keys route'],
+    ['/audit', 'Audit route'],
+    ['/health', 'Health route'],
+  ])('blocks protected route %s while revocation is unresolved', async (path, protectedHeading) => {
+    window.sessionStorage.setItem('s3proxy.pending-session-revocation', 'pending')
+    window.history.replaceState(null, '', path)
+
+    render(<ControlApp />)
+
+    expect(await screen.findByRole('heading', { name: 'Login route' })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: protectedHeading })).toBeNull()
+    expect(window.location.pathname).toBe('/login')
   })
 })

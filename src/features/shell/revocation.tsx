@@ -8,9 +8,9 @@ const revocationMessage = 'The server could not confirm session revocation. Prot
 function hasPendingRevocation() {
   if (typeof window === 'undefined') return false
   try {
-    return window.sessionStorage.getItem(pendingRevocationKey) === 'pending'
+    return window.sessionStorage.getItem(pendingRevocationKey) !== null
   } catch {
-    return false
+    return true
   }
 }
 

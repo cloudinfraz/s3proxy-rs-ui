@@ -144,6 +144,80 @@ test('UI078-01 failed logout blocks protected access until revocation retry succ
   verify()
 })
 
+test('UI078-02 malformed revocation state survives reload and remains isolated per tab', async ({ page }) => {
+  const verifyFirstTab = await mockControlApi(page)
+  await page.goto('/admin/ui/login')
+  await page.evaluate(() => sessionStorage.setItem('s3proxy.pending-session-revocation', 'synthetic-private-marker-detail'))
+  await page.reload()
+
+  await expect(page.getByRole('heading', { name: 'Session revocation pending' })).toBeVisible()
+  await expect(page.getByText('synthetic-private-marker-detail')).toHaveCount(0)
+  await page.goto('/admin/ui/keys')
+  await expect(page).toHaveURL(/\/login$/)
+  await expect(page.getByText('fixture-admin', { exact: true })).toHaveCount(0)
+
+  const secondPage = await page.context().newPage()
+  const verifySecondTab = await mockControlApi(secondPage)
+  await secondPage.goto('/admin/ui/keys')
+  await expect(secondPage.getByText('fixture-admin', { exact: true })).toBeVisible()
+  expect(await secondPage.evaluate(() => sessionStorage.length)).toBe(0)
+  await expect(page.getByRole('heading', { name: 'Session revocation pending' })).toBeVisible()
+
+  await secondPage.close()
+  verifyFirstTab()
+  verifySecondTab()
+})
+
+test('UI078-03 authoritative unauthenticated retry clears pending state without deletion', async ({ page }) => {
+  const verify = await mockControlApi(page)
+  let verifications = 0
+  let deletions = 0
+  await page.route('**/admin/session', route => {
+    if (route.request().method() === 'GET') {
+      verifications += 1
+      return route.fulfill({ status: 403 })
+    }
+    deletions += 1
+    return route.fulfill({ status: 204 })
+  })
+  await page.goto('/admin/ui/login')
+  await page.evaluate(() => sessionStorage.setItem('s3proxy.pending-session-revocation', 'pending'))
+  await page.reload()
+
+  await page.getByRole('button', { name: 'Retry revocation' }).click()
+
+  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
+  expect(verifications).toBe(1)
+  expect(deletions).toBe(0)
+  expect(await page.evaluate(() => sessionStorage.length)).toBe(0)
+  verify()
+})
+
+test('UI078-04 failed verification stays sanitized and permits another retry', async ({ page }) => {
+  const verify = await mockControlApi(page)
+  let verifications = 0
+  await page.route('**/admin/session', route => {
+    verifications += 1
+    return verifications === 1
+      ? route.fulfill({ status: 503, body: 'synthetic-private-verification-error' })
+      : route.fulfill({ status: 403 })
+  })
+  await page.goto('/admin/ui/login')
+  await page.evaluate(() => sessionStorage.setItem('s3proxy.pending-session-revocation', 'pending'))
+  await page.reload()
+
+  await page.getByRole('button', { name: 'Retry revocation' }).click()
+  await expect(page.getByRole('button', { name: 'Retry revocation' })).toBeVisible()
+  await expect(page.getByText('synthetic-private-verification-error')).toHaveCount(0)
+  await expect(page.getByRole('textbox', { name: 'Admin API key' })).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'Retry revocation' }).click()
+  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
+  expect(verifications).toBe(2)
+  expect(await page.evaluate(() => sessionStorage.length)).toBe(0)
+  verify()
+})
+
 test('UI076-01 direct unauthenticated navigation never renders protected records', async ({ page }) => {
   const verify = await mockControlApi(page)
   await page.route('**/admin/session', route => route.fulfill({ status: 403 }))
