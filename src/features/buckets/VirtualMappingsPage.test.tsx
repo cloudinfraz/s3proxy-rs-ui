@@ -3,6 +3,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useQuery } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router'
 import { ApiError, api } from '../../api/client'
 import type { Schema } from '../../api/control'
 import { invalidateControl } from '../../api/query-keys'
@@ -84,6 +85,10 @@ function state<T>(data?: T, overrides: Partial<QueryState<T>> = {}): QueryState<
   return { data, isPending: false, isFetching: false, isError: false, error: null, refetch: vi.fn(), ...overrides }
 }
 
+function renderPage(initialEntry = '/buckets') {
+  return render(<VirtualMappingsPage />, { wrapper: ({ children }) => <MemoryRouter initialEntries={[initialEntry]}>{children}</MemoryRouter> })
+}
+
 let mappingsQuery: QueryState<Schema['VirtualMappingPage']>
 let identitiesQuery: QueryState<Schema['IdentityProjection'][]>
 let backendsQuery: QueryState<Schema['StorageBackendProjection'][]>
@@ -117,7 +122,7 @@ afterEach(() => {
 describe('VirtualMappingsPage', () => {
   it('renders loading, retryable error, data, and pagination states', () => {
     mappingsQuery = state(undefined, { isPending: true })
-    const view = render(<VirtualMappingsPage />)
+    const view = renderPage()
     expect(screen.getByRole('status').textContent).toContain('Loading...')
 
     mappingsQuery = state(undefined, { isError: true, error: new Error('mapping list failed') })
@@ -136,7 +141,7 @@ describe('VirtualMappingsPage', () => {
 
   it('loads and presents authoritative mapping details', async () => {
     vi.mocked(api).mockResolvedValue(mapping)
-    render(<VirtualMappingsPage />)
+    renderPage()
 
     fireEvent.click(screen.getByRole('button', { name: 'View photos' }))
     const dialog = await screen.findByRole('dialog', { name: 'Mapping details' })
@@ -149,7 +154,7 @@ describe('VirtualMappingsPage', () => {
     vi.mocked(api)
       .mockResolvedValueOnce({ id: 'backend-id', azure_account: 'archiveaccount', auth_mode: 'managed_identity', enabled: true, revision: 7 })
       .mockResolvedValueOnce(mapping)
-    render(<VirtualMappingsPage />)
+    renderPage()
 
     fireEvent.click(screen.getByRole('button', { name: /add bucket routing/i }))
     fireEvent.change(screen.getByLabelText('S3 bucket'), { target: { value: 'new-photos' } })
@@ -171,7 +176,7 @@ describe('VirtualMappingsPage', () => {
 
   it('keeps the form open when backend review fails', async () => {
     vi.mocked(api).mockRejectedValue(new Error('backend review unavailable'))
-    render(<VirtualMappingsPage />)
+    renderPage()
 
     fireEvent.click(screen.getByRole('button', { name: /add bucket routing/i }))
     fireEvent.change(screen.getByLabelText('S3 bucket'), { target: { value: 'new-photos' } })
@@ -186,7 +191,7 @@ describe('VirtualMappingsPage', () => {
 
   it('reviews an edit and sends only changed mapping fields', async () => {
     vi.mocked(api).mockResolvedValueOnce(mapping).mockResolvedValueOnce(mapping)
-    render(<VirtualMappingsPage />)
+    renderPage()
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit photos' }))
     await screen.findByDisplayValue('photos-container')
@@ -207,7 +212,7 @@ describe('VirtualMappingsPage', () => {
       .mockRejectedValueOnce(new ApiError(409, 'resource changed'))
       .mockResolvedValueOnce(mapping)
       .mockResolvedValueOnce(undefined)
-    render(<VirtualMappingsPage />)
+    renderPage()
 
     fireEvent.click(screen.getByRole('button', { name: 'Remove photos' }))
     await screen.findByRole('alertdialog', { name: 'Remove bucket routing' })
@@ -222,5 +227,23 @@ describe('VirtualMappingsPage', () => {
       method: 'DELETE', body: JSON.stringify({ expected_impact_token: 'impact-token' }),
     }))
     expect(invalidateControl).toHaveBeenCalledOnce()
+  })
+
+  it('preselects an enabled virtual identity from a safe mapping handoff', async () => {
+    const credentialId = '22222222-2222-4222-8222-222222222222'
+    identitiesQuery = state([{ ...identity, credential_id: credentialId }])
+    renderPage(`/buckets?create=mapping&identity=${credentialId}`)
+
+    const dialog = await screen.findByRole('dialog', { name: 'Add bucket routing' })
+    expect(within(dialog).getByLabelText('Identity')).toHaveProperty('value', credentialId)
+    expect(screen.getByRole('link', { name: 'Create virtual identity', hidden: true }).getAttribute('href')).toBe('/credentials?create=virtual&return=buckets')
+  })
+
+  it('opens a recoverable mapping form when a credential handoff is invalid', async () => {
+    renderPage('/buckets?create=mapping&identity=not-a-uuid')
+
+    const dialog = await screen.findByRole('dialog', { name: 'Add bucket routing' })
+    expect(within(dialog).getByRole('alert').textContent).toContain('Select an enabled virtual identity')
+    expect(within(dialog).getByLabelText('Identity')).toHaveProperty('value', '')
   })
 })

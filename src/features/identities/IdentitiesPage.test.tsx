@@ -8,11 +8,13 @@ import { api } from '../../api/client'
 import type { Schema } from '../../api/control'
 import IdentitiesPage from './IdentitiesPage'
 
+const routerMocks = vi.hoisted(() => ({ navigate: vi.fn(), setSearchParams: vi.fn() }))
+
 vi.mock('@tanstack/react-query', async importOriginal => ({ ...(await importOriginal<typeof import('@tanstack/react-query')>()), useQuery: vi.fn(), useQueryClient: () => ({ invalidateQueries: vi.fn() }) }))
-vi.mock('react-router', () => ({ useSearchParams: vi.fn() }))
+vi.mock('react-router', () => ({ useNavigate: () => routerMocks.navigate, useSearchParams: vi.fn() }))
 vi.mock('../../api/client', () => ({ api: vi.fn(), ApiError: class extends Error { status = 500 } }))
 vi.mock('../../api/query-keys', async importOriginal => ({ ...(await importOriginal<typeof import('../../api/query-keys')>()), invalidateControl: vi.fn() }))
-vi.mock('../../components/EphemeralCredentials', () => ({ default: ({ material }: { material: { accessKey: string } }) => <p>created credentials {material.accessKey}</p>, EphemeralCredentials: ({ material }: { material: { accessKey: string } }) => <p>created credentials {material.accessKey}</p> }))
+vi.mock('../../components/EphemeralCredentials', () => ({ EphemeralCredentials: ({ material, dismiss, acknowledgeLabel = 'I have stored this securely' }: { material: { accessKey: string; secretKey: string }; dismiss: () => void; acknowledgeLabel?: string }) => <div><p>created credentials {material.accessKey} {material.secretKey}</p><button onClick={dismiss}>{acknowledgeLabel}</button></div> }))
 vi.mock('./DirectMappingDetails', () => ({ default: () => <p>direct mapping detail</p> }))
 vi.mock('../../components/control', () => ({
   Page: ({ title, action, children }: { title: string; action: ReactNode; children: ReactNode }) => <main><h1>{title}</h1>{action}{children}</main>,
@@ -40,7 +42,7 @@ function mockQueries(identities: ReturnType<typeof query>, backends = query({ da
 }
 
 beforeEach(() => {
-  vi.mocked(useSearchParams).mockReturnValue([new URLSearchParams(), vi.fn()] as never)
+  vi.mocked(useSearchParams).mockReturnValue([new URLSearchParams(), routerMocks.setSearchParams] as never)
 })
 afterEach(() => { cleanup(); vi.resetAllMocks() })
 
@@ -74,12 +76,12 @@ describe('IdentitiesPage', () => {
 
   it('creates an identity and reports asynchronous creation failure', async () => {
     mockQueries(query({ data: [] }))
-    vi.mocked(api).mockResolvedValueOnce({ s3_access_key: 'NEW_ACCESS', s3_secret_key: 'secret', s3_endpoint: 'https://example.test' })
+    vi.mocked(api).mockResolvedValueOnce({ credential_id: '22222222-2222-4222-8222-222222222222', s3_access_key: 'NEW_ACCESS', s3_secret_key: 'secret', s3_endpoint: 'https://example.test', azure_account: 'newaccount', access_mode: 'direct', use_managed_identity: true, default_backend_id: null })
     const { unmount } = render(<IdentitiesPage />)
     fireEvent.click(screen.getByRole('button', { name: 'Create identity' }))
     fireEvent.change(screen.getByLabelText('Azure account'), { target: { value: 'newaccount' } })
     fireEvent.submit(within(screen.getByRole('dialog', { name: 'Create S3 identity' })).getByRole('button', { name: 'Create identity' }).closest('form')!)
-    expect(await screen.findByText('created credentials NEW_ACCESS')).toBeTruthy()
+    expect(await screen.findByText(/created credentials\s+NEW_ACCESS/)).toBeTruthy()
     unmount()
 
     mockQueries(query({ data: [] }))
@@ -89,5 +91,38 @@ describe('IdentitiesPage', () => {
     fireEvent.change(screen.getByLabelText('Azure account'), { target: { value: 'newaccount' } })
     fireEvent.submit(within(screen.getByRole('dialog', { name: 'Create S3 identity' })).getByRole('button', { name: 'Create identity' }).closest('form')!)
     expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'Identity creation failed')
+  })
+
+  it('creates a server-generated virtual identity and continues to mapping creation after acknowledgement', async () => {
+    const credentialId = '22222222-2222-4222-8222-222222222222'
+    vi.mocked(useSearchParams).mockReturnValue([new URLSearchParams('create=virtual&return=buckets'), routerMocks.setSearchParams] as never)
+    mockQueries(query({ data: [] }))
+    vi.mocked(api).mockResolvedValueOnce({ credential_id: credentialId, s3_access_key: 'GENERATED_ACCESS', s3_secret_key: 'generated-secret', s3_endpoint: 'https://example.test', azure_account: 'newaccount', access_mode: 'virtual', use_managed_identity: true, default_backend_id: null })
+    render(<IdentitiesPage />)
+
+    const dialog = await screen.findByRole('dialog', { name: 'Create S3 identity' })
+    expect(within(dialog).getByLabelText('Mode')).toHaveProperty('value', 'virtual')
+    fireEvent.change(within(dialog).getByLabelText('Azure account'), { target: { value: 'newaccount' } })
+    fireEvent.submit(within(dialog).getByRole('button', { name: 'Create identity' }).closest('form')!)
+
+    await waitFor(() => expect(api).toHaveBeenCalledWith('/admin/credentials', {
+      method: 'POST',
+      body: JSON.stringify({ s3_access_key: '', s3_secret_key: '', azure_account: 'newaccount', use_managed_identity: true, access_mode: 'virtual', versioning_enabled: false, default_backend_id: null }),
+    }))
+    expect(await screen.findByText(/generated-secret/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'I stored these securely; continue' }))
+    expect(screen.queryByText(/generated-secret/)).toBeNull()
+    expect(routerMocks.navigate).toHaveBeenCalledWith(`/buckets?create=mapping&identity=${credentialId}`)
+  })
+
+  it('clears the mapping continuation when virtual identity creation is cancelled', async () => {
+    vi.mocked(useSearchParams).mockReturnValue([new URLSearchParams('create=virtual&return=buckets'), routerMocks.setSearchParams] as never)
+    mockQueries(query({ data: [] }))
+    render(<IdentitiesPage />)
+
+    await screen.findByRole('dialog', { name: 'Create S3 identity' })
+    fireEvent.click(screen.getByRole('button', { name: 'Close dialog' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Create identity' }))
+    expect(screen.getByLabelText('Mode')).toHaveProperty('value', 'direct')
   })
 })

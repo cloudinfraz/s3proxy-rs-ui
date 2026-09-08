@@ -27,3 +27,22 @@
   font-size: 13px;
   overflow-wrap: anywhere;
 }
+
+.mapping-create-identity {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 7px 13px;
+  border: 1px solid #cbd2cd;
+  background: #fff;
+  color: #18201d;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.mapping-create-identity:hover {
+  border-color: #77857d;
+}

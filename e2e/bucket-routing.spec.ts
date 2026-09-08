@@ -135,6 +135,85 @@ async function mappingFixture(page: Page, empty = false) {
   return { requests, flags, rows: () => rows, verify: () => { verifyControl(); expect(denied).toEqual([]) } }
 }
 
+test('UI077-01 generates a virtual identity then creates and updates its bucket mapping', async ({ page }) => {
+  const verifyControl = await mockControlApi(page, true)
+  const credentialId = '00000000-0000-4000-8000-000000000099'
+  const mappingId = '00000000-0000-4000-8000-000000000098'
+  const secret = 'synthetic-ui077-one-time-secret'
+  const timestamp = '2026-09-08T00:00:00Z'
+  const credentialRequests: components['schemas']['CreateCredentialRequest'][] = []
+  const mappingRequests: Array<components['schemas']['CreateVirtualMapping'] | components['schemas']['UpdateVirtualMapping']> = []
+  let identity: components['schemas']['IdentityProjection'] | null = null
+  let mapping: Mapping | null = null
+  await page.route('**/*', async route => {
+    const request = route.request()
+    if (!['fetch', 'xhr'].includes(request.resourceType())) return route.fallback()
+    const path = new URL(request.url()).pathname
+    const method = request.method()
+    if (path === '/admin/ui/identities' && method === 'GET') return route.fulfill({ json: { count: identity ? 1 : 0, items: identity ? [identity] : [] } })
+    if (path === '/admin/ui/virtual-buckets' && method === 'GET') return route.fulfill({ json: { items: mapping ? [mapping] : [], next_after_id: null } })
+    if (path === '/admin/credentials' && method === 'POST') {
+      credentialRequests.push(request.postDataJSON())
+      identity = {
+        credential_id: credentialId, s3_access_key: 'generated-ui077-access', azure_account: 'workflowaccount', access_mode: 'virtual',
+        use_managed_identity: true, versioning_enabled: false, default_backend_id: null, enabled: true, virtual_bucket_count: 0, policy_attachment_count: 0,
+      }
+      return route.fulfill({ status: 201, json: {
+        credential_id: credentialId, s3_access_key: identity.s3_access_key, s3_secret_key: secret, s3_endpoint: 'https://s3.example.test',
+        azure_account: identity.azure_account, access_mode: identity.access_mode, use_managed_identity: true, default_backend_id: null,
+      } satisfies components['schemas']['CredentialCreatedResponse'] })
+    }
+    if (path === '/admin/ui/virtual-buckets' && method === 'POST') {
+      const body = request.postDataJSON() as components['schemas']['CreateVirtualMapping']
+      mappingRequests.push(body)
+      mapping = { ...body, id: mappingId, backend_id: body.backend_id ?? null, endpoint_prefix: body.endpoint_prefix ?? null, enabled: true, credential_default_backend_id: null, impact_token: '11111111111111111111111111111111', created_at: timestamp, updated_at: timestamp }
+      return route.fulfill({ status: 201, json: mapping })
+    }
+    if (path === `/admin/ui/virtual-buckets/${mappingId}` && mapping && method === 'GET') return route.fulfill({ json: mapping })
+    if (path === `/admin/ui/virtual-buckets/${mappingId}` && mapping && method === 'PUT') {
+      const body = request.postDataJSON() as components['schemas']['UpdateVirtualMapping']
+      mappingRequests.push(body)
+      mapping = { ...mapping, ...body, impact_token: '22222222222222222222222222222222', updated_at: timestamp }
+      return route.fulfill({ json: mapping })
+    }
+    return route.fallback()
+  })
+
+  await page.goto('/admin/ui/buckets')
+  await page.getByRole('link', { name: 'Create virtual identity', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: 'Create S3 identity' })).toBeVisible()
+  await expect(page.getByLabel('Mode')).toHaveValue('virtual')
+  await page.getByLabel('Azure account').fill('workflowaccount')
+  await page.getByRole('button', { name: 'Create identity', exact: true }).last().click()
+  await expect(page.getByRole('dialog')).toContainText(secret)
+  await page.getByRole('button', { name: 'I stored these securely; continue', exact: true }).click()
+
+  await expect(page.getByRole('dialog', { name: 'Add bucket routing' })).toBeVisible()
+  await expect(page.getByRole('combobox', { name: 'Identity', exact: true })).toHaveValue(credentialId)
+  expect(page.url()).not.toContain(secret)
+  expect(await page.evaluate(() => ({ local: Object.values(localStorage), session: Object.values(sessionStorage), body: document.body.textContent }))).toEqual({ local: [], session: [], body: expect.not.stringContaining(secret) })
+  await page.getByLabel('S3 bucket', { exact: true }).fill('workflow-bucket')
+  await page.getByLabel('Azure container', { exact: true }).fill('workflow-container')
+  await page.getByRole('button', { name: 'Review changes', exact: true }).click()
+  await page.getByRole('button', { name: 'Confirm change', exact: true }).click()
+  await expect(page.getByText('workflow-bucket', { exact: true })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Edit workflow-bucket', exact: true }).click()
+  await expect(page.getByRole('dialog')).toContainText('Alias and identity ownership remain fixed.')
+  await expect(page.getByRole('combobox', { name: 'Identity', exact: true })).toBeDisabled()
+  await page.getByLabel('Azure container', { exact: true }).fill('updated-container')
+  await page.getByRole('button', { name: 'Review changes', exact: true }).click()
+  await page.getByRole('button', { name: 'Confirm change', exact: true }).click()
+
+  expect(credentialRequests).toEqual([{ s3_access_key: '', s3_secret_key: '', azure_account: 'workflowaccount', use_managed_identity: true, access_mode: 'virtual', versioning_enabled: false, default_backend_id: null }])
+  expect(mappingRequests).toEqual([
+    { virtual_bucket_name: 'workflow-bucket', azure_container: 'workflow-container', credential_id: credentialId, backend_id: null, endpoint_prefix: null },
+    { expected_impact_token: '11111111111111111111111111111111', azure_container: 'updated-container' },
+  ])
+  expect(JSON.stringify(mappingRequests)).not.toContain(secret)
+  verifyControl()
+})
+
 test('UI072-05 dotted aliases stay local and a corrected alias submits unchanged', async ({ page }, testInfo) => {
   const fixture = await mappingFixture(page, true)
   await page.goto('/admin/ui/buckets')

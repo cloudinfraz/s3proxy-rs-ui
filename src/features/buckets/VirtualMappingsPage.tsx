@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, ChevronRight, Eye, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router'
+import { ChevronLeft, ChevronRight, Eye, KeyRound, Pencil, Plus, Trash2 } from 'lucide-react'
 import { api, ApiError } from '../../api/client'
 import { controlQueries, type Schema } from '../../api/control'
 import { controlKeys, invalidateControl } from '../../api/query-keys'
 import { DataTable, DestructiveDialog, ErrorBanner, Modal, Page, RefreshButton } from '../../components/control'
 import { completionGuard } from '../operations/state'
+import { requestedMappingIdentity, virtualIdentityCreationPath } from '../identities/credential-mapping-workflow'
 import { createMappingPayload, draftError, effectiveTarget, mappingDraft, reviewedRoutingContext, updateMappingPayload, type Mapping, type MappingDraft, type RoutingContext } from './routing'
 import './buckets.css'
 
@@ -14,6 +16,9 @@ type Operation = 'create' | 'edit' | 'detail' | 'delete'
 type Review = { draft: MappingDraft; revision?: number; context: RoutingContext }
 
 export default function VirtualMappingsPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const mappingIntent = searchParams.get('create') === 'mapping' ? searchParams.toString() : null
+  const requestedIdentityId = requestedMappingIdentity(searchParams)
   const [cursors, setCursors] = useState<Array<string | null>>([null])
   const cursor = cursors[cursors.length - 1]
   const mappings = useQuery({ queryKey: [...controlKeys.list('buckets'), 'page', cursor], queryFn: async () => {
@@ -33,9 +38,26 @@ export default function VirtualMappingsPage() {
   const [error, setError] = useState<Error | null>(null)
   const [stale, setStale] = useState(false)
   const guard = useRef(completionGuard())
+  const consumedMappingIntent = useRef<string | null>(null)
   useEffect(() => { const owner = guard.current; return () => owner.cancel() }, [])
   const context: RoutingContext | null = identities.data && backends.data && capabilities.data && !identities.isError && !backends.isError && !capabilities.isError
     ? reviewedRoutingContext({ identities: identities.data, backends: backends.data, capabilities: capabilities.data }, selected) : null
+  useEffect(() => {
+    if (!mappingIntent || !context || consumedMappingIntent.current === mappingIntent) return
+    consumedMappingIntent.current = mappingIntent
+    const requestedIdentity = requestedIdentityId
+      ? identities.data?.find(identity => identity.credential_id === requestedIdentityId && identity.access_mode === 'virtual' && identity.enabled)
+      : undefined
+    guard.current.cancel()
+    setSearchParams({}, { replace: true })
+    setSelected(null)
+    setReview(null)
+    setPending(false)
+    setStale(false)
+    setDraft({ ...mappingDraft(), owner: requestedIdentity?.credential_id ?? '' })
+    setError(requestedIdentity ? null : new Error('The requested identity is unavailable. Select an enabled virtual identity.'))
+    setOperation('create')
+  }, [context, identities.data, mappingIntent, requestedIdentityId, setSearchParams])
 
   function dismiss() {
     guard.current.cancel(); setOperation(null); setSelected(null); setReview(null); setPending(false); setError(null); setStale(false)
@@ -103,7 +125,7 @@ export default function VirtualMappingsPage() {
   const owner = identities.data?.find(item => item.credential_id === draft.owner)
   const title = stale ? 'Mapping review expired' : review ? 'Confirm mapping change' : operation === 'create' ? 'Add bucket routing' : operation === 'edit' ? 'Edit mapping' : operation === 'delete' ? 'Remove mapping' : 'Mapping details'
   const update = (field: keyof MappingDraft, value: string | boolean) => setDraft(current => ({ ...current, [field]: value }))
-  return <Page title="Bucket routing" action={<div className="page-actions"><RefreshButton pending={mappings.isFetching} refresh={() => { void mappings.refetch() }} /><button className="primary" disabled={!context} onClick={() => { dismiss(); setDraft(mappingDraft()); setOperation('create') }}><Plus size={17} /> Add bucket routing</button></div>}>
+  return <Page title="Bucket routing" action={<div className="page-actions"><RefreshButton pending={mappings.isFetching} refresh={() => { void mappings.refetch() }} /><Link className="mapping-create-identity" to={virtualIdentityCreationPath}><KeyRound size={17} /> Create virtual identity</Link><button className="primary" disabled={!context} onClick={() => { dismiss(); setDraft(mappingDraft()); setOperation('create') }}><Plus size={17} /> Add bucket routing</button></div>}>
     {[mappings, identities, backends, capabilities].map((query, index) => query.isError && <ErrorBanner key={index} error={query.error} retry={() => { void query.refetch() }} />)}
     {(!mappings.isError || mappings.data) && <DataTable rows={mappings.data?.items ?? []} rowKey={row => row.id} loading={mappings.isPending} columns={[
       { label: 'S3 bucket', value: row => row.virtual_bucket_name },
@@ -113,7 +135,7 @@ export default function VirtualMappingsPage() {
       { label: 'Actions', value: (row: Summary) => <div className="row-actions"><button className="icon-button" title="View mapping details" aria-label={`View ${row.virtual_bucket_name}`} onClick={() => { void open('detail', row.id) }}><Eye size={16} /></button><button className="icon-button" title="Edit mapping" aria-label={`Edit ${row.virtual_bucket_name}`} disabled={!context} onClick={() => { void open('edit', row.id) }}><Pencil size={16} /></button><button className="icon-button danger" title="Remove mapping" aria-label={`Remove ${row.virtual_bucket_name}`} onClick={() => { void open('delete', row.id) }}><Trash2 size={16} /></button></div> },
     ]} />}
     <div className="mapping-pagination"><button className="icon-button" title="Previous page" aria-label="Previous page" disabled={cursors.length === 1 || mappings.isFetching} onClick={() => setCursors(current => current.slice(0, -1))}><ChevronLeft size={16} /></button><span>Page {cursors.length}</span><button className="icon-button" title="Next page" aria-label="Next page" disabled={!mappings.data?.next_after_id || mappings.isFetching} onClick={() => { if (mappings.data?.next_after_id) setCursors(current => [...current, mappings.data.next_after_id]) }}><ChevronRight size={16} /></button></div>
-    {operation && operation !== 'delete' && <Modal title={title} description="Routing metadata only. Changes do not move data or verify Azure access." onClose={dismiss} pending={pending}>
+    {operation && operation !== 'delete' && <Modal title={title} description={operation === 'edit' ? 'Container, backend, prefix, and status may change. Alias and identity ownership remain fixed.' : 'Routing metadata only. Changes do not move data or verify Azure access.'} onClose={dismiss} pending={pending}>
       {error && <ErrorBanner error={error} />}
       {stale ? <div className="dialog-actions"><button disabled={pending} onClick={dismiss}>Cancel</button><button className="primary" disabled={pending} onClick={() => { if (selected) void open('edit', selected.id); else { dismiss(); void invalidateControl(client) } }}>Reload and review</button></div>
         : (operation === 'create' || (operation === 'edit' && selected)) && !review ? <form className="operation-form" onSubmit={event => { void prepare(event) }}>

@@ -16,8 +16,8 @@ export function EphemeralCredentialBody({ material }: { material: EphemeralCrede
   </>
 }
 
-export function EphemeralCredentials({ material, dismiss }: { material: EphemeralCredentialMaterial; dismiss: () => void }) {
-  return <OneTimeSecretDialog title="One-time S3 credentials" description="These credentials will not be available after acknowledgement." acknowledge={dismiss}>
+export function EphemeralCredentials({ material, dismiss, acknowledgeLabel }: { material: EphemeralCredentialMaterial; dismiss: () => void; acknowledgeLabel?: string }) {
+  return <OneTimeSecretDialog title="One-time S3 credentials" description="These credentials will not be available after acknowledgement." acknowledge={dismiss} acknowledgeLabel={acknowledgeLabel}>
     <EphemeralCredentialBody material={material} />
   </OneTimeSecretDialog>
 }
