@@ -132,6 +132,18 @@ describe('browser API client', () => {
     await expect(api('/admin/health')).rejects.toMatchObject({ status: 0, message: 'The control service could not be reached. Retry the request.' })
   })
 
+  it.each([
+    ['text/html', '<!doctype html><div id="root"></div>'],
+    ['application/json', '{malformed'],
+  ])('sanitizes an invalid successful %s response', async (contentType, body) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body, { status: 200, headers: { 'content-type': contentType } })))
+
+    await expect(api('/admin/ui/identity-pages?limit=100')).rejects.toMatchObject({
+      status: 502,
+      message: 'The control service returned an invalid response.',
+    })
+  })
+
   it.each(['Conflict', 'NotFound', 'InvalidArgument'])('preserves the allowlisted %s code', async code => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ code }, 400)))
     await expect(api('/admin/health')).rejects.toMatchObject({ status: 400, code })
