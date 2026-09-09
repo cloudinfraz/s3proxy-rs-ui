@@ -1,0 +1,3 @@
+# Repository Instructions
+
+- Never invent, assume, or silently introduce an API endpoint, request shape, or response contract. Before changing a client, verify the interface in the authoritative backend implementation and checked-in OpenAPI contract. If a new or changed API is genuinely required, explicitly identify it as a cross-repository contract change and obtain user approval before implementation. Implement and validate both sides, preserve compatibility or gate the client change, and deploy the backend before any dependent UI. Deployment validation must exercise the real endpoint and reject missing routes or unexpected statuses; mocked tests and source inspection alone are insufficient evidence that an API is available in the target environment.

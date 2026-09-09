@@ -34,6 +34,27 @@ test('S3 identities use bounded cursor pagination', async ({ page }) => {
   verify()
 })
 
+test('S3 identities remain available when the paged endpoint is not deployed', async ({ page }) => {
+  const verify = await mockControlApi(page)
+  const identityRequests: string[] = []
+  page.on('request', request => {
+    const url = new URL(request.url())
+    if (url.pathname === '/admin/ui/identity-pages' || url.pathname === '/admin/ui/identities') identityRequests.push(url.pathname)
+  })
+  await page.route('**/admin/ui/identity-pages?*', route => route.fulfill({
+    status: 404,
+    json: { code: 'NotFound' },
+  }))
+
+  await page.goto('/admin/ui/credentials')
+
+  await expect.poll(() => identityRequests).toEqual(['/admin/ui/identity-pages', '/admin/ui/identities'])
+  await expect(page.getByText('fixture-access', { exact: true })).toBeVisible()
+  await expect(page.getByText('The requested resource no longer exists. Refresh and try again.')).toHaveCount(0)
+  await expect(page.getByText('Page 1', { exact: true })).toBeVisible()
+  verify()
+})
+
 test('UI070-02 replacement reviews safe settings, validates and retries without changing the original', async ({ page }) => {
   const verify = await mockControlApi(page)
   const bodies: components['schemas']['CreateCredentialRequest'][] = []
