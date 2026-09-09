@@ -16,6 +16,7 @@ test('UI072-04 direct details are read-only and fail closed for unavailable rout
       denied.push('non-read or external request'); return route.abort()
     }
     if (path === '/admin/ui/identities') return route.fulfill({ json: { count: 1, items: [{ ...collections['/admin/ui/identities'].items[0], default_backend_id: scenario === 'legacy' ? null : backend.id }] } })
+    if (path === '/admin/ui/identity-pages') return route.fulfill({ json: { items: [{ ...collections['/admin/ui/identities'].items[0], default_backend_id: scenario === 'legacy' ? null : backend.id }], next_after_id: null, default_page_size: 100, max_page_size: 200 } })
     if (path === '/admin/capabilities') {
       if (scenario === 'capability-error') return route.fulfill({ status: 503, body: 'Unavailable' })
       return route.fulfill({ json: { ...capabilities, backend_routing_enabled: scenario !== 'gate-off', public_s3_endpoint: scenario === 'unsafe-endpoint' ? 'https://user:synthetic@example.test?sig=synthetic' : 'https://public-s3.example.test' } })

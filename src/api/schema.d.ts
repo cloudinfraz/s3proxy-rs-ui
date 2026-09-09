@@ -593,6 +593,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/ui/identity-pages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listIdentityProjectionPage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/credentials/{access_key}": {
         parameters: {
             query?: never;
@@ -1517,6 +1533,15 @@ export interface components {
         IdentityProjectionListResponse: {
             count: number;
             items: components["schemas"]["IdentityProjection"][];
+        };
+        IdentityProjectionPage: {
+            items: components["schemas"]["IdentityProjection"][];
+            /** Format: uuid */
+            next_after_id: string | null;
+            /** @constant */
+            default_page_size: 100;
+            /** @constant */
+            max_page_size: 200;
         };
         RotateCredentialSecretResponse: {
             /** Format: uuid */
@@ -3506,6 +3531,33 @@ export interface operations {
                     "application/json": components["schemas"]["IdentityProjectionListResponse"];
                 };
             };
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    listIdentityProjectionPage: {
+        parameters: {
+            query?: {
+                after_id?: string;
+                limit?: number;
+                access_mode?: components["schemas"]["CredentialAccessMode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bounded identity metadata page for the control UI */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityProjectionPage"];
+                };
+            };
+            400: components["responses"]["ControlError"];
             403: components["responses"]["Forbidden"];
             default: components["responses"]["ControlError"];
         };

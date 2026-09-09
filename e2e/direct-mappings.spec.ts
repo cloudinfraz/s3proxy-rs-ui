@@ -27,6 +27,7 @@ async function directFixture(page: Page) {
       return route.abort()
     }
     if (method === 'GET' && path === '/admin/ui/identities') return route.fulfill({ json: { count: rows.length, items: rows } })
+    if (method === 'GET' && path === '/admin/ui/identity-pages') return route.fulfill({ json: { items: rows.filter(identity => url.searchParams.get('access_mode') !== 'direct' || identity.access_mode === 'direct'), next_after_id: null, default_page_size: 100, max_page_size: 200 } satisfies components['schemas']['IdentityProjectionPage'] })
     if (method === 'POST' && path === '/admin/credentials') {
       const body = request.postDataJSON() as components['schemas']['CreateCredentialRequest']
       mutations.push({ method, path, body })

@@ -27,6 +27,12 @@ export const collections = {
     count: 1,
     items: [{ credential_id: fixtureId, s3_access_key: 'fixture-access', azure_account: 'fixtureaccount', access_mode: 'direct', use_managed_identity: true, versioning_enabled: false, default_backend_id: null, enabled: true, virtual_bucket_count: 1, policy_attachment_count: 1 }],
   } satisfies components['schemas']['IdentityProjectionListResponse'],
+  '/admin/ui/identity-pages': {
+    items: [{ credential_id: fixtureId, s3_access_key: 'fixture-access', azure_account: 'fixtureaccount', access_mode: 'direct', use_managed_identity: true, versioning_enabled: false, default_backend_id: null, enabled: true, virtual_bucket_count: 1, policy_attachment_count: 1 }],
+    next_after_id: null,
+    default_page_size: 100,
+    max_page_size: 200,
+  } satisfies components['schemas']['IdentityProjectionPage'],
   '/admin/policies': {
     count: 1,
     items: [{ id: fixtureId, name: 'fixture-policy', document: { Version: '2012-10-17', Statement: [] }, description: null, created_at: timestamp, updated_at: timestamp }],
@@ -56,6 +62,7 @@ export const emptyCollections = {
   '/admin/ui/virtual-buckets': { items: [], next_after_id: null },
   '/admin/credentials': { count: 0, items: [] },
   '/admin/ui/identities': { count: 0, items: [] },
+  '/admin/ui/identity-pages': { items: [], next_after_id: null, default_page_size: 100, max_page_size: 200 },
   '/admin/policies': { count: 0, items: [] },
   '/admin/ui/policies': { items: [], next_after_id: null, default_page_size: 100, max_page_size: 200 },
   '/admin/backends': [],
