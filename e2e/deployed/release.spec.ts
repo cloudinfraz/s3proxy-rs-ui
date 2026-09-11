@@ -29,7 +29,8 @@ test('UI076-04 deployed base path, assets, headers and route isolation', async (
   }
 
   const identityPage = await request.get('/admin/ui/identity-pages?limit=1')
-  expect(identityPage.headers()['content-type'] ?? '').not.toContain('text/html')
+  expect(identityPage.status()).toBe(403)
+  expect(identityPage.headers()['content-type'] ?? '').toContain('application/xml')
 
   expect((await request.get('/bucket')).status()).toBe(404)
   expect((await request.get('/metrics')).status()).toBe(404)

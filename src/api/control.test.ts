@@ -17,21 +17,15 @@ describe('typed read boundaries', () => {
     expect(() => controlQueries.audit(201)).toThrow()
   })
 
-  it('falls back to the legacy identity inventory when pagination is unavailable', async () => {
+  it('requests bounded identity pages with the backend cursor and filter', async () => {
     const identity = {
-      credential_id: '11111111-1111-4111-8111-111111111111', s3_access_key: 'ACCESS_000', azure_account: 'accountone',
+      credential_id: '11111111-1111-4111-8111-111111111111', s3_access_key: 'ACCESS_ONE', azure_account: 'accountone',
       access_mode: 'direct' as const, use_managed_identity: true, versioning_enabled: false, default_backend_id: null,
       enabled: true, virtual_bucket_count: 0, policy_attachment_count: 0,
     }
-    const identities = Array.from({ length: 101 }, (_, index) => ({
-      ...identity,
-      credential_id: `${String(index).padStart(8, '0')}-1111-4111-8111-111111111111`,
-      s3_access_key: `ACCESS_${String(index).padStart(3, '0')}`,
-    }))
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response('{}', { status: 404, headers: { 'content-type': 'application/json' } }))
-      .mockResolvedValueOnce(Response.json({ count: identities.length, items: identities }))
-      .mockResolvedValueOnce(Response.json({ count: identities.length, items: identities }))
+      .mockResolvedValueOnce(Response.json({ items: [identity], next_after_id: identity.credential_id, default_page_size: 100, max_page_size: 200 }))
+      .mockResolvedValueOnce(Response.json({ items: [], next_after_id: null, default_page_size: 100, max_page_size: 200 }))
     vi.stubGlobal('fetch', fetchMock)
 
     const firstQuery = controlQueries.identityPage(null, 'direct').queryFn
@@ -41,13 +35,32 @@ describe('typed read boundaries', () => {
     if (typeof secondQuery !== 'function') throw new Error('Expected identity page query function')
     const secondPage = await secondQuery({} as never)
 
-    expect(firstPage.items).toHaveLength(100)
-    expect(firstPage.next_after_id).toBe('legacy-offset:100')
-    expect(secondPage).toEqual({ items: [identities[100]], next_after_id: null, default_page_size: 100, max_page_size: 200 })
+    expect(firstPage.items).toEqual([identity])
+    expect(firstPage.next_after_id).toBe(identity.credential_id)
+    expect(secondPage.items).toEqual([])
     expect(fetchMock.mock.calls.map(([path]) => path)).toEqual([
       '/admin/ui/identity-pages?limit=100&access_mode=direct',
-      '/admin/ui/identities',
-      '/admin/ui/identities',
+      `/admin/ui/identity-pages?limit=100&after_id=${identity.credential_id}&access_mode=direct`,
     ])
+  })
+
+  it('propagates a missing identity page endpoint without requesting the full inventory', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ code: 'NotFound' }, { status: 404 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const query = controlQueries.identityPage(null, null).queryFn
+    if (typeof query !== 'function') throw new Error('Expected identity page query function')
+
+    await expect(query({} as never)).rejects.toMatchObject({ status: 404 })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenCalledWith('/admin/ui/identity-pages?limit=100', expect.any(Object))
+  })
+
+  it('rejects identity pages larger than the requested bound', async () => {
+    const items = Array.from({ length: 101 }, (_, index) => ({ credential_id: String(index) }))
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ items, next_after_id: null })))
+    const query = controlQueries.identityPage(null, null).queryFn
+    if (typeof query !== 'function') throw new Error('Expected identity page query function')
+
+    await expect(query({} as never)).rejects.toThrow('Invalid identity page response')
   })
 })

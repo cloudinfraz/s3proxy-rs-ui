@@ -1787,9 +1787,21 @@ export interface components {
             error: string;
         };
         VirtualBucketHealth: components["schemas"]["VirtualBucketHealthReady"] | components["schemas"]["VirtualBucketHealthError"];
+        PublicHealthResponse: {
+            status: string;
+            /** Format: date-time */
+            timestamp: string;
+            version: string;
+            commit_sha: string | null;
+            development: boolean;
+            dirty: boolean | null;
+        };
         AdminHealthResponse: {
             status: string;
             version: string;
+            commit_sha: string | null;
+            development: boolean;
+            dirty: boolean | null;
             cache: components["schemas"]["CacheHealth"];
             credentials: components["schemas"]["CredentialHealth"];
             multipart: components["schemas"]["MultipartHealth"];
@@ -3132,7 +3144,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["PublicHealthResponse"];
+                };
             };
         };
     };

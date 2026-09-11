@@ -1,5 +1,5 @@
 import { queryOptions } from '@tanstack/react-query'
-import { api, ApiError } from './client'
+import { api } from './client'
 import type { components } from './schema'
 import { controlKeys } from './query-keys'
 import { auditLimit } from '../features/operations/state'
@@ -19,41 +19,13 @@ export function arrayRows<Row>(response: Row[]): Row[] {
 }
 
 const identityPageSize = 100
-const legacyIdentityCursorPrefix = 'legacy-offset:'
-
-function legacyIdentityOffset(cursor: string): number | null {
-  if (!cursor.startsWith(legacyIdentityCursorPrefix)) return null
-  const offset = Number(cursor.slice(legacyIdentityCursorPrefix.length))
-  return Number.isSafeInteger(offset) && offset >= 0 ? offset : null
-}
-
-async function legacyIdentityPage(offset: number, accessMode: 'direct' | null): Promise<Schema['IdentityProjectionPage']> {
-  const identities = envelopeRows(await api<Schema['IdentityProjectionListResponse']>('/admin/ui/identities'))
-    .filter(identity => accessMode === null || identity.access_mode === accessMode)
-  const items = identities.slice(offset, offset + identityPageSize)
-  const nextOffset = offset + items.length
-  return {
-    items,
-    next_after_id: nextOffset < identities.length ? `${legacyIdentityCursorPrefix}${nextOffset}` : null,
-    default_page_size: identityPageSize,
-    max_page_size: 200,
-  }
-}
 
 export const controlQueries = {
   identities: queryOptions({ queryKey: controlKeys.list('identities'), queryFn: async () => envelopeRows(await api<Schema['IdentityProjectionListResponse']>('/admin/ui/identities')) }),
   identityPage: (afterId: string | null, accessMode: 'direct' | null) => queryOptions({
     queryKey: controlKeys.identityPage(afterId, accessMode),
     queryFn: async () => {
-      const legacyOffset = afterId ? legacyIdentityOffset(afterId) : null
-      if (legacyOffset !== null) return legacyIdentityPage(legacyOffset, accessMode)
-      let response: Schema['IdentityProjectionPage']
-      try {
-        response = await api<Schema['IdentityProjectionPage']>(`/admin/ui/identity-pages?limit=${identityPageSize}${afterId ? `&after_id=${encodeURIComponent(afterId)}` : ''}${accessMode ? `&access_mode=${accessMode}` : ''}`)
-      } catch (cause) {
-        if (!(cause instanceof ApiError) || cause.status !== 404 || afterId) throw cause
-        response = await legacyIdentityPage(0, accessMode)
-      }
+      const response = await api<Schema['IdentityProjectionPage']>(`/admin/ui/identity-pages?limit=${identityPageSize}${afterId ? `&after_id=${encodeURIComponent(afterId)}` : ''}${accessMode ? `&access_mode=${accessMode}` : ''}`)
       if (!Array.isArray(response.items) || response.items.length > identityPageSize || !(response.next_after_id === null || typeof response.next_after_id === 'string')) throw new Error('Invalid identity page response')
       return response
     },

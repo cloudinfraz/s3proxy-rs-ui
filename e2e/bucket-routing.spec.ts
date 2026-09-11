@@ -200,9 +200,9 @@ test('UI077-01 generates a virtual identity then creates and updates its bucket 
   await page.getByLabel('Azure container', { exact: true }).fill('workflow-container')
   await page.getByRole('button', { name: 'Review changes', exact: true }).click()
   await page.getByRole('button', { name: 'Confirm change', exact: true }).click()
-  await expect(page.getByText('workflow-bucket', { exact: true })).toBeVisible()
-
-  await page.getByRole('button', { name: 'Edit workflow-bucket', exact: true }).click()
+  const editMapping = page.getByRole('button', { name: 'Edit workflow-bucket', exact: true })
+  await expect(editMapping).toBeVisible()
+  await editMapping.click()
   await expect(page.getByRole('dialog')).toContainText('changing ownership requires a new mapping.')
   await expect(page.getByRole('combobox', { name: 'Identity', exact: true })).toBeDisabled()
   await page.getByLabel('Azure container', { exact: true }).fill('updated-container')
