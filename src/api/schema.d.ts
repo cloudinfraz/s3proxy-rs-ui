@@ -364,6 +364,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/ui/backend-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listBackendOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/ui/backend-options/{backend_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                backend_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["getBackendOption"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/ui/backends/{name}": {
         parameters: {
             query?: never;
@@ -617,6 +651,24 @@ export interface paths {
             cookie?: never;
         };
         get: operations["listIdentityProjectionPage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/ui/identities/{credential_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                credential_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["getIdentityProjection"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1133,6 +1185,7 @@ export interface components {
             azure_container: string;
             /** Format: uuid */
             credential_id: string;
+            credential_access_key: string;
             /** Format: uuid */
             backend_id: string | null;
             endpoint_prefix: string | null;
@@ -1623,6 +1676,23 @@ export interface components {
             credential_default_count: number;
             virtual_bucket_count: number;
             impact_token: string;
+        };
+        StorageBackendOption: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            azure_account: string;
+            auth_mode: components["schemas"]["BackendAuthMode"];
+            enabled: boolean;
+        };
+        StorageBackendOptionPage: {
+            items: components["schemas"]["StorageBackendOption"][];
+            /** Format: uuid */
+            next_after_id: string | null;
+            /** @constant */
+            default_page_size: 100;
+            /** @constant */
+            max_page_size: 200;
         };
         StorageBackendUpdateRequest: {
             name: string;
@@ -3100,6 +3170,57 @@ export interface operations {
             default: components["responses"]["ControlError"];
         };
     };
+    listBackendOptions: {
+        parameters: {
+            query?: {
+                after_id?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bounded non-secret backend selector page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageBackendOptionPage"];
+                };
+            };
+            400: components["responses"]["ControlError"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    getBackendOption: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                backend_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Backend selector metadata resolved by stable backend ID */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageBackendOption"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["ControlError"];
+            default: components["responses"]["ControlError"];
+        };
+    };
     getBackendProjection: {
         parameters: {
             query?: never;
@@ -3622,6 +3743,31 @@ export interface operations {
             };
             400: components["responses"]["ControlError"];
             403: components["responses"]["Forbidden"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    getIdentityProjection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                credential_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Identity metadata resolved by stable credential ID */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityProjection"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["ControlError"];
             default: components["responses"]["ControlError"];
         };
     };

@@ -37,6 +37,7 @@ const summary: Schema['VirtualMappingSummary'] = {
   virtual_bucket_name: 'photos',
   azure_container: 'photos-container',
   credential_id: 'identity-id',
+  credential_access_key: 'virtual-owner',
   backend_id: null,
   endpoint_prefix: null,
   enabled: true,
@@ -60,19 +61,12 @@ const identity: Schema['IdentityProjection'] = {
   virtual_bucket_count: 1,
   policy_attachment_count: 2,
 }
-const backend: Schema['StorageBackendProjection'] = {
+const backend: Schema['StorageBackendOption'] = {
   id: 'backend-id',
   name: 'archive',
   azure_account: 'archiveaccount',
   auth_mode: 'managed_identity',
-  managed_identity_client_id: null,
-  user_delegation_sas_enabled: true,
-  has_secret_ref: false,
-  region_label: null,
   enabled: true,
-  credential_default_count: 0,
-  virtual_bucket_count: 0,
-  impact_token: 'backend-impact',
 }
 const capabilities: Schema['ControlCapabilities'] = {
   plane: 'control', authz_mode: 'enforce', sts_enabled: true, iam_assume_role_enabled: true,
@@ -90,25 +84,29 @@ function renderPage(initialEntry = '/buckets') {
 }
 
 let mappingsQuery: QueryState<Schema['VirtualMappingPage']>
-let identitiesQuery: QueryState<Schema['IdentityProjection'][]>
+let identityQuery: QueryState<Schema['IdentityProjection']>
 let identityOptionsQuery: QueryState<Schema['IdentityProjectionPage']>
-let backendsQuery: QueryState<Schema['StorageBackendProjection'][]>
+let backendQuery: QueryState<Schema['StorageBackendOption']>
+let backendOptionsQuery: QueryState<Schema['StorageBackendOptionPage']>
 let capabilitiesQuery: QueryState<Schema['ControlCapabilities']>
 
 beforeEach(() => {
   mappingsQuery = state({ items: [summary], next_after_id: 'next-id' })
-  identitiesQuery = state([identity])
+  identityQuery = state(identity)
   identityOptionsQuery = state({ items: [identity], next_after_id: null, default_page_size: 100, max_page_size: 200 })
-  backendsQuery = state([backend])
+  backendQuery = state(backend)
+  backendOptionsQuery = state({ items: [backend], next_after_id: null, default_page_size: 100, max_page_size: 200 })
   capabilitiesQuery = state(capabilities)
   vi.mocked(api).mockReset()
   vi.mocked(invalidateControl).mockClear()
   vi.mocked(useQuery).mockImplementation(options => {
     const key = (options as { queryKey: readonly unknown[] }).queryKey
+    if ((options as { enabled?: boolean }).enabled === false) return state() as never
     if (key[1] === 'buckets') return mappingsQuery as never
     if (key[1] === 'identities' && key[2] === 'page') return identityOptionsQuery as never
-    if (key[1] === 'identities') return identitiesQuery as never
-    if (key[1] === 'backends') return backendsQuery as never
+    if (key[1] === 'identities' && key[2] === 'detail') return identityQuery as never
+    if (key[1] === 'backends' && key[2] === 'options' && key[3] === 'page') return backendOptionsQuery as never
+    if (key[1] === 'backends' && key[2] === 'options') return backendQuery as never
     return capabilitiesQuery as never
   })
   Object.defineProperty(window, 'matchMedia', {
@@ -257,11 +255,11 @@ describe('VirtualMappingsPage', () => {
 
   it('preselects an enabled virtual identity from a safe mapping handoff', async () => {
     const credentialId = '22222222-2222-4222-8222-222222222222'
-    identitiesQuery = state([], { isFetching: true })
+    identityQuery = state<Schema['IdentityProjection']>(undefined, { isFetching: true })
     const view = renderPage(`/buckets?create=mapping&credential_id=${credentialId}`)
     expect(screen.queryByRole('dialog', { name: 'Add bucket routing' })).toBeNull()
 
-    identitiesQuery = state([{ ...identity, credential_id: credentialId }])
+    identityQuery = state({ ...identity, credential_id: credentialId })
     view.rerender(<VirtualMappingsPage />)
 
     const dialog = await screen.findByRole('dialog', { name: 'Add bucket routing' })
@@ -286,7 +284,7 @@ describe('VirtualMappingsPage', () => {
     ['non-virtual', [{ ...identity, credential_id: '22222222-2222-4222-8222-222222222222', access_mode: 'direct' as const }]],
   ])('keeps mapping creation usable for a %s handed-off identity', async (_case, availableIdentities) => {
     const credentialId = '22222222-2222-4222-8222-222222222222'
-    identitiesQuery = state(availableIdentities)
+    identityQuery = state(availableIdentities[0])
     renderPage(`/buckets?create=mapping&credential_id=${credentialId}`)
 
     const dialog = await screen.findByRole('dialog', { name: 'Add bucket routing' })

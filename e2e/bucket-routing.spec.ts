@@ -21,9 +21,14 @@ test('UI072-04 direct details are read-only and fail closed for unavailable rout
       if (scenario === 'capability-error') return route.fulfill({ status: 503, body: 'Unavailable' })
       return route.fulfill({ json: { ...capabilities, backend_routing_enabled: scenario !== 'gate-off', public_s3_endpoint: scenario === 'unsafe-endpoint' ? 'https://user:synthetic@example.test?sig=synthetic' : 'https://public-s3.example.test' } })
     }
-    if (path === '/admin/ui/backends') {
+    if (path === '/admin/ui/backend-options') {
       if (scenario === 'backend-error') return route.fulfill({ status: 503, body: 'Unavailable' })
-      return route.fulfill({ json: { count: scenario === 'missing' ? 0 : 1, items: scenario === 'missing' ? [] : [{ ...backend, azure_account: 'selectedaccount', enabled: scenario !== 'disabled', auth_mode: scenario === 'unsupported' ? 'sas_token' : 'managed_identity' }] } })
+      return route.fulfill({ json: { items: scenario === 'missing' ? [] : [{ id: backend.id, name: backend.name, azure_account: 'selectedaccount', enabled: scenario !== 'disabled', auth_mode: scenario === 'unsupported' ? 'sas_token' : 'managed_identity' }], next_after_id: null, default_page_size: 100, max_page_size: 200 } })
+    }
+    if (path === `/admin/ui/backend-options/${backend.id}`) {
+      if (scenario === 'backend-error') return route.fulfill({ status: 503, body: 'Unavailable' })
+      if (scenario === 'missing') return route.fulfill({ status: 404, body: 'Unavailable' })
+      return route.fulfill({ json: { id: backend.id, name: backend.name, azure_account: 'selectedaccount', enabled: scenario !== 'disabled', auth_mode: scenario === 'unsupported' ? 'sas_token' : 'managed_identity' } })
     }
     if (path === '/admin/session') return route.fallback()
     denied.push(path); return route.abort()
@@ -97,16 +102,15 @@ async function mappingFixture(page: Page, empty = false) {
     const method = request.method()
     const path = url.pathname
     if (url.origin !== new URL(page.url()).origin) { denied.push('external'); return route.abort() }
-    if (path === '/admin/ui/identities' && method === 'GET') return route.fulfill({ json: { count: 3, items: [
-      { ...collections['/admin/ui/identities'].items[0], access_mode: 'virtual', default_backend_id: ownerId },
-      { ...collections['/admin/ui/identities'].items[0], access_mode: 'virtual', credential_id: secondOwnerId, s3_access_key: 'second-owner', default_backend_id: ownerId },
-      { ...collections['/admin/ui/identities'].items[0], credential_id: selectedBackend, s3_access_key: 'direct-owner' },
-    ] } })
     if (path === '/admin/ui/identity-pages' && method === 'GET') return route.fulfill({ json: { items: [
       { ...collections['/admin/ui/identities'].items[0], access_mode: 'virtual', default_backend_id: ownerId },
       { ...collections['/admin/ui/identities'].items[0], access_mode: 'virtual', credential_id: secondOwnerId, s3_access_key: 'second-owner', default_backend_id: ownerId },
     ], next_after_id: null, default_page_size: 100, max_page_size: 200 } })
-    if (path === '/admin/ui/backends' && method === 'GET') return route.fulfill({ json: { count: 2, items: [collections['/admin/ui/backends'].items[0], { ...collections['/admin/ui/backends'].items[0], id: selectedBackend, name: 'second-backend', azure_account: 'otheraccount' }] } })
+    if (path === `/admin/ui/identities/${ownerId}` && method === 'GET') return route.fulfill({ json: { ...collections['/admin/ui/identities'].items[0], access_mode: 'virtual', default_backend_id: ownerId } })
+    if (path === `/admin/ui/identities/${secondOwnerId}` && method === 'GET') return route.fulfill({ json: { ...collections['/admin/ui/identities'].items[0], access_mode: 'virtual', credential_id: secondOwnerId, s3_access_key: 'second-owner', default_backend_id: ownerId } })
+    if (path === '/admin/ui/backend-options' && method === 'GET') return route.fulfill({ json: { items: [collections['/admin/ui/backend-options'].items[0], { ...collections['/admin/ui/backend-options'].items[0], id: selectedBackend, name: 'second-backend', azure_account: 'otheraccount' }], next_after_id: null, default_page_size: 100, max_page_size: 200 } })
+    if (path === `/admin/ui/backend-options/${ownerId}` && method === 'GET') return route.fulfill({ json: collections['/admin/ui/backend-options'].items[0] })
+    if (path === `/admin/ui/backend-options/${selectedBackend}` && method === 'GET') return route.fulfill({ json: { ...collections['/admin/ui/backend-options'].items[0], id: selectedBackend, name: 'second-backend', azure_account: 'otheraccount' } })
     if (path === `/admin/ui/mapping-backends/${selectedBackend}` && method === 'GET') return route.fulfill({ json: { id: selectedBackend, azure_account: 'otheraccount', auth_mode: 'managed_identity', enabled: !flags.backendDisabled, revision: 7 } })
     if (path === '/admin/ui/virtual-buckets' && method === 'GET') return route.fulfill({ json: { items: rows, next_after_id: null } })
     if (path === '/admin/ui/virtual-buckets' && method === 'POST') {
@@ -155,8 +159,8 @@ test('UI077-01 generates a virtual identity then creates and updates its bucket 
     if (!['fetch', 'xhr'].includes(request.resourceType())) return route.fallback()
     const path = new URL(request.url()).pathname
     const method = request.method()
-    if (path === '/admin/ui/identities' && method === 'GET') return route.fulfill({ json: { count: identity ? 1 : 0, items: identity ? [identity] : [] } })
     if (path === '/admin/ui/identity-pages' && method === 'GET') return route.fulfill({ json: { items: identity ? [identity] : [], next_after_id: null, default_page_size: 100, max_page_size: 200 } })
+    if (identity && path === `/admin/ui/identities/${identity.credential_id}` && method === 'GET') return route.fulfill({ json: identity })
     if (path === '/admin/ui/virtual-buckets' && method === 'GET') return route.fulfill({ json: { items: mapping ? [mapping] : [], next_after_id: null } })
     if (path === '/admin/credentials' && method === 'POST') {
       credentialRequests.push(request.postDataJSON())

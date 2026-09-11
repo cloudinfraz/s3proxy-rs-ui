@@ -3,7 +3,7 @@ import { virtualBucketAliasError } from '../resources/validation'
 
 export type Mapping = Schema['AdminVirtualMapping']
 export type Identity = Schema['IdentityProjection']
-export type Backend = Schema['StorageBackendProjection']
+export type Backend = Schema['StorageBackendOption']
 export type RoutingContext = { identities: readonly Identity[]; backends: readonly Backend[]; capabilities: Schema['ControlCapabilities'] }
 export type MappingDraft = { alias: string; container: string; owner: string; backend: string; prefix: string; enabled: boolean }
 export type EffectiveTarget = { source: string; account: string; blocked?: string }

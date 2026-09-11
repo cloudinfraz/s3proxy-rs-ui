@@ -6,6 +6,7 @@ import { api, ApiError } from '../../api/client'
 import { controlQueries, type Schema } from '../../api/control'
 import { controlKeys, invalidateControl } from '../../api/query-keys'
 import { DataTable, DestructiveDialog, ErrorBanner, Modal, Page, RefreshButton } from '../../components/control'
+import { BackendSelectorPagination, useBackendSelectorPage } from '../backends/backend-selector'
 import { completionGuard } from '../operations/state'
 import { requestedMappingIdentity, virtualIdentityCreationPath } from '../identities/credential-mapping-workflow'
 import { IdentitySelectorPagination, useIdentitySelectorPage } from '../identities/identity-selector'
@@ -27,9 +28,8 @@ export default function VirtualMappingsPage() {
     if (!result || !Array.isArray(result.items) || result.items.length > 100 || !(result.next_after_id === null || typeof result.next_after_id === 'string')) throw new Error('Invalid mapping page response')
     return result
   } })
-  const identities = useQuery(controlQueries.identities)
   const identitySelector = useIdentitySelectorPage('virtual')
-  const backends = useQuery(controlQueries.backends)
+  const backendSelector = useBackendSelectorPage()
   const capabilities = useQuery(controlQueries.capabilities)
   const client = useQueryClient()
   const [operation, setOperation] = useState<Operation | null>(null)
@@ -42,13 +42,27 @@ export default function VirtualMappingsPage() {
   const guard = useRef(completionGuard())
   const consumedMappingIntent = useRef<string | null>(null)
   useEffect(() => { const owner = guard.current; return () => owner.cancel() }, [])
-  const context: RoutingContext | null = identities.data && backends.data && capabilities.data && !identities.isError && !backends.isError && !capabilities.isError
-    ? reviewedRoutingContext({ identities: identities.data, backends: backends.data, capabilities: capabilities.data }, selected) : null
+  const ownerFromPage = identitySelector.query.data?.items.find(item => item.credential_id === draft.owner)
+  const ownerQuery = useQuery({ ...controlQueries.identity(draft.owner), enabled: Boolean(draft.owner && !ownerFromPage) })
+  const requestedIdentityQuery = useQuery({ ...controlQueries.identity(requestedIdentityId ?? ''), enabled: Boolean(mappingIntent && requestedIdentityId) })
+  const owner = ownerFromPage ?? ownerQuery.data ?? requestedIdentityQuery.data
+  const backendFromPage = backendSelector.query.data?.items.find(item => item.id === draft.backend)
+  const backendQuery = useQuery({ ...controlQueries.backendOption(draft.backend), enabled: Boolean(draft.backend && !backendFromPage) })
+  const defaultBackendId = owner?.default_backend_id ?? selected?.credential_default_backend_id ?? ''
+  const defaultBackendFromPage = backendSelector.query.data?.items.find(item => item.id === defaultBackendId)
+  const defaultBackendQuery = useQuery({ ...controlQueries.backendOption(defaultBackendId), enabled: Boolean(defaultBackendId && !defaultBackendFromPage && defaultBackendId !== draft.backend) })
+  const identities = [...(identitySelector.query.data?.items ?? []), ...[ownerQuery.data, requestedIdentityQuery.data].filter((item): item is Schema['IdentityProjection'] => Boolean(item))]
+    .filter((item, index, items) => items.findIndex(candidate => candidate.credential_id === item.credential_id) === index)
+  const backends = [...(backendSelector.query.data?.items ?? []), ...[backendQuery.data, defaultBackendQuery.data].filter((item): item is Schema['StorageBackendOption'] => Boolean(item))]
+    .filter((item, index, items) => items.findIndex(candidate => candidate.id === item.id) === index)
+  const contextPending = identitySelector.query.isPending || backendSelector.query.isPending || ownerQuery.isFetching || requestedIdentityQuery.isFetching || backendQuery.isFetching || defaultBackendQuery.isFetching
+  const context: RoutingContext | null = capabilities.data && !contextPending && !identitySelector.query.isError && !backendSelector.query.isError && !ownerQuery.isError && !requestedIdentityQuery.isError && !backendQuery.isError && !defaultBackendQuery.isError && !capabilities.isError
+    ? reviewedRoutingContext({ identities, backends, capabilities: capabilities.data }, selected) : null
   useEffect(() => {
-    if (!mappingIntent || !context || identities.isFetching || consumedMappingIntent.current === mappingIntent) return
+    if (!mappingIntent || !context || requestedIdentityQuery.isFetching || consumedMappingIntent.current === mappingIntent) return
     consumedMappingIntent.current = mappingIntent
     const requestedIdentity = requestedIdentityId
-      ? identities.data?.find(identity => identity.credential_id === requestedIdentityId && identity.access_mode === 'virtual' && identity.enabled)
+      ? identities.find(identity => identity.credential_id === requestedIdentityId && identity.access_mode === 'virtual' && identity.enabled)
       : undefined
     guard.current.cancel()
     setSearchParams({}, { replace: true })
@@ -59,7 +73,7 @@ export default function VirtualMappingsPage() {
     setDraft({ ...mappingDraft(), owner: requestedIdentity?.credential_id ?? '' })
     setError(requestedIdentity ? null : new Error('The requested identity is unavailable. Select an enabled virtual identity.'))
     setOperation('create')
-  }, [context, identities.data, identities.isFetching, mappingIntent, requestedIdentityId, setSearchParams])
+  }, [context, identities, mappingIntent, requestedIdentityId, requestedIdentityQuery.isFetching, setSearchParams])
 
   function dismiss() {
     guard.current.cancel(); setOperation(null); setSelected(null); setReview(null); setPending(false); setError(null); setStale(false)
@@ -124,16 +138,16 @@ export default function VirtualMappingsPage() {
     const result = effectiveTarget(currentContext.identities.find(item => item.credential_id === value.owner), value.backend || null, currentContext)
     return `${result.source}: ${result.account || 'Unavailable'} / ${value.container || 'Not set'}${result.blocked ? ` (${result.blocked})` : ''}`
   }
-  const owner = identities.data?.find(item => item.credential_id === draft.owner)
   const ownerOptions = identitySelector.query.data?.items ?? []
+  const backendOptions = backendSelector.query.data?.items ?? []
   const title = stale ? 'Mapping review expired' : review ? 'Confirm mapping change' : operation === 'create' ? 'Add bucket routing' : operation === 'edit' ? 'Edit mapping' : operation === 'delete' ? 'Remove mapping' : 'Mapping details'
   const update = (field: keyof MappingDraft, value: string | boolean) => setDraft(current => ({ ...current, [field]: value }))
   return <Page title="Bucket routing" action={<div className="page-actions"><RefreshButton pending={mappings.isFetching} refresh={() => { void mappings.refetch() }} /><Link className="mapping-create-identity" to={virtualIdentityCreationPath}><KeyRound size={17} /> Create virtual identity</Link><button className="primary" disabled={!context} onClick={() => { dismiss(); setDraft(mappingDraft()); setOperation('create') }}><Plus size={17} /> Add bucket routing</button></div>}>
-    {[mappings, identities, backends, capabilities].map((query, index) => query.isError && <ErrorBanner key={index} error={query.error} retry={() => { void query.refetch() }} />)}
+    {[mappings, identitySelector.query, backendSelector.query, ownerQuery, requestedIdentityQuery, backendQuery, defaultBackendQuery, capabilities].map((query, index) => query.isError && <ErrorBanner key={index} error={query.error} retry={() => { void query.refetch() }} />)}
     {(!mappings.isError || mappings.data) && <DataTable rows={mappings.data?.items ?? []} rowKey={row => row.id} loading={mappings.isPending} columns={[
       { label: 'S3 bucket', value: row => row.virtual_bucket_name },
       { label: 'Container', value: row => row.azure_container },
-      { label: 'Identity', value: row => identities.data?.find(item => item.credential_id === row.credential_id)?.s3_access_key ?? row.credential_id },
+      { label: 'Identity', value: row => row.credential_access_key },
       { label: 'Status', value: row => row.enabled ? 'Enabled' : 'Disabled' },
       { label: 'Actions', value: (row: Summary) => <div className="row-actions"><button className="icon-button" title="View mapping details" aria-label={`View ${row.virtual_bucket_name}`} onClick={() => { void open('detail', row.id) }}><Eye size={16} /></button><button className="icon-button" title="Edit mapping" aria-label={`Edit ${row.virtual_bucket_name}`} disabled={!context} onClick={() => { void open('edit', row.id) }}><Pencil size={16} /></button><button className="icon-button danger" title="Remove mapping" aria-label={`Remove ${row.virtual_bucket_name}`} onClick={() => { void open('delete', row.id) }}><Trash2 size={16} /></button></div> },
     ]} />}
@@ -146,7 +160,8 @@ export default function VirtualMappingsPage() {
           <label>Azure container<input required value={draft.container} onChange={event => update('container', event.target.value)} /></label>
           <label>Identity<select required disabled={Boolean(selected)} value={draft.owner} onChange={event => update('owner', event.target.value)}><option value="">Select virtual identity</option>{owner && !ownerOptions.some(item => item.credential_id === owner.credential_id) && <option value={owner.credential_id} disabled={!owner.enabled}>{owner.s3_access_key}{!owner.enabled ? ' (disabled)' : ''}</option>}{ownerOptions.map(item => <option key={item.credential_id} value={item.credential_id} disabled={!item.enabled}>{item.s3_access_key}{!item.enabled ? ' (disabled)' : ''}</option>)}</select></label>
           {!selected && <IdentitySelectorPagination page={identitySelector.page} pending={identitySelector.query.isFetching} canPrevious={identitySelector.canPrevious} canNext={identitySelector.canNext} previous={() => { update('owner', ''); identitySelector.previous() }} next={() => { update('owner', ''); identitySelector.next() }} />}
-          <label>Backend override<select value={draft.backend} disabled={!capabilities.data?.backend_routing_enabled} onChange={event => update('backend', event.target.value)}><option value="">Inherit identity default</option>{draft.backend && !backends.data?.some(item => item.id === draft.backend) && <option value={draft.backend}>Missing backend ({draft.backend})</option>}{backends.data?.map(item => <option key={item.id} value={item.id} disabled={!item.enabled || !capabilities.data?.usable_registry_auth_modes.includes(item.auth_mode)}>{item.name} / {item.azure_account}{!item.enabled ? ' (disabled)' : ''}</option>)}</select></label>
+          <label>Backend override<select value={draft.backend} disabled={!capabilities.data?.backend_routing_enabled} onChange={event => update('backend', event.target.value)}><option value="">Inherit identity default</option>{backendQuery.data && !backendOptions.some(item => item.id === backendQuery.data?.id) && <option value={backendQuery.data.id} disabled={!backendQuery.data.enabled}>{backendQuery.data.name} / {backendQuery.data.azure_account}{!backendQuery.data.enabled ? ' (disabled)' : ''}</option>}{backendOptions.map(item => <option key={item.id} value={item.id} disabled={!item.enabled || !capabilities.data?.usable_registry_auth_modes.includes(item.auth_mode)}>{item.name} / {item.azure_account}{!item.enabled ? ' (disabled)' : ''}</option>)}</select></label>
+          <BackendSelectorPagination page={backendSelector.page} pending={backendSelector.query.isFetching} canPrevious={backendSelector.canPrevious} canNext={backendSelector.canNext} previous={backendSelector.previous} next={backendSelector.next} />
           <label>Endpoint prefix<input value={draft.prefix} onChange={event => update('prefix', event.target.value)} /></label>
           {selected && <label className="checkbox-field"><input type="checkbox" checked={draft.enabled} onChange={event => update('enabled', event.target.checked)} /> Enabled</label>}
           <p className="mapping-target">{target(draft, context)}</p>

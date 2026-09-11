@@ -63,4 +63,36 @@ describe('typed read boundaries', () => {
 
     await expect(query({} as never)).rejects.toThrow('Invalid identity page response')
   })
+
+  it('pages backend options and resolves off-page selections by stable ID', async () => {
+    const backend = { id: '11111111-1111-4111-8111-111111111111', name: 'primary', azure_account: 'accountone', auth_mode: 'managed_identity' as const, enabled: true }
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json({ items: [backend], next_after_id: backend.id, default_page_size: 100, max_page_size: 200 }))
+      .mockResolvedValueOnce(Response.json({ items: [], next_after_id: null, default_page_size: 100, max_page_size: 200 }))
+      .mockResolvedValueOnce(Response.json(backend))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const firstQuery = controlQueries.backendOptionPage(null).queryFn
+    const secondQuery = controlQueries.backendOptionPage(backend.id).queryFn
+    const detailQuery = controlQueries.backendOption(backend.id).queryFn
+    if (typeof firstQuery !== 'function' || typeof secondQuery !== 'function' || typeof detailQuery !== 'function') throw new Error('Expected backend option query functions')
+    await firstQuery({} as never)
+    await secondQuery({} as never)
+    await detailQuery({} as never)
+
+    expect(fetchMock.mock.calls.map(([path]) => path)).toEqual([
+      '/admin/ui/backend-options?limit=100',
+      `/admin/ui/backend-options?limit=100&after_id=${backend.id}`,
+      `/admin/ui/backend-options/${backend.id}`,
+    ])
+  })
+
+  it('rejects backend option pages larger than the requested bound', async () => {
+    const items = Array.from({ length: 101 }, (_, index) => ({ id: String(index) }))
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ items, next_after_id: null })))
+    const query = controlQueries.backendOptionPage(null).queryFn
+    if (typeof query !== 'function') throw new Error('Expected backend option page query function')
+
+    await expect(query({} as never)).rejects.toThrow('Invalid backend option page response')
+  })
 })

@@ -109,10 +109,13 @@ for (const backendState of ['disabled', 'missing'] as const) {
       items: [{ ...collections['/admin/ui/identities'].items[0], default_backend_id: backendId, enabled: null }],
       next_after_id: null, default_page_size: 100, max_page_size: 200,
     } }))
-    await page.route('**/admin/ui/backends', route => route.fulfill({ json: {
-      count: backendState === 'missing' ? 0 : 1,
-      items: backendState === 'missing' ? [] : [{ ...collections['/admin/ui/backends'].items[0], enabled: false }],
-    } satisfies components['schemas']['StorageBackendProjectionListResponse'] }))
+    await page.route('**/admin/ui/backend-options?*', route => route.fulfill({ json: {
+      items: backendState === 'missing' ? [] : [{ ...collections['/admin/ui/backend-options'].items[0], enabled: false }],
+      next_after_id: null, default_page_size: 100, max_page_size: 200,
+    } satisfies components['schemas']['StorageBackendOptionPage'] }))
+    await page.route(`**/admin/ui/backend-options/${backendId}`, route => route.fulfill(backendState === 'missing'
+      ? { status: 404, body: 'Unavailable' }
+      : { json: { ...collections['/admin/ui/backend-options'].items[0], enabled: false } satisfies components['schemas']['StorageBackendOption'] }))
     const updates: unknown[] = []
     let status = 400
     await page.route('**/admin/credentials/fixture-access', route => {
