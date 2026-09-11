@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createMappingPayload, draftError, effectiveTarget, listingTemplates, mappingDraft, reviewedRoutingContext, updateMappingPayload, type Backend, type Identity, type Mapping, type RoutingContext } from './routing'
 
 const identity: Identity = { credential_id: 'owner', s3_access_key: 'SYNTHETIC', azure_account: 'legacyaccount', access_mode: 'virtual', enabled: true, default_backend_id: 'default', use_managed_identity: true, versioning_enabled: true, virtual_bucket_count: 1, policy_attachment_count: 0 }
-const backend: Backend = { id: 'default', name: 'primary', azure_account: 'primaryaccount', auth_mode: 'managed_identity', managed_identity_client_id: null, enabled: true, has_secret_ref: false, user_delegation_sas_enabled: true, region_label: null, credential_default_count: 1, virtual_bucket_count: 0, impact_token: 'a'.repeat(32) }
+const backend: Backend = { id: 'default', name: 'primary', azure_account: 'primaryaccount', auth_mode: 'managed_identity', enabled: true }
 const context: RoutingContext = { identities: [identity], backends: [backend, { ...backend, id: 'override', azure_account: 'otheraccount' }], capabilities: { plane: 'control', authz_mode: 'enforce', sts_enabled: false, iam_assume_role_enabled: false, assume_role_ready: false, iam_account_configured: false, backend_routing_enabled: true, usable_registry_auth_modes: ['managed_identity'], legacy_routing_available: true, public_s3_endpoint: null, public_sts_endpoint: null } }
 const mapping: Mapping = { id: 'mapping', virtual_bucket_name: 'reports-alias', azure_container: 'reports-physical', credential_id: 'owner', backend_id: 'override', endpoint_prefix: 'reports', enabled: true, created_at: '', updated_at: '', credential_default_backend_id: 'default', impact_token: 'a'.repeat(32) }
 
@@ -46,6 +46,20 @@ describe('mapping payloads', () => {
     expect(draftError(mappingDraft(mapping), { ...context, identities: [{ ...identity, access_mode: 'direct' }] })).toContain('virtual')
     expect(draftError({ ...mappingDraft(mapping), alias: 'another-alias' }, context, mapping)).toContain('cannot change')
     expect(draftError({ ...mappingDraft(mapping), owner: 'another-owner' }, context, mapping)).toContain('cannot change')
+  })
+  it('allows only an unchanged disable transition when routing is unavailable', () => {
+    const unavailable = { ...context, backends: context.backends.map(item => ({ ...item, enabled: false })) }
+    const disableOnly = { ...mappingDraft(mapping), enabled: false }
+    for (const blocked of [
+      unavailable,
+      { ...context, backends: context.backends.filter(item => item.id !== mapping.backend_id) },
+      { ...context, backends: context.backends.map(item => item.id === mapping.backend_id ? { ...item, auth_mode: 'account_key' as const } : item) },
+      { ...context, identities: [{ ...identity, enabled: false }] },
+    ]) expect(draftError(disableOnly, blocked, mapping)).toBeUndefined()
+    expect(draftError({ ...disableOnly, container: 'changed-container' }, unavailable, mapping)).toContain('disabled')
+    expect(draftError({ ...disableOnly, backend: 'default' }, unavailable, mapping)).toContain('disabled')
+    expect(draftError({ ...disableOnly, prefix: 'changed' }, unavailable, mapping)).toContain('disabled')
+    expect(draftError(disableOnly, { ...unavailable, identities: [{ ...identity, access_mode: 'direct' }] }, mapping)).toContain('virtual')
   })
 })
 

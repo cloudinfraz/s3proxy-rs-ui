@@ -3,7 +3,7 @@ import { virtualBucketAliasError } from '../resources/validation'
 
 export type Mapping = Schema['AdminVirtualMapping']
 export type Identity = Schema['IdentityProjection']
-export type Backend = Schema['StorageBackendProjection']
+export type Backend = Schema['StorageBackendOption']
 export type RoutingContext = { identities: readonly Identity[]; backends: readonly Backend[]; capabilities: Schema['ControlCapabilities'] }
 export type MappingDraft = { alias: string; container: string; owner: string; backend: string; prefix: string; enabled: boolean }
 export type EffectiveTarget = { source: string; account: string; blocked?: string }
@@ -39,6 +39,12 @@ export function draftError(draft: MappingDraft, context: RoutingContext, existin
   const owner = context.identities.find(identity => identity.credential_id === draft.owner)
   if (owner?.access_mode !== 'virtual') return 'Select a virtual identity.'
   if (draft.backend && !context.capabilities.backend_routing_enabled && draft.backend !== existing?.backend_id) return 'Backend routing is disabled.'
+  const disableOnly = existing?.enabled === true
+    && !draft.enabled
+    && draft.container === existing.azure_container
+    && draft.backend === (existing.backend_id ?? '')
+    && draft.prefix === (existing.endpoint_prefix ?? '')
+  if (disableOnly) return undefined
   return effectiveTarget(owner, draft.backend || null, context).blocked
 }
 

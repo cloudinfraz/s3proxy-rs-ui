@@ -47,7 +47,7 @@ async function directFixture(page: Page) {
       const updated = rows.find(identity => identity.s3_access_key === 'fixture-access')!
       return route.fulfill({ json: { credential_id: updated.credential_id, s3_access_key: updated.s3_access_key, azure_account: updated.azure_account, access_mode: updated.access_mode, use_managed_identity: updated.use_managed_identity, versioning_enabled: updated.versioning_enabled, default_backend_id: updated.default_backend_id, credential_scope: null } satisfies components['schemas']['CredentialDetail'] })
     }
-    if (method === 'GET' && ['/admin/session', '/admin/capabilities', '/admin/ui/backends'].includes(path)) return route.fallback()
+    if (method === 'GET' && ['/admin/session', '/admin/capabilities', '/admin/ui/backends', '/admin/ui/backend-options'].includes(path)) return route.fallback()
     denied.push(`${method} ${path}`)
     return route.abort()
   })

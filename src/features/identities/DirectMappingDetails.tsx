@@ -5,7 +5,7 @@ import './direct-details.css'
 
 export default function DirectMappingDetails({ identity, backends, capabilities, onClose }: {
   identity?: Schema['IdentityProjection']
-  backends?: readonly Schema['StorageBackendProjection'][]
+  backends?: readonly Schema['StorageBackendOption'][]
   capabilities?: Schema['ControlCapabilities']
   onClose: () => void
 }) {

@@ -161,6 +161,40 @@ describe('BackendsPage', () => {
     })))
   })
 
+  it('preserves the backend draft when returning from impact review', () => {
+    render(<BackendsPage />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit archive' }))
+    fireEvent.change(screen.getByLabelText('Azure account'), { target: { value: 'changedaccount' } })
+    fireEvent.change(screen.getByLabelText('Region label'), { target: { value: 'changedregion' } })
+    fireEvent.click(screen.getByLabelText('User Delegation SAS enabled'))
+    fireEvent.click(screen.getByLabelText('Enabled'))
+    fireEvent.click(screen.getByRole('button', { name: 'Review and save' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+
+    expect(screen.getByLabelText('Azure account')).toHaveProperty('value', 'changedaccount')
+    expect(screen.getByLabelText('Region label')).toHaveProperty('value', 'changedregion')
+    expect(screen.getByLabelText('User Delegation SAS enabled')).toHaveProperty('checked', false)
+    expect(screen.getByLabelText('Enabled')).toHaveProperty('checked', false)
+  })
+
+  it('preserves authentication mode and secret reference when returning from review', () => {
+    render(<BackendsPage />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit archive' }))
+    fireEvent.change(screen.getByLabelText('Authentication'), { target: { value: 'account_key' } })
+    fireEvent.change(screen.getByLabelText('Secret reference'), { target: { value: 'review-only-reference' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Review and save' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+
+    expect(screen.getByLabelText('Authentication')).toHaveProperty('value', 'account_key')
+    expect(screen.getByLabelText('Secret reference')).toHaveProperty('value', 'review-only-reference')
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Edit archive' }))
+    fireEvent.change(screen.getByLabelText('Authentication'), { target: { value: 'account_key' } })
+    expect(screen.getByLabelText('Secret reference')).toHaveProperty('value', '')
+  })
+
   it('reports a failed delete and succeeds when the user retries', async () => {
     vi.mocked(api).mockRejectedValueOnce(new Error('network')).mockResolvedValueOnce(undefined)
     render(<BackendsPage />)

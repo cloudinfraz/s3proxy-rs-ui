@@ -9,7 +9,7 @@ test('login and cookie mutation keep credential material out of browser storage'
     outboundRequests.push(`${request.url()}\n${request.postData() ?? ''}`)
   })
   const emptyLists = [
-    '/admin/credentials', '/admin/ui/identities', '/admin/ui/identity-pages', '/admin/virtual-buckets', '/admin/backends', '/admin/policies', '/admin/api-keys',
+    '/admin/credentials', '/admin/ui/identities', '/admin/ui/identity-pages', '/admin/ui/backend-options', '/admin/virtual-buckets', '/admin/backends', '/admin/policies', '/admin/api-keys',
   ]
 
   await page.route('**/admin/session/login', async route => {

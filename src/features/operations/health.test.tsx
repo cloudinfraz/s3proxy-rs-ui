@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { HealthSummary } from './HealthPage'
 import type { Schema } from '../../api/control'
 
-const health: Schema['AdminHealthResponse'] = { status: 'healthy', version: 'test', timestamp: '2026-09-05T00:00:00Z', cache: { mode: 'redis', available: true, redis_connected: true }, credentials: { count: 1 }, multipart: { store_type: 'hybrid', redis_available: true, persistence: 'enabled', warning: 'synthetic-sensitive-detail' }, authorization: { mode: 'off', coherence: 'strict', resolver_ready: false, database_ready: true, audit_required: false, audit_dispatcher_ready: true } }
+const health: Schema['AdminHealthResponse'] = { status: 'healthy', version: 'test', commit_sha: null, development: true, dirty: null, timestamp: '2026-09-05T00:00:00Z', cache: { mode: 'redis', available: true, redis_connected: true }, credentials: { count: 1 }, multipart: { store_type: 'hybrid', redis_available: true, persistence: 'enabled', warning: 'synthetic-sensitive-detail' }, authorization: { mode: 'off', coherence: 'strict', resolver_ready: false, database_ready: true, audit_required: false, audit_dispatcher_ready: true } }
 
 describe('safe health presentation', () => {
   it('renders allowlisted diagnostics without raw warning payloads', () => {

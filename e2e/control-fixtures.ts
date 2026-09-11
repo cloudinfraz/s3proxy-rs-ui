@@ -7,7 +7,7 @@ const fixtureId = '00000000-0000-4000-8000-000000000001'
 export const capabilities = { plane: 'control', authz_mode: 'off', sts_enabled: false, iam_assume_role_enabled: false, assume_role_ready: false, iam_account_configured: false, backend_routing_enabled: true, usable_registry_auth_modes: ['managed_identity'], legacy_routing_available: true, public_sts_endpoint: null, public_s3_endpoint: null } satisfies components['schemas']['ControlCapabilities']
 
 export const health = {
-  status: 'healthy', version: 'test', timestamp,
+  status: 'healthy', version: 'test', commit_sha: null, development: false, dirty: null, timestamp,
   cache: { mode: 'memory', available: true, redis_connected: false },
   credentials: { count: 1 },
   multipart: { store_type: 'memory-only', redis_available: false, persistence: 'disabled', warning: 'State lost on restart' },
@@ -15,8 +15,11 @@ export const health = {
 } satisfies components['schemas']['AdminHealthResponse']
 
 export const collections = {
+  '/admin/ui/overview': {
+    identity_count: 1, bucket_routing_count: 1, backend_count: 1, policy_count: 1,
+  } satisfies components['schemas']['AdminOverviewSummary'],
   '/admin/ui/virtual-buckets': {
-    items: [{ id: fixtureId, virtual_bucket_name: 'fixture-bucket', azure_container: 'fixturecontainer', credential_id: fixtureId, backend_id: null, endpoint_prefix: null, enabled: true, created_at: timestamp, updated_at: timestamp }],
+    items: [{ id: fixtureId, virtual_bucket_name: 'fixture-bucket', azure_container: 'fixturecontainer', credential_id: fixtureId, credential_access_key: 'fixture-access', backend_id: null, endpoint_prefix: null, enabled: true, created_at: timestamp, updated_at: timestamp }],
     next_after_id: null,
   } satisfies components['schemas']['VirtualMappingPage'],
   '/admin/credentials': {
@@ -50,6 +53,12 @@ export const collections = {
     count: 1,
     items: [{ id: fixtureId, name: 'fixture-backend', azure_account: 'fixtureaccount', auth_mode: 'managed_identity', managed_identity_client_id: null, user_delegation_sas_enabled: false, has_secret_ref: false, region_label: null, enabled: true, credential_default_count: 2, virtual_bucket_count: 3, impact_token: '0123456789abcdef0123456789abcdef' }],
   } satisfies components['schemas']['StorageBackendProjectionListResponse'],
+  '/admin/ui/backend-options': {
+    items: [{ id: fixtureId, name: 'fixture-backend', azure_account: 'fixtureaccount', auth_mode: 'managed_identity', enabled: true }],
+    next_after_id: null,
+    default_page_size: 100,
+    max_page_size: 200,
+  } satisfies components['schemas']['StorageBackendOptionPage'],
   '/admin/virtual-buckets': [
     { id: fixtureId, virtual_bucket_name: 'fixture-bucket', azure_container: 'fixturecontainer', credential_id: fixtureId, backend_id: null, endpoint_prefix: null, enabled: true },
   ] satisfies components['schemas']['VirtualBucketList'],
@@ -59,6 +68,7 @@ export const collections = {
 }
 
 export const emptyCollections = {
+  '/admin/ui/overview': { identity_count: 0, bucket_routing_count: 0, backend_count: 0, policy_count: 0 },
   '/admin/ui/virtual-buckets': { items: [], next_after_id: null },
   '/admin/credentials': { count: 0, items: [] },
   '/admin/ui/identities': { count: 0, items: [] },
@@ -67,6 +77,7 @@ export const emptyCollections = {
   '/admin/ui/policies': { items: [], next_after_id: null, default_page_size: 100, max_page_size: 200 },
   '/admin/backends': [],
   '/admin/ui/backends': { count: 0, items: [] },
+  '/admin/ui/backend-options': { items: [], next_after_id: null, default_page_size: 100, max_page_size: 200 },
   '/admin/virtual-buckets': [],
   '/admin/api-keys': [],
 } satisfies { [Path in keyof typeof collections]: (typeof collections)[Path] }
@@ -81,6 +92,12 @@ export async function mockControlApi(page: Page, empty = false) {
     if (request.method() === 'GET' && path in collections) {
       const selected = empty ? emptyCollections : collections
       return route.fulfill({ json: selected[path as keyof typeof collections] })
+    }
+    if (!empty && request.method() === 'GET' && path === `/admin/ui/identities/${fixtureId}`) {
+      return route.fulfill({ json: collections['/admin/ui/identities'].items[0] })
+    }
+    if (!empty && request.method() === 'GET' && path === `/admin/ui/backend-options/${fixtureId}`) {
+      return route.fulfill({ json: collections['/admin/ui/backend-options'].items[0] })
     }
     if (path === '/admin/session' && request.method() === 'GET') {
       const session = { authenticated: true, csrf_token: 'synthetic-csrf', expires_at: '2099-01-01T00:00:00Z' } satisfies components['schemas']['SessionResponse']

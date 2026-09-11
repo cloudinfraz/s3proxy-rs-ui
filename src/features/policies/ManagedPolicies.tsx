@@ -1,13 +1,18 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, Eye, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { api, ApiError } from '../../api/client'
 import type { Schema } from '../../api/control'
 import { invalidateControl } from '../../api/query-keys'
 import { DataTable, DestructiveDialog, ErrorBanner, Modal, RefreshButton } from '../../components/control'
+import { completionGuard } from '../operations/state'
 import { createPolicyRequest, deletePolicyRequest, emptyPolicyDocument, formatPolicyDocument, policyKeys, updatePolicyRequest, validationRequest, type PolicyDetail, type PolicySummary } from './policy-state'
 
 type Operation = 'create' | 'edit' | 'delete'
+type PolicyReview = {
+  authoritative: PolicyDetail | null
+  request: Schema['AdminPolicyCreateRequest'] | Schema['ReviewPolicyUpdateRequest'] | Schema['ReviewPolicyDeleteRequest']
+}
 
 export default function ManagedPolicies() {
   const [cursors, setCursors] = useState<Array<string | null>>([null])
@@ -48,62 +53,81 @@ function PolicyDialog({ operation, initial, close, changed }: { operation: Opera
   const [draftName, setDraftName] = useState(name)
   const [description, setDescription] = useState(initial?.policy.description ?? '')
   const [document, setDocument] = useState(initial ? formatPolicyDocument(initial.document) : emptyPolicyDocument)
-  const [review, setReview] = useState<PolicyDetail | true | null>(null)
+  const [review, setReview] = useState<PolicyReview | null>(null)
   const [validation, setValidation] = useState<Schema['AdminPolicyDraftValidationResponse'] | null>(null)
   const [error, setError] = useState<Error | null>(null)
   const [stale, setStale] = useState(false)
   const [pending, setPending] = useState(false)
+  const guard = useRef(completionGuard())
+  useEffect(() => { const owner = guard.current; return () => owner.cancel() }, [])
   const title = operation === 'create' ? 'Create managed policy' : operation === 'edit' ? `Edit ${name}` : `Delete ${name}`
+
+  function changeDraft(change: () => void) {
+    guard.current.cancel()
+    setPending(false)
+    setReview(null)
+    setValidation(null)
+    setError(null)
+    change()
+  }
 
   async function prepare(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault(); if (pending) return
+    const request = guard.current.begin()
     setPending(true); setError(null); setStale(false)
     try {
+      const createRequest = operation === 'create' ? createPolicyRequest(draftName, description, document) : null
       if (operation !== 'delete') {
         const result = await api<Schema['AdminPolicyDraftValidationResponse']>('/admin/ui/policies/validate', { method: 'POST', body: JSON.stringify(validationRequest(document, 'managed_policy')) })
+        if (!guard.current.current(request)) return
         setValidation(result)
         if (!result.valid) throw new Error('Resolve the server validation findings before review')
       }
-      if (operation === 'create') { createPolicyRequest(draftName, description, document); setReview(true) }
+      if (operation === 'create') {
+        if (!createRequest) throw new Error('Policy review is unavailable')
+        setReview({ authoritative: null, request: createRequest })
+      }
       else {
         if (!initial) throw new Error('Policy review is unavailable')
         const authoritative = await api<PolicyDetail>(`/admin/ui/policies/${encodeURIComponent(initial.policy.id)}`)
-        if (operation === 'edit') updatePolicyRequest(authoritative, description, document)
-        else deletePolicyRequest(authoritative)
-        setReview(authoritative)
+        if (!guard.current.current(request)) return
+        setReview({ authoritative, request: operation === 'edit' ? updatePolicyRequest(authoritative, description, document) : deletePolicyRequest(authoritative) })
       }
-    } catch (cause) { setError(cause instanceof Error ? cause : new Error('Policy review failed')) }
-    finally { setPending(false) }
+    } catch (cause) { if (guard.current.current(request)) setError(cause instanceof Error ? cause : new Error('Policy review failed')) }
+    finally { if (guard.current.current(request)) setPending(false) }
   }
 
   async function persist() {
     if (!review || pending) return
+    const request = guard.current.begin()
     setPending(true); setError(null)
     try {
       let result: PolicyDetail | null
-      if (operation === 'create') result = await api<PolicyDetail>('/admin/ui/policies', { method: 'POST', body: JSON.stringify(createPolicyRequest(draftName, description, document)) })
+      if (operation === 'create') result = await api<PolicyDetail>('/admin/ui/policies', { method: 'POST', body: JSON.stringify(review.request) })
       else {
-        if (review === true) throw new Error('Policy review is unavailable')
-        const response = await api<Schema['AdminPolicyMutationResult']>(`/admin/ui/policies/${encodeURIComponent(review.policy.id)}`, { method: operation === 'edit' ? 'PUT' : 'DELETE', body: JSON.stringify(operation === 'edit' ? updatePolicyRequest(review, description, document) : deletePolicyRequest(review)) })
+        if (!review.authoritative) throw new Error('Policy review is unavailable')
+        const response = await api<Schema['AdminPolicyMutationResult']>(`/admin/ui/policies/${encodeURIComponent(review.authoritative.policy.id)}`, { method: operation === 'edit' ? 'PUT' : 'DELETE', body: JSON.stringify(review.request) })
         result = response.detail
       }
+      if (!guard.current.current(request)) return
       await invalidateControl(client); changed(result)
     } catch (cause) {
+      if (!guard.current.current(request)) return
       setError(cause instanceof Error ? cause : new Error('Policy change failed'))
       setReview(null)
       if (cause instanceof ApiError && cause.status === 409) { setStale(true); await invalidateControl(client) }
-    } finally { setPending(false) }
+    } finally { if (guard.current.current(request)) setPending(false) }
   }
 
-  if (operation === 'delete' && review && review !== true) return <DestructiveDialog title={title} description="Permanently removes this managed policy after authoritative attachment impact review. Azure containers, blobs, and routing are unchanged." confirmLabel={`Delete ${review.policy.name}`} pending={pending} onClose={() => setReview(null)} onConfirm={() => { void persist() }}>
+  if (operation === 'delete' && review?.authoritative) return <DestructiveDialog title={title} description="Permanently removes this managed policy after authoritative attachment impact review. Azure containers, blobs, and routing are unchanged." confirmLabel={`Delete ${review.authoritative.policy.name}`} pending={pending} onClose={() => setReview(null)} onConfirm={() => { void persist() }}>
     {error && <ErrorBanner error={error} />}
-    <dl className="policy-detail-grid"><dt>Name</dt><dd>{review.policy.name}</dd><dt>Reviewed revision</dt><dd>{review.policy.revision}</dd><dt>Identity impact</dt><dd>{review.policy.credential_attachment_count} attachments</dd><dt>Role impact</dt><dd>{review.policy.role_attachment_count} attachments and active sessions</dd></dl>
+    <dl className="policy-detail-grid"><dt>Name</dt><dd>{review.authoritative.policy.name}</dd><dt>Reviewed revision</dt><dd>{review.authoritative.policy.revision}</dd><dt>Identity impact</dt><dd>{review.authoritative.policy.credential_attachment_count} attachments</dd><dt>Role impact</dt><dd>{review.authoritative.policy.role_attachment_count} attachments and active sessions</dd></dl>
   </DestructiveDialog>
 
   return <Modal title={review ? `Confirm: ${title}` : title} description="This changes S3 authorization metadata only. Azure containers, blobs, and routing are unchanged." onClose={close} pending={pending}>
     {error && <ErrorBanner error={error} retry={stale ? () => { void prepare() } : undefined} />}
     {stale && <p className="policy-notice" role="status">The review was stale. Authoritative state was refreshed; your unsaved draft is preserved for another review.</p>}
-    {review ? <><dl className="policy-detail-grid"><dt>Name</dt><dd>{operation === 'create' ? draftName : review === true ? name : review.policy.name}</dd>{operation !== 'delete' && <><dt>Description</dt><dd>{description || 'None'}</dd><dt>Validated bytes</dt><dd>{validation?.json_bytes ?? 'Unavailable'}</dd><dt>Statements</dt><dd>{validation?.statements ?? 'Unavailable'}</dd></>}{review !== true && <><dt>Reviewed revision</dt><dd>{review.policy.revision}</dd><dt>Identity impact</dt><dd>{review.policy.credential_attachment_count} attachments</dd><dt>Role impact</dt><dd>{review.policy.role_attachment_count} attachments and active sessions</dd></>}</dl><div className="dialog-actions"><button disabled={pending} onClick={() => setReview(null)}>Back</button><button className="primary" disabled={pending} onClick={() => { void persist() }}>{pending ? 'Applying...' : 'Confirm change'}</button></div></>
-      : <form className="operation-form" onSubmit={event => { void prepare(event) }}>{operation === 'create' ? <label>Policy name<input required value={draftName} onChange={event => setDraftName(event.target.value)} /></label> : <label>Policy name<input value={name} readOnly aria-readonly="true" /></label>}{operation !== 'delete' && <><label>Description<input value={description} onChange={event => setDescription(event.target.value)} /></label><label>Policy document<textarea className="policy-editor" required spellCheck={false} value={document} onChange={event => setDocument(event.target.value)} /></label>{validation && !validation.valid && <ul className="policy-violations">{validation.violations.map((item, index) => <li key={`${item.code}-${index}`}><strong>{item.field}</strong>: {item.message}</li>)}</ul>}</>}{operation === 'delete' && initial && <p>Review deletion impact for {initial.policy.credential_attachment_count} identity and {initial.policy.role_attachment_count} role attachments.</p>}<div className="dialog-actions"><button type="button" disabled={pending} onClick={close}>Cancel</button><button className={operation === 'delete' ? 'danger' : 'primary'} disabled={pending}>{pending ? 'Validating...' : 'Review change'}</button></div></form>}
+    {review ? <><dl className="policy-detail-grid"><dt>Name</dt><dd>{operation === 'create' ? draftName : review.authoritative?.policy.name ?? name}</dd>{operation !== 'delete' && <><dt>Description</dt><dd>{description || 'None'}</dd><dt>Validated bytes</dt><dd>{validation?.json_bytes ?? 'Unavailable'}</dd><dt>Statements</dt><dd>{validation?.statements ?? 'Unavailable'}</dd></>}{review.authoritative && <><dt>Reviewed revision</dt><dd>{review.authoritative.policy.revision}</dd><dt>Identity impact</dt><dd>{review.authoritative.policy.credential_attachment_count} attachments</dd><dt>Role impact</dt><dd>{review.authoritative.policy.role_attachment_count} attachments and active sessions</dd></>}</dl><div className="dialog-actions"><button disabled={pending} onClick={() => setReview(null)}>Back</button><button className="primary" disabled={pending} onClick={() => { void persist() }}>{pending ? 'Applying...' : 'Confirm change'}</button></div></>
+      : <form className="operation-form" onSubmit={event => { void prepare(event) }}>{operation === 'create' ? <label>Policy name<input required value={draftName} onChange={event => changeDraft(() => setDraftName(event.target.value))} /></label> : <label>Policy name<input value={name} readOnly aria-readonly="true" /></label>}{operation !== 'delete' && <><label>Description<input value={description} onChange={event => changeDraft(() => setDescription(event.target.value))} /></label><label>Policy document<textarea className="policy-editor" required spellCheck={false} value={document} onChange={event => changeDraft(() => setDocument(event.target.value))} /></label>{validation && !validation.valid && <ul className="policy-violations">{validation.violations.map((item, index) => <li key={`${item.code}-${index}`}><strong>{item.field}</strong>: {item.message}</li>)}</ul>}</>}{operation === 'delete' && initial && <p>Review deletion impact for {initial.policy.credential_attachment_count} identity and {initial.policy.role_attachment_count} role attachments.</p>}<div className="dialog-actions"><button type="button" disabled={pending} onClick={close}>Cancel</button><button className={operation === 'delete' ? 'danger' : 'primary'} disabled={pending}>{pending ? 'Validating...' : 'Review change'}</button></div></form>}
   </Modal>
 }

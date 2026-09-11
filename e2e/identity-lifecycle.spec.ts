@@ -34,27 +34,6 @@ test('S3 identities use bounded cursor pagination', async ({ page }) => {
   verify()
 })
 
-test('S3 identities remain available when the paged endpoint is not deployed', async ({ page }) => {
-  const verify = await mockControlApi(page)
-  const identityRequests: string[] = []
-  page.on('request', request => {
-    const url = new URL(request.url())
-    if (url.pathname === '/admin/ui/identity-pages' || url.pathname === '/admin/ui/identities') identityRequests.push(url.pathname)
-  })
-  await page.route('**/admin/ui/identity-pages?*', route => route.fulfill({
-    status: 404,
-    json: { code: 'NotFound' },
-  }))
-
-  await page.goto('/admin/ui/credentials')
-
-  await expect.poll(() => identityRequests).toEqual(['/admin/ui/identity-pages', '/admin/ui/identities'])
-  await expect(page.getByText('fixture-access', { exact: true })).toBeVisible()
-  await expect(page.getByText('The requested resource no longer exists. Refresh and try again.')).toHaveCount(0)
-  await expect(page.getByText('Page 1', { exact: true })).toBeVisible()
-  verify()
-})
-
 test('UI070-02 replacement reviews safe settings, validates and retries without changing the original', async ({ page }) => {
   const verify = await mockControlApi(page)
   const bodies: components['schemas']['CreateCredentialRequest'][] = []
@@ -130,10 +109,13 @@ for (const backendState of ['disabled', 'missing'] as const) {
       items: [{ ...collections['/admin/ui/identities'].items[0], default_backend_id: backendId, enabled: null }],
       next_after_id: null, default_page_size: 100, max_page_size: 200,
     } }))
-    await page.route('**/admin/ui/backends', route => route.fulfill({ json: {
-      count: backendState === 'missing' ? 0 : 1,
-      items: backendState === 'missing' ? [] : [{ ...collections['/admin/ui/backends'].items[0], enabled: false }],
-    } satisfies components['schemas']['StorageBackendProjectionListResponse'] }))
+    await page.route('**/admin/ui/backend-options?*', route => route.fulfill({ json: {
+      items: backendState === 'missing' ? [] : [{ ...collections['/admin/ui/backend-options'].items[0], enabled: false }],
+      next_after_id: null, default_page_size: 100, max_page_size: 200,
+    } satisfies components['schemas']['StorageBackendOptionPage'] }))
+    await page.route(`**/admin/ui/backend-options/${backendId}`, route => route.fulfill(backendState === 'missing'
+      ? { status: 404, body: 'Unavailable' }
+      : { json: { ...collections['/admin/ui/backend-options'].items[0], enabled: false } satisfies components['schemas']['StorageBackendOption'] }))
     const updates: unknown[] = []
     let status = 400
     await page.route('**/admin/credentials/fixture-access', route => {

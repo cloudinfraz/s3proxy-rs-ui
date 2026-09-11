@@ -1,7 +1,7 @@
 import type { Schema } from '../../api/control'
 
 type Identity = Schema['IdentityProjection']
-type Backend = Schema['StorageBackendProjection']
+type Backend = Schema['StorageBackendOption']
 type Capabilities = Schema['ControlCapabilities']
 export type DirectTarget = { source: string; account: string | null; backend: string | null; blocked?: string }
 

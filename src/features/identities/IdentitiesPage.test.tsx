@@ -38,9 +38,13 @@ function mockQueries(identities: ReturnType<typeof query>, backends = query({ da
   const identityData = Array.isArray(identities.data)
     ? { ...identities, data: { items: identities.data, next_after_id: null, default_page_size: 100, max_page_size: 200 } }
     : identities
+  const backendData = Array.isArray(backends.data)
+    ? { ...backends, data: { items: backends.data, next_after_id: null, default_page_size: 100, max_page_size: 200 } }
+    : backends
   vi.mocked(useQuery).mockImplementation(options => {
     const key = (options as { queryKey?: readonly unknown[] }).queryKey ?? []
-    if (key.includes('backends')) return backends as never
+    if (key[1] === 'backends' && key[3] === 'page') return backendData as never
+    if (key[1] === 'backends') return query() as never
     if (key.includes('capabilities')) return capabilities as never
     return identityData as never
   })
@@ -83,7 +87,8 @@ describe('IdentitiesPage', () => {
     const second = { ...identity, credential_id: '22222222-2222-4222-8222-222222222222', s3_access_key: 'ACCESS_TWO' }
     vi.mocked(useQuery).mockImplementation(options => {
       const key = (options as { queryKey?: readonly unknown[] }).queryKey ?? []
-      if (key.includes('backends')) return query({ data: [] }) as never
+      if (key[1] === 'backends' && key[3] === 'page') return query({ data: { items: [], next_after_id: null, default_page_size: 100, max_page_size: 200 } }) as never
+      if (key[1] === 'backends') return query() as never
       if (key.includes('capabilities')) return query() as never
       const page = key.at(-1) as { afterId: string | null; accessMode: 'direct' | null }
       return query({ data: page.afterId

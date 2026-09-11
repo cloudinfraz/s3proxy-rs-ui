@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import type { ReactNode } from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { useQuery } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { api, ApiError } from '../../api/client'
@@ -17,7 +17,14 @@ vi.mock('../../components/control', () => ({
 }))
 
 const identity = { credential_id: '11111111-1111-4111-8111-111111111111', s3_access_key: 'SIMULATOR_KEY' }
-beforeEach(() => vi.mocked(useQuery).mockReturnValue({ data: [identity], isError: false, refetch: vi.fn() } as never))
+const identityPage = { items: [identity], next_after_id: null }
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason: Error) => void
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => { resolve = resolvePromise; reject = rejectPromise })
+  return { promise, resolve, reject }
+}
+beforeEach(() => vi.mocked(useQuery).mockReturnValue({ data: identityPage, isError: false, isFetching: false, refetch: vi.fn() } as never))
 afterEach(() => { cleanup(); vi.resetAllMocks() })
 
 describe('PolicyDiagnostics', () => {
@@ -59,12 +66,81 @@ describe('PolicyDiagnostics', () => {
     expect(await screen.findByText('Allowed')).toBeTruthy()
     expect(screen.getByText(/Matched statement: ReadObjects/)).toBeTruthy()
     cleanup()
-    vi.mocked(useQuery).mockReturnValue({ data: [identity], isError: false, refetch: vi.fn() } as never)
+    vi.mocked(useQuery).mockReturnValue({ data: identityPage, isError: false, isFetching: false, refetch: vi.fn() } as never)
     vi.mocked(api).mockRejectedValueOnce(new ApiError(503, 'unavailable'))
     render(<PolicyDiagnostics />)
     fireEvent.change(screen.getByLabelText('Identity'), { target: { value: identity.credential_id } })
     fireEvent.submit(screen.getByRole('button', { name: /Simulate/ }).closest('form')!)
     await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('failed closed'))
+  })
+
+  it('retries the failed request instead of the previous successful request', async () => {
+    vi.mocked(api)
+      .mockResolvedValueOnce({ allowed: true, effect: 'Allow', matched_sid: 'ReadObjects', evaluated_policies: 1 })
+      .mockRejectedValueOnce(new ApiError(503, 'unavailable'))
+      .mockResolvedValueOnce({ allowed: false, effect: 'ExplicitDeny', matched_sid: 'DenyDelete', evaluated_policies: 1 })
+    render(<PolicyDiagnostics />)
+    fireEvent.change(screen.getByLabelText('Identity'), { target: { value: identity.credential_id } })
+    fireEvent.submit(screen.getByRole('button', { name: /Simulate/ }).closest('form')!)
+    expect(await screen.findByText('Allowed')).toBeTruthy()
+
+    fireEvent.change(screen.getByLabelText('S3 action'), { target: { value: 's3:DeleteObject' } })
+    fireEvent.submit(screen.getByRole('button', { name: /Simulate/ }).closest('form')!)
+    const alert = await screen.findByRole('alert')
+    fireEvent.click(within(alert).getByRole('button', { name: 'Retry' }))
+    expect(await screen.findByText('Explicit deny')).toBeTruthy()
+
+    expect(vi.mocked(api).mock.calls.map(([, options]) => JSON.parse(String(options?.body)))).toEqual([
+      expect.objectContaining({ action: 's3:GetObject' }),
+      expect.objectContaining({ action: 's3:DeleteObject' }),
+      expect.objectContaining({ action: 's3:DeleteObject' }),
+    ])
+  })
+
+  it('offers Retry when the first simulation attempt fails', async () => {
+    vi.mocked(api)
+      .mockRejectedValueOnce(new ApiError(503, 'unavailable'))
+      .mockResolvedValueOnce({ allowed: true, effect: 'Allow', matched_sid: 'ReadObjects', evaluated_policies: 1 })
+    render(<PolicyDiagnostics />)
+    fireEvent.change(screen.getByLabelText('Identity'), { target: { value: identity.credential_id } })
+    fireEvent.submit(screen.getByRole('button', { name: /Simulate/ }).closest('form')!)
+    const alert = await screen.findByRole('alert')
+    fireEvent.click(within(alert).getByRole('button', { name: 'Retry' }))
+
+    expect(await screen.findByText('Allowed')).toBeTruthy()
+    expect(api).toHaveBeenCalledTimes(2)
+  })
+
+  it('discards a delayed result when displayed inputs change', async () => {
+    const first = deferred<{ allowed: boolean; effect: string; matched_sid: string; evaluated_policies: number }>()
+    vi.mocked(api).mockReturnValueOnce(first.promise)
+    render(<PolicyDiagnostics />)
+    fireEvent.change(screen.getByLabelText('Identity'), { target: { value: identity.credential_id } })
+    fireEvent.submit(screen.getByRole('button', { name: /Simulate/ }).closest('form')!)
+
+    fireEvent.change(screen.getByLabelText('S3 action'), { target: { value: 's3:DeleteObject' } })
+    first.resolve({ allowed: true, effect: 'Allow', matched_sid: 'ReadObjects', evaluated_policies: 1 })
+
+    await waitFor(() => expect(screen.queryByText('Allowed')).toBeNull())
+    expect(screen.getByRole('button', { name: /Simulate/ })).toHaveProperty('disabled', false)
+  })
+
+  it('keeps the newest result when requests complete out of order', async () => {
+    const first = deferred<{ allowed: boolean; effect: string; matched_sid: string; evaluated_policies: number }>()
+    const second = deferred<{ allowed: boolean; effect: string; matched_sid: string; evaluated_policies: number }>()
+    vi.mocked(api).mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+    render(<PolicyDiagnostics />)
+    fireEvent.change(screen.getByLabelText('Identity'), { target: { value: identity.credential_id } })
+    fireEvent.submit(screen.getByRole('button', { name: /Simulate/ }).closest('form')!)
+    fireEvent.change(screen.getByLabelText('S3 action'), { target: { value: 's3:DeleteObject' } })
+    fireEvent.submit(screen.getByRole('button', { name: /Simulate/ }).closest('form')!)
+
+    second.resolve({ allowed: false, effect: 'ExplicitDeny', matched_sid: 'DenyDelete', evaluated_policies: 1 })
+    expect(await screen.findByText('Explicit deny')).toBeTruthy()
+    first.reject(new Error('stale request failed'))
+
+    await waitFor(() => expect(screen.queryByText('stale request failed')).toBeNull())
+    expect(screen.getByText('Explicit deny')).toBeTruthy()
   })
 
   it('removes condition input and renders a deny without an optional statement match', async () => {
