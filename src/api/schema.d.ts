@@ -577,6 +577,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/ui/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAdminOverview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/ui/identities": {
         parameters: {
             query?: never;
@@ -1543,6 +1559,16 @@ export interface components {
             /** @constant */
             max_page_size: 200;
         };
+        AdminOverviewSummary: {
+            /** Format: int64 */
+            identity_count: number;
+            /** Format: int64 */
+            bucket_routing_count: number;
+            /** Format: int64 */
+            backend_count: number;
+            /** Format: int64 */
+            policy_count: number;
+        };
         RotateCredentialSecretResponse: {
             /** Format: uuid */
             credential_id: string;
@@ -2338,9 +2364,10 @@ export interface operations {
     };
     listAdminBucketPolicies: {
         parameters: {
-            query?: {
+            query: {
                 after_key?: string;
                 limit?: number;
+                scope_kind: "direct" | "virtual";
             };
             header?: never;
             path?: never;
@@ -3524,6 +3551,28 @@ export interface operations {
             413: components["responses"]["ValidationRejected"];
             415: components["responses"]["ValidationRejected"];
             422: components["responses"]["ValidationRejected"];
+            default: components["responses"]["ControlError"];
+        };
+    };
+    getAdminOverview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authoritative control-plane resource counts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminOverviewSummary"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
             default: components["responses"]["ControlError"];
         };
     };

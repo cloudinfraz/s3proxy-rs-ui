@@ -39,7 +39,7 @@ test('UI069-03 keyboard navigation and unavailable capability states', async ({ 
   const verify = await mockControlApi(page)
   await page.route('**/admin/capabilities', route => route.fulfill({ json: { ...capabilities, sts_enabled: true } }))
   await page.goto('/admin/ui/')
-  await expect(page.getByText('AssumeRole configuration is incomplete')).toBeVisible()
+  await expect(page.getByText('Configuration readiness requires an authoritative backend summary.')).toBeVisible()
   await navigateTo(page, 'Temporary credentials')
   await expect(page.getByRole('heading', { name: 'AssumeRole partially configured' })).toBeVisible()
   await page.goBack()

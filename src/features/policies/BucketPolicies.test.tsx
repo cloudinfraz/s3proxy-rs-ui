@@ -65,7 +65,12 @@ describe('BucketPolicies', () => {
     const virtualScope = { kind: 'virtual' as const, bucket: 'reports', bucket_id: 'bucket-id', credential_id: 'credential-id' }
     const virtualSummary = { ...summary, scope: virtualScope }
     const virtualDetail = { ...detail, policy: virtualSummary }
-    mockQueries(query({ items: [summary, virtualSummary], next_after_key: null }), query(virtualDetail))
+    const directQuery = query({ items: [summary], next_after_key: null })
+    const virtualQuery = query({ items: [virtualSummary], next_after_key: null })
+    vi.mocked(useQuery).mockImplementation(options => {
+      if ((options as { enabled?: boolean }).enabled !== undefined) return query(virtualDetail) as never
+      return (JSON.stringify((options as { queryKey: unknown }).queryKey).includes('virtual') ? virtualQuery : directQuery) as never
+    })
     render(<BucketPolicies />)
 
     expect(screen.getByRole('button', { name: 'View Direct global bucket: reports' })).toBeTruthy()
@@ -89,5 +94,19 @@ describe('BucketPolicies', () => {
     expect(screen.getByText(/Resource is outside the bucket/)).toBeTruthy()
     expect(screen.queryByRole('dialog', { name: 'Confirm: edit bucket policy' })).toBeNull()
     expect(api).toHaveBeenCalledTimes(1)
+  })
+
+  it('requests the selected scope before server pagination', async () => {
+    vi.mocked(useQuery).mockImplementation(options => {
+      const queryOptions = options as unknown as { enabled?: boolean; queryFn: () => Promise<unknown> }
+      if (queryOptions.enabled !== undefined) return query(detail) as never
+      void queryOptions.queryFn()
+      return query({ items: [], next_after_key: null }) as never
+    })
+    vi.mocked(api).mockResolvedValue({ items: [], next_after_key: null })
+    render(<BucketPolicies />)
+    await waitFor(() => expect(api).toHaveBeenCalledWith('/admin/ui/bucket-policies?limit=100&scope_kind=direct'))
+    fireEvent.click(screen.getByRole('button', { name: 'Virtual scoped' }))
+    await waitFor(() => expect(api).toHaveBeenCalledWith('/admin/ui/bucket-policies?limit=100&scope_kind=virtual'))
   })
 })

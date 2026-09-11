@@ -91,12 +91,14 @@ function renderPage(initialEntry = '/buckets') {
 
 let mappingsQuery: QueryState<Schema['VirtualMappingPage']>
 let identitiesQuery: QueryState<Schema['IdentityProjection'][]>
+let identityOptionsQuery: QueryState<Schema['IdentityProjectionPage']>
 let backendsQuery: QueryState<Schema['StorageBackendProjection'][]>
 let capabilitiesQuery: QueryState<Schema['ControlCapabilities']>
 
 beforeEach(() => {
   mappingsQuery = state({ items: [summary], next_after_id: 'next-id' })
   identitiesQuery = state([identity])
+  identityOptionsQuery = state({ items: [identity], next_after_id: null, default_page_size: 100, max_page_size: 200 })
   backendsQuery = state([backend])
   capabilitiesQuery = state(capabilities)
   vi.mocked(api).mockReset()
@@ -104,6 +106,7 @@ beforeEach(() => {
   vi.mocked(useQuery).mockImplementation(options => {
     const key = (options as { queryKey: readonly unknown[] }).queryKey
     if (key[1] === 'buckets') return mappingsQuery as never
+    if (key[1] === 'identities' && key[2] === 'page') return identityOptionsQuery as never
     if (key[1] === 'identities') return identitiesQuery as never
     if (key[1] === 'backends') return backendsQuery as never
     return capabilitiesQuery as never

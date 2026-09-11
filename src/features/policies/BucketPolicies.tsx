@@ -13,11 +13,11 @@ export default function BucketPolicies() {
   const [kind, setKind] = useState<ScopeKind>('direct')
   const [cursors, setCursors] = useState<Array<string | null>>([null])
   const cursor = cursors[cursors.length - 1]
-  const list = useQuery({ queryKey: policyKeys.bucketList(cursor), queryFn: () => api<Schema['AdminBucketPolicyPage']>(`/admin/ui/bucket-policies?limit=100${cursor ? `&after_key=${encodeURIComponent(cursor)}` : ''}`) })
+  const list = useQuery({ queryKey: policyKeys.bucketList(kind, cursor), queryFn: () => api<Schema['AdminBucketPolicyPage']>(`/admin/ui/bucket-policies?limit=100&scope_kind=${kind}${cursor ? `&after_key=${encodeURIComponent(cursor)}` : ''}`) })
   const [scope, setScope] = useState<PolicyScope | null>(null)
-  const detail = useQuery({ queryKey: scope ? policyKeys.bucketDetail(scope) : policyKeys.bucketList('detail-disabled'), enabled: scope !== null, queryFn: () => api<BucketPolicyDetail>(bucketPolicyEndpoint(scope!)) })
+  const detail = useQuery({ queryKey: scope ? policyKeys.bucketDetail(scope) : policyKeys.bucketList(kind, 'detail-disabled'), enabled: scope !== null, queryFn: () => api<BucketPolicyDetail>(bucketPolicyEndpoint(scope!)) })
   const [operation, setOperation] = useState<'edit' | 'delete' | null>(null)
-  const rows = list.data?.items.filter(item => item.scope.kind === kind) ?? []
+  const rows = list.data?.items ?? []
   return <section className="policy-section" aria-labelledby="bucket-policy-title"><div className="section-heading"><div><h2 id="bucket-policy-title">Bucket policies</h2><p>Direct global and credential-scoped virtual policies are separate authorization scopes.</p></div><RefreshButton pending={list.isFetching || detail.isFetching} refresh={() => { void list.refetch(); if (scope) void detail.refetch() }} /></div>
     <div className="scope-switch" role="group" aria-label="Bucket policy scope"><button className={kind === 'direct' ? 'active' : ''} aria-pressed={kind === 'direct'} onClick={() => { setKind('direct'); setCursors([null]); setScope(null) }}>Direct global</button><button className={kind === 'virtual' ? 'active' : ''} aria-pressed={kind === 'virtual'} onClick={() => { setKind('virtual'); setCursors([null]); setScope(null) }}>Virtual scoped</button></div>
     <p className="policy-notice">{kind === 'direct' ? 'Direct policies authorize the global S3 bucket name.' : 'Virtual policies are isolated by stable virtual bucket and owning credential IDs.'} No action here changes Azure containers, blobs, or routing.</p>

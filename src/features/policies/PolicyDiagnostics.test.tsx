@@ -17,7 +17,8 @@ vi.mock('../../components/control', () => ({
 }))
 
 const identity = { credential_id: '11111111-1111-4111-8111-111111111111', s3_access_key: 'SIMULATOR_KEY' }
-beforeEach(() => vi.mocked(useQuery).mockReturnValue({ data: [identity], isError: false, refetch: vi.fn() } as never))
+const identityPage = { items: [identity], next_after_id: null }
+beforeEach(() => vi.mocked(useQuery).mockReturnValue({ data: identityPage, isError: false, isFetching: false, refetch: vi.fn() } as never))
 afterEach(() => { cleanup(); vi.resetAllMocks() })
 
 describe('PolicyDiagnostics', () => {
@@ -59,7 +60,7 @@ describe('PolicyDiagnostics', () => {
     expect(await screen.findByText('Allowed')).toBeTruthy()
     expect(screen.getByText(/Matched statement: ReadObjects/)).toBeTruthy()
     cleanup()
-    vi.mocked(useQuery).mockReturnValue({ data: [identity], isError: false, refetch: vi.fn() } as never)
+    vi.mocked(useQuery).mockReturnValue({ data: identityPage, isError: false, isFetching: false, refetch: vi.fn() } as never)
     vi.mocked(api).mockRejectedValueOnce(new ApiError(503, 'unavailable'))
     render(<PolicyDiagnostics />)
     fireEvent.change(screen.getByLabelText('Identity'), { target: { value: identity.credential_id } })

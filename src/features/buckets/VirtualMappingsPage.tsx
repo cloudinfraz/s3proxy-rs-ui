@@ -8,6 +8,7 @@ import { controlKeys, invalidateControl } from '../../api/query-keys'
 import { DataTable, DestructiveDialog, ErrorBanner, Modal, Page, RefreshButton } from '../../components/control'
 import { completionGuard } from '../operations/state'
 import { requestedMappingIdentity, virtualIdentityCreationPath } from '../identities/credential-mapping-workflow'
+import { IdentitySelectorPagination, useIdentitySelectorPage } from '../identities/identity-selector'
 import { createMappingPayload, draftError, effectiveTarget, mappingDraft, reviewedRoutingContext, updateMappingPayload, type Mapping, type MappingDraft, type RoutingContext } from './routing'
 import './buckets.css'
 
@@ -27,6 +28,7 @@ export default function VirtualMappingsPage() {
     return result
   } })
   const identities = useQuery(controlQueries.identities)
+  const identitySelector = useIdentitySelectorPage('virtual')
   const backends = useQuery(controlQueries.backends)
   const capabilities = useQuery(controlQueries.capabilities)
   const client = useQueryClient()
@@ -123,6 +125,7 @@ export default function VirtualMappingsPage() {
     return `${result.source}: ${result.account || 'Unavailable'} / ${value.container || 'Not set'}${result.blocked ? ` (${result.blocked})` : ''}`
   }
   const owner = identities.data?.find(item => item.credential_id === draft.owner)
+  const ownerOptions = identitySelector.query.data?.items ?? []
   const title = stale ? 'Mapping review expired' : review ? 'Confirm mapping change' : operation === 'create' ? 'Add bucket routing' : operation === 'edit' ? 'Edit mapping' : operation === 'delete' ? 'Remove mapping' : 'Mapping details'
   const update = (field: keyof MappingDraft, value: string | boolean) => setDraft(current => ({ ...current, [field]: value }))
   return <Page title="Bucket routing" action={<div className="page-actions"><RefreshButton pending={mappings.isFetching} refresh={() => { void mappings.refetch() }} /><Link className="mapping-create-identity" to={virtualIdentityCreationPath}><KeyRound size={17} /> Create virtual identity</Link><button className="primary" disabled={!context} onClick={() => { dismiss(); setDraft(mappingDraft()); setOperation('create') }}><Plus size={17} /> Add bucket routing</button></div>}>
@@ -141,7 +144,8 @@ export default function VirtualMappingsPage() {
         : (operation === 'create' || (operation === 'edit' && selected)) && !review ? <form className="operation-form" onSubmit={event => { void prepare(event) }}>
           <label>S3 bucket<input required value={draft.alias} readOnly={Boolean(selected)} onChange={event => update('alias', event.target.value)} /></label>
           <label>Azure container<input required value={draft.container} onChange={event => update('container', event.target.value)} /></label>
-          <label>Identity<select required disabled={Boolean(selected)} value={draft.owner} onChange={event => update('owner', event.target.value)}><option value="">Select virtual identity</option>{identities.data?.filter(item => item.access_mode === 'virtual').map(item => <option key={item.credential_id} value={item.credential_id} disabled={!item.enabled}>{item.s3_access_key}{!item.enabled ? ' (disabled)' : ''}</option>)}</select></label>
+          <label>Identity<select required disabled={Boolean(selected)} value={draft.owner} onChange={event => update('owner', event.target.value)}><option value="">Select virtual identity</option>{owner && !ownerOptions.some(item => item.credential_id === owner.credential_id) && <option value={owner.credential_id} disabled={!owner.enabled}>{owner.s3_access_key}{!owner.enabled ? ' (disabled)' : ''}</option>}{ownerOptions.map(item => <option key={item.credential_id} value={item.credential_id} disabled={!item.enabled}>{item.s3_access_key}{!item.enabled ? ' (disabled)' : ''}</option>)}</select></label>
+          {!selected && <IdentitySelectorPagination page={identitySelector.page} pending={identitySelector.query.isFetching} canPrevious={identitySelector.canPrevious} canNext={identitySelector.canNext} previous={() => { update('owner', ''); identitySelector.previous() }} next={() => { update('owner', ''); identitySelector.next() }} />}
           <label>Backend override<select value={draft.backend} disabled={!capabilities.data?.backend_routing_enabled} onChange={event => update('backend', event.target.value)}><option value="">Inherit identity default</option>{draft.backend && !backends.data?.some(item => item.id === draft.backend) && <option value={draft.backend}>Missing backend ({draft.backend})</option>}{backends.data?.map(item => <option key={item.id} value={item.id} disabled={!item.enabled || !capabilities.data?.usable_registry_auth_modes.includes(item.auth_mode)}>{item.name} / {item.azure_account}{!item.enabled ? ' (disabled)' : ''}</option>)}</select></label>
           <label>Endpoint prefix<input value={draft.prefix} onChange={event => update('prefix', event.target.value)} /></label>
           {selected && <label className="checkbox-field"><input type="checkbox" checked={draft.enabled} onChange={event => update('enabled', event.target.checked)} /> Enabled</label>}

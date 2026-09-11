@@ -15,6 +15,9 @@ export const health = {
 } satisfies components['schemas']['AdminHealthResponse']
 
 export const collections = {
+  '/admin/ui/overview': {
+    identity_count: 1, bucket_routing_count: 1, backend_count: 1, policy_count: 1,
+  } satisfies components['schemas']['AdminOverviewSummary'],
   '/admin/ui/virtual-buckets': {
     items: [{ id: fixtureId, virtual_bucket_name: 'fixture-bucket', azure_container: 'fixturecontainer', credential_id: fixtureId, backend_id: null, endpoint_prefix: null, enabled: true, created_at: timestamp, updated_at: timestamp }],
     next_after_id: null,
@@ -59,6 +62,7 @@ export const collections = {
 }
 
 export const emptyCollections = {
+  '/admin/ui/overview': { identity_count: 0, bucket_routing_count: 0, backend_count: 0, policy_count: 0 },
   '/admin/ui/virtual-buckets': { items: [], next_after_id: null },
   '/admin/credentials': { count: 0, items: [] },
   '/admin/ui/identities': { count: 0, items: [] },

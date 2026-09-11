@@ -102,6 +102,10 @@ async function mappingFixture(page: Page, empty = false) {
       { ...collections['/admin/ui/identities'].items[0], access_mode: 'virtual', credential_id: secondOwnerId, s3_access_key: 'second-owner', default_backend_id: ownerId },
       { ...collections['/admin/ui/identities'].items[0], credential_id: selectedBackend, s3_access_key: 'direct-owner' },
     ] } })
+    if (path === '/admin/ui/identity-pages' && method === 'GET') return route.fulfill({ json: { items: [
+      { ...collections['/admin/ui/identities'].items[0], access_mode: 'virtual', default_backend_id: ownerId },
+      { ...collections['/admin/ui/identities'].items[0], access_mode: 'virtual', credential_id: secondOwnerId, s3_access_key: 'second-owner', default_backend_id: ownerId },
+    ], next_after_id: null, default_page_size: 100, max_page_size: 200 } })
     if (path === '/admin/ui/backends' && method === 'GET') return route.fulfill({ json: { count: 2, items: [collections['/admin/ui/backends'].items[0], { ...collections['/admin/ui/backends'].items[0], id: selectedBackend, name: 'second-backend', azure_account: 'otheraccount' }] } })
     if (path === `/admin/ui/mapping-backends/${selectedBackend}` && method === 'GET') return route.fulfill({ json: { id: selectedBackend, azure_account: 'otheraccount', auth_mode: 'managed_identity', enabled: !flags.backendDisabled, revision: 7 } })
     if (path === '/admin/ui/virtual-buckets' && method === 'GET') return route.fulfill({ json: { items: rows, next_after_id: null } })
@@ -152,6 +156,7 @@ test('UI077-01 generates a virtual identity then creates and updates its bucket 
     const path = new URL(request.url()).pathname
     const method = request.method()
     if (path === '/admin/ui/identities' && method === 'GET') return route.fulfill({ json: { count: identity ? 1 : 0, items: identity ? [identity] : [] } })
+    if (path === '/admin/ui/identity-pages' && method === 'GET') return route.fulfill({ json: { items: identity ? [identity] : [], next_after_id: null, default_page_size: 100, max_page_size: 200 } })
     if (path === '/admin/ui/virtual-buckets' && method === 'GET') return route.fulfill({ json: { items: mapping ? [mapping] : [], next_after_id: null } })
     if (path === '/admin/credentials' && method === 'POST') {
       credentialRequests.push(request.postDataJSON())

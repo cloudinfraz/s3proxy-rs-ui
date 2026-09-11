@@ -22,7 +22,7 @@ const identityPageSize = 100
 
 export const controlQueries = {
   identities: queryOptions({ queryKey: controlKeys.list('identities'), queryFn: async () => envelopeRows(await api<Schema['IdentityProjectionListResponse']>('/admin/ui/identities')) }),
-  identityPage: (afterId: string | null, accessMode: 'direct' | null) => queryOptions({
+  identityPage: (afterId: string | null, accessMode: 'direct' | 'virtual' | null) => queryOptions({
     queryKey: controlKeys.identityPage(afterId, accessMode),
     queryFn: async () => {
       const response = await api<Schema['IdentityProjectionPage']>(`/admin/ui/identity-pages?limit=${identityPageSize}${afterId ? `&after_id=${encodeURIComponent(afterId)}` : ''}${accessMode ? `&access_mode=${accessMode}` : ''}`)
@@ -30,6 +30,7 @@ export const controlQueries = {
       return response
     },
   }),
+  overview: queryOptions({ queryKey: controlKeys.overview, queryFn: () => api<Schema['AdminOverviewSummary']>('/admin/ui/overview') }),
   policies: queryOptions({ queryKey: controlKeys.list('policies'), queryFn: async () => envelopeRows(await api<Schema['PolicyListResponse']>('/admin/policies')) }),
   buckets: queryOptions({ queryKey: controlKeys.list('buckets'), queryFn: async () => arrayRows(await api<Schema['VirtualBucketList']>('/admin/virtual-buckets')) }),
   backends: queryOptions({ queryKey: controlKeys.list('backends'), queryFn: async () => envelopeRows(await api<Schema['StorageBackendProjectionListResponse']>('/admin/ui/backends')) }),

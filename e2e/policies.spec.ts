@@ -179,8 +179,8 @@ async function identityFixture(page: Page) {
     const url = new URL(request.url())
     const path = url.pathname
     if (url.origin !== new URL(page.url()).origin) { unexpected.push(`external ${url.origin}`); return route.abort() }
-    if (path === '/admin/ui/identities' && request.method() === 'GET') {
-      const response = { count: 1, items: [{ ...collections['/admin/ui/identities'].items[0], credential_id: ownerA, s3_access_key: 'policy-owner', policy_attachment_count: attachments.length }] } satisfies components['schemas']['IdentityProjectionListResponse']
+    if (path === '/admin/ui/identity-pages' && request.method() === 'GET') {
+      const response = { items: [{ ...collections['/admin/ui/identities'].items[0], credential_id: ownerA, s3_access_key: 'policy-owner', policy_attachment_count: attachments.length }], next_after_id: null, default_page_size: 100, max_page_size: 200 } satisfies components['schemas']['IdentityProjectionPage']
       return route.fulfill({ json: response })
     }
     if (path === '/admin/ui/policies' && request.method() === 'GET') {
@@ -342,8 +342,8 @@ async function diagnosticsFixture(page: Page) {
       const response = { items: [], next_after_id: null, default_page_size: 100, max_page_size: 200 } satisfies PolicyPage
       return route.fulfill({ json: response })
     }
-    if (path === '/admin/ui/identities' && request.method() === 'GET') {
-      const response = { count: 1, items: [{ ...collections['/admin/ui/identities'].items[0], credential_id: ownerA, s3_access_key: 'policy-owner' }] } satisfies components['schemas']['IdentityProjectionListResponse']
+    if (path === '/admin/ui/identity-pages' && request.method() === 'GET') {
+      const response = { items: [{ ...collections['/admin/ui/identities'].items[0], credential_id: ownerA, s3_access_key: 'policy-owner' }], next_after_id: null, default_page_size: 100, max_page_size: 200 } satisfies components['schemas']['IdentityProjectionPage']
       return route.fulfill({ json: response })
     }
     if (path === '/admin/ui/policies/preflight' && request.method() === 'GET') {
