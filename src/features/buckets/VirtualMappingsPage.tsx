@@ -51,12 +51,14 @@ export default function VirtualMappingsPage() {
   const defaultBackendId = owner?.default_backend_id ?? selected?.credential_default_backend_id ?? ''
   const defaultBackendFromPage = backendSelector.query.data?.items.find(item => item.id === defaultBackendId)
   const defaultBackendQuery = useQuery({ ...controlQueries.backendOption(defaultBackendId), enabled: Boolean(defaultBackendId && !defaultBackendFromPage && defaultBackendId !== draft.backend) })
+  const backendMissing = backendQuery.error instanceof ApiError && backendQuery.error.status === 404
+  const defaultBackendMissing = defaultBackendQuery.error instanceof ApiError && defaultBackendQuery.error.status === 404
   const identities = [...(identitySelector.query.data?.items ?? []), ...[ownerQuery.data, requestedIdentityQuery.data].filter((item): item is Schema['IdentityProjection'] => Boolean(item))]
     .filter((item, index, items) => items.findIndex(candidate => candidate.credential_id === item.credential_id) === index)
   const backends = [...(backendSelector.query.data?.items ?? []), ...[backendQuery.data, defaultBackendQuery.data].filter((item): item is Schema['StorageBackendOption'] => Boolean(item))]
     .filter((item, index, items) => items.findIndex(candidate => candidate.id === item.id) === index)
   const contextPending = identitySelector.query.isPending || backendSelector.query.isPending || ownerQuery.isFetching || requestedIdentityQuery.isFetching || backendQuery.isFetching || defaultBackendQuery.isFetching
-  const context: RoutingContext | null = capabilities.data && !contextPending && !identitySelector.query.isError && !backendSelector.query.isError && !ownerQuery.isError && !requestedIdentityQuery.isError && !backendQuery.isError && !defaultBackendQuery.isError && !capabilities.isError
+  const context: RoutingContext | null = capabilities.data && !contextPending && !identitySelector.query.isError && !backendSelector.query.isError && !ownerQuery.isError && !requestedIdentityQuery.isError && (!backendQuery.isError || backendMissing) && (!defaultBackendQuery.isError || defaultBackendMissing) && !capabilities.isError
     ? reviewedRoutingContext({ identities, backends, capabilities: capabilities.data }, selected) : null
   useEffect(() => {
     if (!mappingIntent || !context || requestedIdentityQuery.isFetching || consumedMappingIntent.current === mappingIntent) return
@@ -143,7 +145,9 @@ export default function VirtualMappingsPage() {
   const title = stale ? 'Mapping review expired' : review ? 'Confirm mapping change' : operation === 'create' ? 'Add bucket routing' : operation === 'edit' ? 'Edit mapping' : operation === 'delete' ? 'Remove mapping' : 'Mapping details'
   const update = (field: keyof MappingDraft, value: string | boolean) => setDraft(current => ({ ...current, [field]: value }))
   return <Page title="Bucket routing" action={<div className="page-actions"><RefreshButton pending={mappings.isFetching} refresh={() => { void mappings.refetch() }} /><Link className="mapping-create-identity" to={virtualIdentityCreationPath}><KeyRound size={17} /> Create virtual identity</Link><button className="primary" disabled={!context} onClick={() => { dismiss(); setDraft(mappingDraft()); setOperation('create') }}><Plus size={17} /> Add bucket routing</button></div>}>
-    {[mappings, identitySelector.query, backendSelector.query, ownerQuery, requestedIdentityQuery, backendQuery, defaultBackendQuery, capabilities].map((query, index) => query.isError && <ErrorBanner key={index} error={query.error} retry={() => { void query.refetch() }} />)}
+    {[mappings, identitySelector.query, backendSelector.query, ownerQuery, requestedIdentityQuery, capabilities].map((query, index) => query.isError && <ErrorBanner key={index} error={query.error} retry={() => { void query.refetch() }} />)}
+    {backendQuery.isError && !backendMissing && <ErrorBanner error={backendQuery.error} retry={() => { void backendQuery.refetch() }} />}
+    {defaultBackendQuery.isError && !defaultBackendMissing && <ErrorBanner error={defaultBackendQuery.error} retry={() => { void defaultBackendQuery.refetch() }} />}
     {(!mappings.isError || mappings.data) && <DataTable rows={mappings.data?.items ?? []} rowKey={row => row.id} loading={mappings.isPending} columns={[
       { label: 'S3 bucket', value: row => row.virtual_bucket_name },
       { label: 'Container', value: row => row.azure_container },

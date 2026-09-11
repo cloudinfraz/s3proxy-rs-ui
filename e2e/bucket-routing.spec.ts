@@ -94,7 +94,7 @@ async function mappingFixture(page: Page, empty = false) {
   const nextToken = () => (token++).toString(16).padStart(32, '0')
   const initial: Mapping = { ...collections['/admin/ui/virtual-buckets'].items[0], credential_default_backend_id: ownerId, impact_token: nextToken() }
   let rows: Mapping[] = empty ? [] : [initial, { ...initial, id: secondOwnerId, credential_id: secondOwnerId, impact_token: nextToken() }]
-  const flags = { conflict: false, removalFailure: false, backendDisabled: false }
+  const flags = { conflict: false, removalFailure: false, backendDisabled: false, effectiveBackendDisabled: false }
   await page.route('**/*', async route => {
     const request = route.request()
     if (!['fetch', 'xhr'].includes(request.resourceType())) return route.fallback()
@@ -108,8 +108,8 @@ async function mappingFixture(page: Page, empty = false) {
     ], next_after_id: null, default_page_size: 100, max_page_size: 200 } })
     if (path === `/admin/ui/identities/${ownerId}` && method === 'GET') return route.fulfill({ json: { ...collections['/admin/ui/identities'].items[0], access_mode: 'virtual', default_backend_id: ownerId } })
     if (path === `/admin/ui/identities/${secondOwnerId}` && method === 'GET') return route.fulfill({ json: { ...collections['/admin/ui/identities'].items[0], access_mode: 'virtual', credential_id: secondOwnerId, s3_access_key: 'second-owner', default_backend_id: ownerId } })
-    if (path === '/admin/ui/backend-options' && method === 'GET') return route.fulfill({ json: { items: [collections['/admin/ui/backend-options'].items[0], { ...collections['/admin/ui/backend-options'].items[0], id: selectedBackend, name: 'second-backend', azure_account: 'otheraccount' }], next_after_id: null, default_page_size: 100, max_page_size: 200 } })
-    if (path === `/admin/ui/backend-options/${ownerId}` && method === 'GET') return route.fulfill({ json: collections['/admin/ui/backend-options'].items[0] })
+    if (path === '/admin/ui/backend-options' && method === 'GET') return route.fulfill({ json: { items: [{ ...collections['/admin/ui/backend-options'].items[0], enabled: !flags.effectiveBackendDisabled }, { ...collections['/admin/ui/backend-options'].items[0], id: selectedBackend, name: 'second-backend', azure_account: 'otheraccount' }], next_after_id: null, default_page_size: 100, max_page_size: 200 } })
+    if (path === `/admin/ui/backend-options/${ownerId}` && method === 'GET') return route.fulfill({ json: { ...collections['/admin/ui/backend-options'].items[0], enabled: !flags.effectiveBackendDisabled } })
     if (path === `/admin/ui/backend-options/${selectedBackend}` && method === 'GET') return route.fulfill({ json: { ...collections['/admin/ui/backend-options'].items[0], id: selectedBackend, name: 'second-backend', azure_account: 'otheraccount' } })
     if (path === `/admin/ui/mapping-backends/${selectedBackend}` && method === 'GET') return route.fulfill({ json: { id: selectedBackend, azure_account: 'otheraccount', auth_mode: 'managed_identity', enabled: !flags.backendDisabled, revision: 7 } })
     if (path === '/admin/ui/virtual-buckets' && method === 'GET') return route.fulfill({ json: { items: rows, next_after_id: null } })
@@ -317,6 +317,25 @@ test('UI072-02 unavailable selections and stale review cannot silently persist',
   await expect(page.getByRole('dialog').or(page.getByRole('alertdialog'))).toHaveCount(0)
   expect(fixture.requests).toHaveLength(2)
   expect(fixture.rows()[0].azure_container).toBe('after-reload')
+  fixture.verify()
+})
+
+test('UI072-06 disables a mapping without changing its unavailable route', async ({ page }) => {
+  const fixture = await mappingFixture(page)
+  fixture.flags.effectiveBackendDisabled = true
+  await page.goto('/admin/ui/buckets')
+  await page.getByRole('button', { name: 'Edit fixture-bucket', exact: true }).first().click()
+  await expect(page.getByText(/Selected backend is disabled/)).toBeVisible()
+  await page.getByRole('checkbox', { name: 'Enabled', exact: true }).uncheck()
+  await page.getByRole('button', { name: 'Review changes', exact: true }).click()
+  await page.getByRole('button', { name: 'Confirm change', exact: true }).click()
+
+  expect(fixture.requests).toEqual([{ method: 'PUT', id: ownerId, body: {
+    expected_impact_token: '1'.padStart(32, '0'),
+    enabled: false,
+  } }])
+  expect(fixture.rows()[0].enabled).toBe(false)
+  expect(fixture.rows()[0].backend_id).toBeNull()
   fixture.verify()
 })
 

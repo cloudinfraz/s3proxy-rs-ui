@@ -210,6 +210,22 @@ describe('VirtualMappingsPage', () => {
     }))
   })
 
+  it('allows disable-only review when the effective backend is confirmed missing', async () => {
+    const missingBackendMapping = { ...mapping, backend_id: 'missing-backend' }
+    backendOptionsQuery = state({ items: [], next_after_id: null, default_page_size: 100, max_page_size: 200 })
+    backendQuery = state<Schema['StorageBackendOption']>(undefined, { isError: true, error: new ApiError(404, 'missing backend') })
+    vi.mocked(api).mockResolvedValueOnce(missingBackendMapping)
+    renderPage()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit photos' }))
+    await screen.findByDisplayValue('photos-container')
+    fireEvent.click(screen.getByLabelText('Enabled'))
+    fireEvent.click(screen.getByRole('button', { name: 'Review changes' }))
+
+    expect(await screen.findByRole('dialog', { name: 'Confirm mapping change' })).toBeTruthy()
+    expect(screen.queryByText('missing backend')).toBeNull()
+  })
+
   it('requires authoritative reload after a stale mapping edit', async () => {
     vi.mocked(api)
       .mockResolvedValueOnce(mapping)

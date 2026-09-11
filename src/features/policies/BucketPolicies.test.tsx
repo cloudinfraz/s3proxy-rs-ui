@@ -20,6 +20,8 @@ vi.mock('../../components/control', () => ({
 const scope = { kind: 'direct' as const, bucket: 'reports' }
 const summary = { scope, revision: 4, updated_at: '2026-01-01T00:00:00Z', review_token: 'review-token' }
 const detail = { policy: summary, document: { Version: '2012-10-17', Statement: [] } }
+const validation = { valid: true, violations: [], json_bytes: 80, statements: 1, compiled_bytes: 40 }
+function deferred<T>() { let resolve!: (value: T) => void; const promise = new Promise<T>(resolvePromise => { resolve = resolvePromise }); return { promise, resolve } }
 const query = (data?: unknown, overrides: Record<string, unknown> = {}) => ({ data, isError: false, isPending: false, isFetching: false, error: null, refetch: vi.fn(), ...overrides })
 function mockQueries(listQuery: ReturnType<typeof query>, detailQuery = query(detail)) {
   vi.mocked(useQuery).mockImplementation(options => ((options as { enabled?: boolean }).enabled === undefined ? listQuery : detailQuery) as never)
@@ -108,5 +110,55 @@ describe('BucketPolicies', () => {
     await waitFor(() => expect(api).toHaveBeenCalledWith('/admin/ui/bucket-policies?limit=100&scope_kind=direct'))
     fireEvent.click(screen.getByRole('button', { name: 'Virtual scoped' }))
     await waitFor(() => expect(api).toHaveBeenCalledWith('/admin/ui/bucket-policies?limit=100&scope_kind=virtual'))
+  })
+
+  it('keeps next and previous cursors inside their selected scope', async () => {
+    vi.mocked(useQuery).mockImplementation(options => {
+      const queryOptions = options as unknown as { enabled?: boolean; queryKey: readonly unknown[]; queryFn: () => Promise<unknown> }
+      if (queryOptions.enabled !== undefined) return query(detail) as never
+      void queryOptions.queryFn()
+      const cursor = queryOptions.queryKey.at(-1) as { kind: string; afterKey: string | null }
+      return query({ items: [], next_after_key: cursor.kind === 'direct' && cursor.afterKey === null ? 'direct-cursor' : null }) as never
+    })
+    vi.mocked(api).mockResolvedValue({ items: [], next_after_key: null })
+    render(<BucketPolicies />)
+    await waitFor(() => expect(api).toHaveBeenCalledWith('/admin/ui/bucket-policies?limit=100&scope_kind=direct'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next bucket policy page' }))
+    await waitFor(() => expect(api).toHaveBeenCalledWith('/admin/ui/bucket-policies?limit=100&scope_kind=direct&after_key=direct-cursor'))
+    fireEvent.click(screen.getByRole('button', { name: 'Previous bucket policy page' }))
+    await waitFor(() => expect(vi.mocked(api).mock.calls.filter(([url]) => url === '/admin/ui/bucket-policies?limit=100&scope_kind=direct')).toHaveLength(2))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next bucket policy page' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Virtual scoped' }))
+    await waitFor(() => expect(api).toHaveBeenCalledWith('/admin/ui/bucket-policies?limit=100&scope_kind=virtual'))
+    expect(vi.mocked(api).mock.calls.some(([url]) => String(url).includes('scope_kind=virtual&after_key='))).toBe(false)
+  })
+
+  it('requires revalidation after a bucket policy changes during validation', async () => {
+    const staleValidation = deferred<typeof validation>()
+    mockQueries(query({ items: [summary], next_after_key: null }))
+    vi.mocked(api)
+      .mockReturnValueOnce(staleValidation.promise)
+      .mockResolvedValueOnce(validation)
+      .mockResolvedValueOnce(detail)
+      .mockResolvedValueOnce({ detail })
+    render(<BucketPolicies />)
+    fireEvent.click(screen.getByRole('button', { name: 'View Direct global bucket: reports' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Edit policy' }))
+    const editor = screen.getByLabelText('Policy document')
+    fireEvent.change(editor, { target: { value: JSON.stringify({ Version: '2012-10-17', Statement: [{ Action: 's3:GetObject' }] }) } })
+    fireEvent.submit(screen.getByRole('button', { name: 'Review change' }).closest('form')!)
+    fireEvent.change(editor, { target: { value: JSON.stringify({ Version: '2012-10-17', Statement: [{ Action: 's3:DeleteObject' }] }) } })
+    staleValidation.resolve(validation)
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Confirm: edit bucket policy' })).toBeNull())
+    fireEvent.submit(screen.getByRole('button', { name: 'Review change' }).closest('form')!)
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirm change' }))
+
+    await waitFor(() => expect(api).toHaveBeenLastCalledWith('/admin/ui/bucket-policies/direct/reports', expect.objectContaining({
+      body: expect.stringContaining('s3:DeleteObject'),
+    })))
+    expect(vi.mocked(api).mock.calls.at(-1)?.[1]?.body).not.toContain('s3:GetObject')
   })
 })

@@ -260,6 +260,7 @@ async function bucketFixture(page: Page) {
     [`/admin/ui/bucket-policies/virtual/${virtualB}`, { policy: { scope: scopeB, revision: 3, updated_at: timestamp, review_token: 'b'.repeat(64) }, document: denyDocument }],
   ])
   const requests: string[] = []
+  const listRequests: string[] = []
   const unexpected: string[] = []
   await page.route('**/*', async route => {
     const request = route.request()
@@ -272,7 +273,10 @@ async function bucketFixture(page: Page) {
       return route.fulfill({ json: response })
     }
     if (path === '/admin/ui/bucket-policies' && request.method() === 'GET') {
-      const response = { items: [...details.values()].map(item => item.policy), next_after_key: null, default_page_size: 100, max_page_size: 200 } satisfies BucketPage
+      const scopeKind = url.searchParams.get('scope_kind')
+      listRequests.push(url.search)
+      if (scopeKind !== 'direct' && scopeKind !== 'virtual') { unexpected.push(`invalid scope ${scopeKind}`); return route.abort() }
+      const response = { items: [...details.values()].map(item => item.policy).filter(policy => policy.scope.kind === scopeKind), next_after_key: null, default_page_size: 100, max_page_size: 200 } satisfies BucketPage
       return route.fulfill({ json: response })
     }
     if (path === '/admin/ui/policies/validate' && request.method() === 'POST') return route.fulfill({ json: { valid: true, violations: [], json_bytes: 128, statements: 1, compiled_bytes: 96 } satisfies components['schemas']['AdminPolicyDraftValidationResponse'] })
@@ -294,7 +298,7 @@ async function bucketFixture(page: Page) {
     if (request.method() === 'DELETE') { details.delete(path); return route.fulfill({ json: { changed: true, deleted: true, detail: null } satisfies components['schemas']['AdminBucketPolicyMutationResult'] }) }
     unexpected.push(`${request.method()} ${path}`); return route.abort()
   })
-  return { requests, verify() { expect(unexpected).toEqual([]); verifyControl() } }
+  return { requests, listRequests, verify() { expect(unexpected).toEqual([]); verifyControl() } }
 }
 
 test('UI075-03 direct/virtual owner scopes isolate aliases and reviewed mutations stay metadata-only', async ({ page }) => {
@@ -321,6 +325,8 @@ test('UI075-03 direct/virtual owner scopes isolate aliases and reviewed mutation
   await page.getByRole('alertdialog').getByRole('button', { name: /^Delete / }).click()
   expect(state.requests.some(request => request === 'PUT /admin/ui/bucket-policies/direct/shared-alias')).toBe(true)
   expect(state.requests.some(request => request === `DELETE /admin/ui/bucket-policies/virtual/${virtualB}`)).toBe(true)
+  expect(state.listRequests.some(search => search.includes('scope_kind=direct'))).toBe(true)
+  expect(state.listRequests.some(search => search.includes('scope_kind=virtual'))).toBe(true)
   await assertBrowserBoundary(page)
   state.verify()
 })
@@ -387,12 +393,16 @@ test('UI075-04 bounded preflight and simulator decisions fail closed then retry/
   await expect(page.getByRole('status').filter({ hasText: 'Explicit deny' })).toContainText('Matched statement: DenyDelete')
   await page.getByRole('button', { name: 'Simulate' }).click()
   await expect(page.getByRole('status').filter({ hasText: 'Implicit deny' })).toContainText('No matching statement ID')
+  await page.getByLabel('S3 action').fill('s3:DeleteObject')
   state.failSimulation()
   await page.getByRole('button', { name: 'Simulate' }).click()
   const alert = page.getByRole('alert')
   await expect(alert).toContainText('Simulation failed closed')
   await alert.getByRole('button', { name: 'Retry' }).click()
-  await expect(page.getByRole('status').filter({ hasText: 'Implicit deny' })).toContainText('3 persisted policies evaluated')
+  const retriedResult = page.getByRole('status').filter({ hasText: 'Implicit deny' })
+  await expect(retriedResult).toContainText('3 persisted policies evaluated')
+  await expect(retriedResult).toContainText('Evaluated action: s3:DeleteObject')
+  expect(state.requests.slice(-2).map(request => request.action)).toEqual(['s3:DeleteObject', 's3:DeleteObject'])
   expect(state.requests.every(request => request.credential_id === ownerA && request.resource === 'arn:aws:s3:::bucket/key')).toBe(true)
   await assertBrowserBoundary(page)
   state.verify()

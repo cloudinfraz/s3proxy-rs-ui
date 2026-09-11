@@ -18,6 +18,8 @@ vi.mock('../../components/control', () => ({
 
 const summary = { id: 'policy-id', name: 'ReadOnly', description: 'read access', revision: 2, built_in: false, deletable: true, credential_attachment_count: 1, role_attachment_count: 0, updated_at: '2026-01-01T00:00:00Z' }
 const detail = { policy: summary, document: { Version: '2012-10-17', Statement: [] }, impact_token: 'impact' }
+const validation = { valid: true, violations: [], json_bytes: 80, statements: 1, compiled_bytes: 40 }
+function deferred<T>() { let resolve!: (value: T) => void; const promise = new Promise<T>(resolvePromise => { resolve = resolvePromise }); return { promise, resolve } }
 function renderView() { const client = new QueryClient({ defaultOptions: { queries: { retry: false } } }); return render(<QueryClientProvider client={client}><ManagedPolicies /></QueryClientProvider>) }
 afterEach(() => { cleanup(); vi.resetAllMocks() })
 
@@ -77,5 +79,50 @@ describe('ManagedPolicies', () => {
     expect(screen.getByText(/Unsupported action/)).toBeTruthy()
     expect(screen.getByRole('dialog', { name: 'Create managed policy' })).toBeTruthy()
     expect(api).toHaveBeenCalledTimes(2)
+  })
+
+  it('requires revalidation after a managed create draft changes during validation', async () => {
+    const staleValidation = deferred<typeof validation>()
+    vi.mocked(api)
+      .mockResolvedValueOnce({ items: [], next_after_id: null, max_page_size: 100 })
+      .mockReturnValueOnce(staleValidation.promise)
+      .mockResolvedValueOnce(validation)
+      .mockResolvedValueOnce(detail)
+    renderView()
+    fireEvent.click(await screen.findByRole('button', { name: /Create policy/ }))
+    fireEvent.change(screen.getByLabelText('Policy name'), { target: { value: 'ReadOnly' } })
+    const editor = screen.getByLabelText('Policy document')
+    fireEvent.change(editor, { target: { value: JSON.stringify({ Version: '2012-10-17', Statement: [{ Action: 's3:GetObject' }] }) } })
+    fireEvent.submit(screen.getByRole('button', { name: 'Review change' }).closest('form')!)
+    fireEvent.change(editor, { target: { value: JSON.stringify({ Version: '2012-10-17', Statement: [{ Action: 's3:DeleteObject' }] }) } })
+    staleValidation.resolve(validation)
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Confirm: Create managed policy' })).toBeNull())
+    fireEvent.submit(screen.getByRole('button', { name: 'Review change' }).closest('form')!)
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirm change' }))
+
+    await waitFor(() => expect(api).toHaveBeenLastCalledWith('/admin/ui/policies', expect.objectContaining({
+      body: expect.stringContaining('s3:DeleteObject'),
+    })))
+    expect(vi.mocked(api).mock.calls.at(-1)?.[1]?.body).not.toContain('s3:GetObject')
+  })
+
+  it('discards a delayed managed edit validation after the document changes', async () => {
+    const staleValidation = deferred<typeof validation>()
+    vi.mocked(api)
+      .mockResolvedValueOnce({ items: [summary], next_after_id: null, max_page_size: 100 })
+      .mockResolvedValueOnce(detail)
+      .mockReturnValueOnce(staleValidation.promise)
+    renderView()
+    fireEvent.click(await screen.findByRole('button', { name: 'View ReadOnly' }))
+    await screen.findByText('read access')
+    fireEvent.click(screen.getByRole('button', { name: 'Edit policy' }))
+    const editor = screen.getByLabelText('Policy document')
+    fireEvent.submit(screen.getByRole('button', { name: 'Review change' }).closest('form')!)
+    fireEvent.change(editor, { target: { value: JSON.stringify({ Version: '2012-10-17', Statement: [{ Action: 's3:DeleteObject' }] }) } })
+    staleValidation.resolve(validation)
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Confirm: Edit ReadOnly' })).toBeNull())
+    expect(api).toHaveBeenCalledTimes(3)
   })
 })

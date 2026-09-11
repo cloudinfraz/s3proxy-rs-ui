@@ -39,6 +39,12 @@ export function draftError(draft: MappingDraft, context: RoutingContext, existin
   const owner = context.identities.find(identity => identity.credential_id === draft.owner)
   if (owner?.access_mode !== 'virtual') return 'Select a virtual identity.'
   if (draft.backend && !context.capabilities.backend_routing_enabled && draft.backend !== existing?.backend_id) return 'Backend routing is disabled.'
+  const disableOnly = existing?.enabled === true
+    && !draft.enabled
+    && draft.container === existing.azure_container
+    && draft.backend === (existing.backend_id ?? '')
+    && draft.prefix === (existing.endpoint_prefix ?? '')
+  if (disableOnly) return undefined
   return effectiveTarget(owner, draft.backend || null, context).blocked
 }
 

@@ -47,6 +47,20 @@ describe('mapping payloads', () => {
     expect(draftError({ ...mappingDraft(mapping), alias: 'another-alias' }, context, mapping)).toContain('cannot change')
     expect(draftError({ ...mappingDraft(mapping), owner: 'another-owner' }, context, mapping)).toContain('cannot change')
   })
+  it('allows only an unchanged disable transition when routing is unavailable', () => {
+    const unavailable = { ...context, backends: context.backends.map(item => ({ ...item, enabled: false })) }
+    const disableOnly = { ...mappingDraft(mapping), enabled: false }
+    for (const blocked of [
+      unavailable,
+      { ...context, backends: context.backends.filter(item => item.id !== mapping.backend_id) },
+      { ...context, backends: context.backends.map(item => item.id === mapping.backend_id ? { ...item, auth_mode: 'account_key' as const } : item) },
+      { ...context, identities: [{ ...identity, enabled: false }] },
+    ]) expect(draftError(disableOnly, blocked, mapping)).toBeUndefined()
+    expect(draftError({ ...disableOnly, container: 'changed-container' }, unavailable, mapping)).toContain('disabled')
+    expect(draftError({ ...disableOnly, backend: 'default' }, unavailable, mapping)).toContain('disabled')
+    expect(draftError({ ...disableOnly, prefix: 'changed' }, unavailable, mapping)).toContain('disabled')
+    expect(draftError(disableOnly, { ...unavailable, identities: [{ ...identity, access_mode: 'direct' }] }, mapping)).toContain('virtual')
+  })
 })
 
 it('produces escaped list-only templates with default signing and TLS', () => {
