@@ -1,7 +1,7 @@
 {
   "name": "s3proxy-rs-ui",
   "private": true,
-  "version": "0.6.4",
+  "version": "0.6.5",
   "description": "Standalone administration UI for s3proxy-rs",
   "license": "MIT",
   "repository": {
