@@ -47,7 +47,7 @@ test('UI068-06 malformed envelopes fail visibly instead of appearing empty', asy
   await mockControlApi(page)
   await page.route('**/admin/ui/identity-pages?*', route => route.fulfill({ json: { next_after_id: null } }))
   await page.goto('/admin/ui/credentials')
-  await expect(page.getByText('Invalid identity page response', { exact: true })).toBeVisible()
+  await expect(page.getByText('The control service returned an invalid response.', { exact: true })).toBeVisible()
   await expect(page.getByText('No records', { exact: true })).toHaveCount(0)
   await page.unroute('**/admin/ui/identity-pages?*')
   await page.reload()

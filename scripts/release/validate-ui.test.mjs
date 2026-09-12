@@ -11,7 +11,7 @@ const expectedCommands = [
   'npm ci --ignore-scripts --registry=https://registry.npmjs.org/',
   'npm audit --audit-level=high --registry=https://registry.npmjs.org/',
   'npm run generate:api',
-  'git diff --exit-code -- src/api/schema.d.ts',
+  'git diff --exit-code -- src/api/schema.d.ts src/api/generated',
   'npm run lint', 'npm test', 'npm run test:deploy', 'npm run test:release',
   'npm run build', 'npx playwright install --with-deps chromium', 'npm run test:e2e',
 ]

@@ -10,7 +10,7 @@ actual="$(sha256sum contracts/admin-openapi.json | awk '{print $1}')"
   exit 1
 }
 npm run generate:api
-git diff --exit-code -- src/api/schema.d.ts
+git diff --exit-code -- src/api/schema.d.ts src/api/generated
 npm run lint
 npm test
 npm run test:deploy

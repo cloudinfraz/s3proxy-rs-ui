@@ -2,8 +2,9 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router'
 import { ChevronLeft, ChevronRight, Eye, KeyRound, Pencil, Plus, Trash2 } from 'lucide-react'
-import { api, ApiError } from '../../api/client'
+import { ApiError } from '../../api/client'
 import { controlQueries, type Schema } from '../../api/control'
+import { invokeOperation } from '../../api/operations'
 import { controlKeys, invalidateControl } from '../../api/query-keys'
 import { DataTable, DestructiveDialog, ErrorBanner, Modal, Page, RefreshButton } from '../../components/control'
 import { BackendSelectorPagination, useBackendSelectorPage } from '../backends/backend-selector'
@@ -23,8 +24,8 @@ export default function VirtualMappingsPage() {
   const requestedIdentityId = requestedMappingIdentity(searchParams)
   const [cursors, setCursors] = useState<Array<string | null>>([null])
   const cursor = cursors[cursors.length - 1]
-  const mappings = useQuery({ queryKey: [...controlKeys.list('buckets'), 'page', cursor], queryFn: async () => {
-    const result = await api<Schema['VirtualMappingPage']>(`/admin/ui/virtual-buckets?limit=100${cursor ? `&after_id=${encodeURIComponent(cursor)}` : ''}`)
+  const mappings = useQuery({ queryKey: [...controlKeys.list('buckets'), 'page', cursor], queryFn: async ({ signal }) => {
+    const result = await invokeOperation('listVirtualMappings', { parameters: { query: { limit: 100, after_id: cursor ?? undefined } }, signal })
     if (!result || !Array.isArray(result.items) || result.items.length > 100 || !(result.next_after_id === null || typeof result.next_after_id === 'string')) throw new Error('Invalid mapping page response')
     return result
   } })
@@ -91,7 +92,7 @@ export default function VirtualMappingsPage() {
     dismiss(); setOperation(kind)
     const request = guard.current.begin(); setPending(true)
     try {
-      const current = await api<Mapping>(`/admin/ui/virtual-buckets/${encodeURIComponent(id)}`)
+      const current = await invokeOperation('getVirtualMapping', { parameters: { path: { id } } })
       if (!guard.current.current(request)) return
       setSelected(current); setDraft(mappingDraft(current))
     } catch (cause) { report(cause, request) }
@@ -108,7 +109,7 @@ export default function VirtualMappingsPage() {
       let revision: number | undefined
       let reviewedContext = context
       if (draft.backend && draft.backend !== selected?.backend_id) {
-        const backend = await api<Schema['VirtualMappingBackendReview']>(`/admin/ui/mapping-backends/${encodeURIComponent(draft.backend)}`)
+        const backend = await invokeOperation('reviewMappingBackend', { parameters: { path: { id: draft.backend } } })
         if (backend.id !== draft.backend || !backend.enabled || !context.capabilities.usable_registry_auth_modes.includes(backend.auth_mode as Schema['BackendAuthMode'])) throw new Error('Selected backend is unavailable')
         revision = backend.revision
         reviewedContext = { ...context, backends: context.backends.map(item => item.id === backend.id ? { ...item, azure_account: backend.azure_account } : item) }
@@ -123,11 +124,10 @@ export default function VirtualMappingsPage() {
     const request = guard.current.begin(); setPending(true); setError(null)
     try {
       if (operation === 'delete' && selected) {
-        await api(`/admin/ui/virtual-buckets/${encodeURIComponent(selected.id)}`, { method: 'DELETE', body: JSON.stringify({ expected_impact_token: selected.impact_token } satisfies Schema['DeleteVirtualMapping']) })
+        await invokeOperation('deleteVirtualMapping', { parameters: { path: { id: selected.id } }, body: { expected_impact_token: selected.impact_token } })
       } else if (review) {
-        await api<Mapping>(selected ? `/admin/ui/virtual-buckets/${encodeURIComponent(selected.id)}` : '/admin/ui/virtual-buckets', {
-          method: selected ? 'PUT' : 'POST', body: JSON.stringify(selected ? updateMappingPayload(review.draft, selected, review.revision) : createMappingPayload(review.draft, review.revision)),
-        })
+        if (selected) await invokeOperation('updateVirtualMapping', { parameters: { path: { id: selected.id } }, body: updateMappingPayload(review.draft, selected, review.revision) })
+        else await invokeOperation('createVirtualMapping', { body: createMappingPayload(review.draft, review.revision) })
       }
       await invalidateControl(client)
       if (guard.current.current(request)) { dismiss(); setCursors([null]) }

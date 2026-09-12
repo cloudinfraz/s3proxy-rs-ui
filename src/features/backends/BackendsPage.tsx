@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Eye, Pencil, Plus, Trash2 } from 'lucide-react'
-import { api, ApiError } from '../../api/client'
+import { ApiError } from '../../api/client'
 import { controlQueries, type Schema } from '../../api/control'
+import { invokeOperation } from '../../api/operations'
 import { invalidateControl } from '../../api/query-keys'
 import { DataTable, DestructiveDialog, ErrorBanner, Modal, Page, RefreshButton } from '../../components/control'
 import { completionGuard } from '../operations/state'
@@ -58,12 +59,14 @@ export default function BackendsPage() {
     setPending(true)
     setError(null)
     try {
-      await api<Schema['StorageBackendResponse']>(existing
-        ? `/admin/ui/backends/${encodeURIComponent(existing.name)}`
-        : '/admin/ui/backends', {
-        method: existing ? 'PUT' : 'POST',
-        body: JSON.stringify(existing ? reviewedBackendPayload(payload, existing) : payload),
-      })
+      if (existing) {
+        await invokeOperation('updateBackendForUi', {
+          parameters: { path: { name: existing.name } },
+          body: reviewedBackendPayload(payload, existing),
+        })
+      } else {
+        await invokeOperation('createBackendForUi', { body: payload })
+      }
       await invalidateControl(queryClient)
       if (guard.current.current(request)) dismiss()
     } catch (cause) {
@@ -78,7 +81,7 @@ export default function BackendsPage() {
     const request = guard.current.begin()
     setPending(true)
     try {
-      const current = await api<Backend>(`/admin/ui/backends/${encodeURIComponent(action.backend.name)}`)
+      const current = await invokeOperation('getBackendProjection', { parameters: { path: { name: action.backend.name } } })
       if (!guard.current.current(request)) return
       setAction({ backend: current, kind: 'edit' })
       setFormAuthMode(current.auth_mode)
@@ -118,7 +121,7 @@ export default function BackendsPage() {
     setPending(true)
     setError(null)
     try {
-      await api(`/admin/backends/${encodeURIComponent(action.backend.name)}`, { method: 'DELETE' })
+      await invokeOperation('deleteBackend', { parameters: { path: { name: action.backend.name } } })
       await invalidateControl(queryClient)
       if (guard.current.current(request)) dismiss()
     } catch (cause) { report(cause, 'Backend deletion', request) }

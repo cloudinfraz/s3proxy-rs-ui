@@ -2,15 +2,18 @@
 import type { ReactNode } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { useQuery } from '@tanstack/react-query'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { api, ApiError } from '../../api/client'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
+import { ApiError } from '../../api/client'
+import { invokeOperation } from '../../api/operations'
 import PolicyDiagnostics from './PolicyDiagnostics'
 
 vi.mock('@tanstack/react-query', async importOriginal => ({ ...(await importOriginal<typeof import('@tanstack/react-query')>()), useQuery: vi.fn() }))
 vi.mock('../../api/client', async importOriginal => ({
   ...await importOriginal<typeof import('../../api/client')>(),
-  api: vi.fn(),
 }))
+vi.mock('../../api/operations', () => ({ invokeOperation: vi.fn() }))
+const api = invokeOperation as unknown as Mock<(operationId: string, input?: OperationMockInput) => Promise<unknown>>
+type OperationMockInput = { parameters?: { path?: Record<string, string>; query?: Record<string, unknown> }; body?: unknown; signal?: AbortSignal }
 vi.mock('../../components/control', () => ({
   ErrorBanner: ({ error, retry }: { error: Error; retry?: () => void }) => <div role="alert">{error.message}{retry && <button onClick={retry}>Retry</button>}</div>,
   DataTable: ({ rows, columns }: { rows: unknown[]; columns: Array<{ label: string; value: (row: never) => ReactNode }> }) => <div>{rows.map((row, index) => <div key={index}>{columns.map(column => <span key={column.label}>{column.value(row as never)}</span>)}</div>)}</div>,
@@ -90,7 +93,7 @@ describe('PolicyDiagnostics', () => {
     fireEvent.click(within(alert).getByRole('button', { name: 'Retry' }))
     expect(await screen.findByText('Explicit deny')).toBeTruthy()
 
-    expect(vi.mocked(api).mock.calls.map(([, options]) => JSON.parse(String(options?.body)))).toEqual([
+    expect(vi.mocked(api).mock.calls.map(([, options]) => options?.body)).toEqual([
       expect.objectContaining({ action: 's3:GetObject' }),
       expect.objectContaining({ action: 's3:DeleteObject' }),
       expect.objectContaining({ action: 's3:DeleteObject' }),

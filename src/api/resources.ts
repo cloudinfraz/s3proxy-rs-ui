@@ -1,4 +1,4 @@
-import { api } from './client'
+import { invokeOperation } from './operations'
 import type { paths } from './schema'
 
 type CredentialList = paths['/admin/credentials']['get']['responses']['200']['content']['application/json']
@@ -34,7 +34,10 @@ export function normalizeResourceRows<P extends ResourceListPath>(
   return rows.map(row => ({ ...row }))
 }
 
-export async function fetchResourceRows<P extends ResourceListPath>(path: P): Promise<ResourceRow[]> {
-  const response = await api<ResourceListResponses[P]>(path)
-  return normalizeResourceRows(path, response)
+export async function fetchResourceRows<P extends ResourceListPath>(path: P, signal?: AbortSignal): Promise<ResourceRow[]> {
+  if (path === '/admin/credentials') return normalizeResourceRows('/admin/credentials', await invokeOperation('listCredentials', { signal }))
+  if (path === '/admin/virtual-buckets') return normalizeResourceRows('/admin/virtual-buckets', await invokeOperation('listVirtualBuckets', { signal }))
+  if (path === '/admin/backends') return normalizeResourceRows('/admin/backends', await invokeOperation('listBackends', { signal }))
+  if (path === '/admin/policies') return normalizeResourceRows('/admin/policies', await invokeOperation('listPolicies', { signal }))
+  return normalizeResourceRows('/admin/api-keys', await invokeOperation('listAdminKeys', { signal }))
 }

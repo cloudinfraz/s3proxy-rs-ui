@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, Eye, Pencil, Plus, Trash2 } from 'lucide-react'
-import { api, ApiError } from '../../api/client'
+import { ApiError } from '../../api/client'
 import type { Schema } from '../../api/control'
+import { invokeOperation } from '../../api/operations'
 import { invalidateControl } from '../../api/query-keys'
 import { DataTable, DestructiveDialog, DialogFlow, ErrorBanner, Modal, RefreshButton } from '../../components/control'
 import { completionGuard } from '../operations/state'
@@ -18,13 +19,13 @@ export default function ManagedPolicies() {
   const createButton = useRef<HTMLButtonElement>(null)
   const [cursors, setCursors] = useState<Array<string | null>>([null])
   const cursor = cursors[cursors.length - 1]
-  const policies = useQuery({ queryKey: policyKeys.managedList(cursor), queryFn: async () => {
-    const page = await api<Schema['AdminPolicyPage']>(`/admin/ui/policies?limit=100${cursor ? `&after_id=${encodeURIComponent(cursor)}` : ''}`)
+  const policies = useQuery({ queryKey: policyKeys.managedList(cursor), queryFn: async ({ signal }) => {
+    const page = await invokeOperation('listAdminPolicies', { parameters: { query: { limit: 100, after_id: cursor ?? undefined } }, signal })
     if (!Array.isArray(page.items) || page.items.length > page.max_page_size) throw new Error('Invalid managed policy page')
     return page
   } })
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const detail = useQuery({ queryKey: policyKeys.managedDetail(selectedId ?? ''), enabled: selectedId !== null, queryFn: () => api<PolicyDetail>(`/admin/ui/policies/${encodeURIComponent(selectedId!)}`) })
+  const detail = useQuery({ queryKey: policyKeys.managedDetail(selectedId ?? ''), enabled: selectedId !== null, queryFn: ({ signal }) => invokeOperation('getAdminPolicy', { parameters: { path: { policy_id: selectedId! } }, signal }) })
   const [operation, setOperation] = useState<Operation | null>(null)
 
   function select(policy: PolicySummary) { setSelectedId(policy.id); setOperation(null) }
@@ -83,7 +84,7 @@ function PolicyDialog({ operation, initial, close, changed }: { operation: Opera
     try {
       const createRequest = operation === 'create' ? createPolicyRequest(draftName, description, document) : null
       if (operation !== 'delete') {
-        const result = await api<Schema['AdminPolicyDraftValidationResponse']>('/admin/ui/policies/validate', { method: 'POST', body: JSON.stringify(validationRequest(document, 'managed_policy')) })
+        const result = await invokeOperation('validateAdminPolicyDraft', { body: validationRequest(document, 'managed_policy') })
         if (!guard.current.current(request)) return
         setValidation(result)
         if (!result.valid) throw new Error('Resolve the server validation findings before review')
@@ -94,7 +95,7 @@ function PolicyDialog({ operation, initial, close, changed }: { operation: Opera
       }
       else {
         if (!initial) throw new Error('Policy review is unavailable')
-        const authoritative = await api<PolicyDetail>(`/admin/ui/policies/${encodeURIComponent(initial.policy.id)}`)
+        const authoritative = await invokeOperation('getAdminPolicy', { parameters: { path: { policy_id: initial.policy.id } } })
         if (!guard.current.current(request)) return
         setReview({ authoritative, request: operation === 'edit' ? updatePolicyRequest(authoritative, description, document) : deletePolicyRequest(authoritative) })
       }
@@ -108,10 +109,13 @@ function PolicyDialog({ operation, initial, close, changed }: { operation: Opera
     setPending(true); setError(null)
     try {
       let result: PolicyDetail | null
-      if (operation === 'create') result = await api<PolicyDetail>('/admin/ui/policies', { method: 'POST', body: JSON.stringify(review.request) })
+      if (operation === 'create') result = await invokeOperation('createAdminPolicy', { body: review.request as Schema['AdminPolicyCreateRequest'] })
       else {
         if (!review.authoritative) throw new Error('Policy review is unavailable')
-        const response = await api<Schema['AdminPolicyMutationResult']>(`/admin/ui/policies/${encodeURIComponent(review.authoritative.policy.id)}`, { method: operation === 'edit' ? 'PUT' : 'DELETE', body: JSON.stringify(review.request) })
+        const input = { parameters: { path: { policy_id: review.authoritative.policy.id } }, body: review.request as Schema['ReviewPolicyUpdateRequest'] | Schema['ReviewPolicyDeleteRequest'] }
+        const response = operation === 'edit'
+          ? await invokeOperation('updateReviewedAdminPolicy', { ...input, body: input.body as Schema['ReviewPolicyUpdateRequest'] })
+          : await invokeOperation('deleteReviewedAdminPolicy', { ...input, body: input.body as Schema['ReviewPolicyDeleteRequest'] })
         result = response.detail
       }
       if (!guard.current.current(request)) return

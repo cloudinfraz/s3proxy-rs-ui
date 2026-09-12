@@ -4,10 +4,11 @@ import { useQuery } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { api } from '../../api/client'
+import { invokeOperation } from '../../api/operations'
 import IdentityPolicies from './IdentityPolicies'
 
-vi.mock('../../api/client', () => ({ api: vi.fn(), ApiError: class extends Error { status = 409 } }))
+vi.mock('../../api/client', () => ({ ApiError: class extends Error { status = 409 } }))
+vi.mock('../../api/operations', () => ({ invokeOperation: vi.fn() }))
 vi.mock('@tanstack/react-query', async importOriginal => ({ ...(await importOriginal<typeof import('@tanstack/react-query')>()), useQuery: vi.fn(), useQueryClient: () => ({ invalidateQueries: vi.fn() }) }))
 vi.mock('../../api/query-keys', async importOriginal => ({ ...(await importOriginal<typeof import('../../api/query-keys')>()), invalidateControl: vi.fn() }))
 vi.mock('../../components/control', () => ({
@@ -51,21 +52,21 @@ describe('IdentityPolicies', () => {
 
   it('reviews and persists an attachment for the selected identity', async () => {
     mockQueries(query(identityResponse))
-    vi.mocked(api).mockResolvedValueOnce(relationship).mockResolvedValueOnce({ changed: true, detail: relationship })
+    vi.mocked(invokeOperation).mockResolvedValueOnce(relationship as never).mockResolvedValueOnce({ changed: true, detail: relationship } as never)
     renderView()
     fireEvent.change(await screen.findByLabelText('Identity'), { target: { value: credentialId } })
     fireEvent.change(await screen.findByLabelText('Managed policy'), { target: { value: 'policy-id' } })
     fireEvent.click(screen.getByRole('button', { name: /Review attachment/ }))
     expect(await screen.findByRole('dialog', { name: 'Confirm: attach policy' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Attach policy' }))
-    await waitFor(() => expect(api).toHaveBeenCalledWith(`/admin/ui/identities/${credentialId}/policies`, expect.objectContaining({ method: 'POST' })))
+    await waitFor(() => expect(invokeOperation).toHaveBeenCalledWith('attachReviewedAdminIdentityPolicy', expect.objectContaining({ parameters: { path: { credential_id: credentialId } } })))
   })
 
   it('does not reopen a delayed review after an identity A to B to A change', async () => {
     const secondCredentialId = '22222222-2222-4222-8222-222222222222'
     mockQueries(query({ ...identityResponse, items: [...identityResponse.items, { credential_id: secondCredentialId, s3_access_key: 'IDENTITY_TWO', enabled: true }] }))
     const request = deferred<typeof relationship>()
-    vi.mocked(api).mockImplementationOnce(() => request.promise)
+    vi.mocked(invokeOperation).mockImplementationOnce(() => request.promise as never)
     renderView()
     const selector = await screen.findByLabelText('Identity')
     fireEvent.change(selector, { target: { value: credentialId } })
@@ -76,7 +77,7 @@ describe('IdentityPolicies', () => {
     fireEvent.change(selector, { target: { value: credentialId } })
     request.resolve(relationship)
 
-    await waitFor(() => expect(api).toHaveBeenCalledOnce())
+    await waitFor(() => expect(invokeOperation).toHaveBeenCalledOnce())
     expect(selector).toHaveProperty('value', credentialId)
     expect(screen.queryByRole('dialog', { name: 'Confirm: attach policy' })).toBeNull()
   })
@@ -84,7 +85,7 @@ describe('IdentityPolicies', () => {
   it('does not reopen a delayed review after selecting another policy', async () => {
     mockQueries(query(identityResponse), query({ items: [policy, secondPolicy], next_after_id: null }))
     const request = deferred<typeof relationship>()
-    vi.mocked(api).mockImplementationOnce(() => request.promise)
+    vi.mocked(invokeOperation).mockImplementationOnce(() => request.promise as never)
     renderView()
     fireEvent.change(await screen.findByLabelText('Identity'), { target: { value: credentialId } })
     const selector = await screen.findByLabelText('Managed policy')
@@ -94,7 +95,7 @@ describe('IdentityPolicies', () => {
     fireEvent.change(selector, { target: { value: secondPolicy.id } })
     request.resolve(relationship)
 
-    await waitFor(() => expect(api).toHaveBeenCalledOnce())
+    await waitFor(() => expect(invokeOperation).toHaveBeenCalledOnce())
     expect(selector).toHaveProperty('value', secondPolicy.id)
     expect(screen.queryByRole('dialog', { name: 'Confirm: attach policy' })).toBeNull()
   })
@@ -104,7 +105,7 @@ describe('IdentityPolicies', () => {
     mockQueries(query({ ...identityResponse, items: [...identityResponse.items, { credential_id: secondCredentialId, s3_access_key: 'IDENTITY_TWO', enabled: true }] }))
     const obsoleteRequest = deferred<typeof relationship>()
     const currentRequest = deferred<typeof relationship>()
-    vi.mocked(api).mockImplementationOnce(() => obsoleteRequest.promise).mockImplementationOnce(() => currentRequest.promise)
+    vi.mocked(invokeOperation).mockImplementationOnce(() => obsoleteRequest.promise as never).mockImplementationOnce(() => currentRequest.promise as never)
     renderView()
     const identitySelector = await screen.findByLabelText('Identity')
     fireEvent.change(identitySelector, { target: { value: credentialId } })
@@ -117,7 +118,7 @@ describe('IdentityPolicies', () => {
     fireEvent.click(reviewButton)
     obsoleteRequest.reject(new Error('obsolete failure'))
 
-    await waitFor(() => expect(api).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(invokeOperation).toHaveBeenCalledTimes(2))
     expect(reviewButton).toHaveProperty('disabled', true)
     expect(screen.queryByText('obsolete failure')).toBeNull()
 
@@ -129,7 +130,7 @@ describe('IdentityPolicies', () => {
     const attachment = { policy_id: policy.id, policy_name: policy.name, policy_revision: policy.revision, attached_at: '2026-01-01T00:00:00Z' }
     const attachedRelationship = { ...relationship, items: [attachment] }
     mockQueries(query(identityResponse), query({ items: [policy], next_after_id: null }), query(attachedRelationship))
-    vi.mocked(api).mockResolvedValueOnce(attachedRelationship).mockResolvedValueOnce({ changed: true, detail: relationship })
+    vi.mocked(invokeOperation).mockResolvedValueOnce(attachedRelationship as never).mockResolvedValueOnce({ changed: true, detail: relationship } as never)
     renderView()
     fireEvent.change(screen.getByLabelText('Identity'), { target: { value: credentialId } })
 
@@ -137,6 +138,6 @@ describe('IdentityPolicies', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Detach ReadOnly' }))
     const confirmation = await screen.findByRole('alertdialog', { name: 'Detach identity policy' })
     fireEvent.click(within(confirmation).getByRole('button', { name: 'Detach ReadOnly' }))
-    await waitFor(() => expect(api).toHaveBeenCalledWith(`/admin/ui/identities/${credentialId}/policies`, expect.objectContaining({ method: 'DELETE' })))
+    await waitFor(() => expect(invokeOperation).toHaveBeenCalledWith('detachReviewedAdminIdentityPolicy', expect.objectContaining({ parameters: { path: { credential_id: credentialId } } })))
   })
 })

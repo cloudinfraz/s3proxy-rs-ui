@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import type { components } from '../src/api/schema'
 import { emptyCollections, mockControlApi } from './control-fixtures'
 
 test('login and cookie mutation keep credential material out of browser storage', async ({ page }) => {
@@ -30,7 +31,16 @@ test('login and cookie mutation keep credential material out of browser storage'
     await page.route(`**${path}`, async route => {
       if (path === '/admin/credentials' && route.request().method() === 'POST') {
         mutationCsrf = route.request().headers()['x-csrf-token'] ?? null
-        return route.fulfill({ status: 201, json: { credential_id: 'created-id', s3_access_key: 'generated-access', s3_secret_key: 'generated-one-time-secret', s3_endpoint: 'https://synthetic.invalid' } })
+        return route.fulfill({ status: 201, json: {
+          credential_id: '00000000-0000-4000-8000-000000000099',
+          s3_access_key: 'generated-access',
+          s3_secret_key: 'generated-one-time-secret',
+          s3_endpoint: 'https://synthetic.invalid',
+          azure_account: 'testaccount',
+          access_mode: 'direct',
+          use_managed_identity: true,
+          default_backend_id: null,
+        } satisfies components['schemas']['CredentialCreatedResponse'] })
       }
       return route.fulfill({ status: 200, json: emptyCollections[path as keyof typeof emptyCollections] })
     })

@@ -14,9 +14,12 @@ const apiMocks = vi.hoisted(() => ({
 
 vi.mock('../../api/client', async importOriginal => ({
   ...await importOriginal<typeof import('../../api/client')>(),
+  setCsrfToken: apiMocks.setCsrfToken,
+}))
+vi.mock('../../api/operations', async importOriginal => ({
+  ...await importOriginal<typeof import('../../api/operations')>(),
   getSession: apiMocks.getSession,
   logout: apiMocks.logout,
-  setCsrfToken: apiMocks.setCsrfToken,
 }))
 
 function Probe() {

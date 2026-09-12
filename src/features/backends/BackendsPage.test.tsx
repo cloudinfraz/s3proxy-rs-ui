@@ -3,8 +3,9 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useQuery } from '@tanstack/react-query'
-import { ApiError, api } from '../../api/client'
+import { ApiError } from '../../api/client'
 import type { Schema } from '../../api/control'
+import { invokeOperation } from '../../api/operations'
 import { invalidateControl } from '../../api/query-keys'
 import BackendsPage from './BackendsPage'
 
@@ -13,10 +14,7 @@ vi.mock('@tanstack/react-query', async importOriginal => ({
   useQuery: vi.fn(),
   useQueryClient: vi.fn(() => ({ invalidateQueries: vi.fn() })),
 }))
-vi.mock('../../api/client', async importOriginal => ({
-  ...await importOriginal<typeof import('../../api/client')>(),
-  api: vi.fn(),
-}))
+vi.mock('../../api/operations', () => ({ invokeOperation: vi.fn() }))
 vi.mock('../../api/query-keys', async importOriginal => ({
   ...await importOriginal<typeof import('../../api/query-keys')>(),
   invalidateControl: vi.fn(() => Promise.resolve()),
@@ -67,7 +65,7 @@ let backendsQuery: QueryState<Schema['StorageBackendProjection'][]>
 let capabilitiesQuery: QueryState<Schema['ControlCapabilities']>
 
 beforeEach(() => {
-  vi.mocked(api).mockReset()
+  vi.mocked(invokeOperation).mockReset()
   vi.mocked(invalidateControl).mockClear()
   backendsQuery = state([backend])
   capabilitiesQuery = state(capabilities)
@@ -114,7 +112,7 @@ describe('BackendsPage', () => {
   })
 
   it('creates a backend, invalidates queries, and closes the form', async () => {
-    vi.mocked(api).mockResolvedValue({})
+    vi.mocked(invokeOperation).mockResolvedValue({} as never)
     render(<BackendsPage />)
 
     fireEvent.click(screen.getByRole('button', { name: /register backend/i }))
@@ -123,16 +121,15 @@ describe('BackendsPage', () => {
     fireEvent.change(screen.getByLabelText('Region label'), { target: { value: 'west' } })
     fireEvent.click(screen.getByRole('button', { name: 'Review and save' }))
 
-    await waitFor(() => expect(api).toHaveBeenCalledWith('/admin/ui/backends', {
-      method: 'POST',
-      body: JSON.stringify({ name: 'new-backend', azure_account: 'newaccount', auth_mode: 'managed_identity', managed_identity_client_id: null, user_delegation_sas_enabled: true, secret_ref: null, region_label: 'west', enabled: true }),
+    await waitFor(() => expect(invokeOperation).toHaveBeenCalledWith('createBackendForUi', {
+      body: { name: 'new-backend', azure_account: 'newaccount', auth_mode: 'managed_identity', managed_identity_client_id: null, user_delegation_sas_enabled: true, secret_ref: null, region_label: 'west', enabled: true },
     }))
     expect(invalidateControl).toHaveBeenCalledOnce()
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
 
   it('keeps the create form open and reports API failures', async () => {
-    vi.mocked(api).mockRejectedValue(new ApiError(503, 'temporarily unavailable'))
+    vi.mocked(invokeOperation).mockRejectedValue(new ApiError(503, 'temporarily unavailable'))
     render(<BackendsPage />)
 
     fireEvent.click(screen.getByRole('button', { name: /register backend/i }))
@@ -145,20 +142,20 @@ describe('BackendsPage', () => {
   })
 
   it('requires impact confirmation before updating referenced routing metadata', async () => {
-    vi.mocked(api).mockResolvedValue({})
+    vi.mocked(invokeOperation).mockResolvedValue({} as never)
     render(<BackendsPage />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit archive' }))
     fireEvent.change(screen.getByLabelText('Azure account'), { target: { value: 'replacement' } })
     fireEvent.click(screen.getByRole('button', { name: 'Review and save' }))
     expect(screen.getByRole('dialog', { name: 'Confirm routing impact' })).toBeTruthy()
-    expect(api).not.toHaveBeenCalled()
+    expect(invokeOperation).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: 'Confirm change' }))
-    await waitFor(() => expect(api).toHaveBeenCalledWith('/admin/ui/backends/archive', expect.objectContaining({
-      method: 'PUT',
-      body: expect.stringContaining('"expected_impact_token":"impact-token"'),
-    })))
+    await waitFor(() => expect(invokeOperation).toHaveBeenCalledWith('updateBackendForUi', {
+      parameters: { path: { name: 'archive' } },
+      body: expect.objectContaining({ expected_impact_token: 'impact-token' }),
+    }))
   })
 
   it('preserves the backend draft when returning from impact review', () => {
@@ -196,7 +193,7 @@ describe('BackendsPage', () => {
   })
 
   it('reports a failed delete and succeeds when the user retries', async () => {
-    vi.mocked(api).mockRejectedValueOnce(new Error('network')).mockResolvedValueOnce(undefined)
+    vi.mocked(invokeOperation).mockRejectedValueOnce(new Error('network')).mockResolvedValueOnce(undefined)
     render(<BackendsPage />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete archive' }))
@@ -204,8 +201,8 @@ describe('BackendsPage', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('Backend deletion failed')
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete archive' }))
-    await waitFor(() => expect(api).toHaveBeenCalledTimes(2))
-    expect(api).toHaveBeenLastCalledWith('/admin/backends/archive', { method: 'DELETE' })
+    await waitFor(() => expect(invokeOperation).toHaveBeenCalledTimes(2))
+    expect(invokeOperation).toHaveBeenLastCalledWith('deleteBackend', { parameters: { path: { name: 'archive' } } })
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
   })
 })

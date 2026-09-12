@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { useQuery } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router'
-import { ApiError, api } from '../../api/client'
+import { ApiError } from '../../api/client'
+import { invokeOperation } from '../../api/operations'
 import type { Schema } from '../../api/control'
 import { invalidateControl } from '../../api/query-keys'
 import VirtualMappingsPage from './VirtualMappingsPage'
@@ -16,8 +17,11 @@ vi.mock('@tanstack/react-query', async importOriginal => ({
 }))
 vi.mock('../../api/client', async importOriginal => ({
   ...await importOriginal<typeof import('../../api/client')>(),
-  api: vi.fn(),
 }))
+vi.mock('../../api/operations', () => ({ invokeOperation: vi.fn() }))
+
+const api = invokeOperation as unknown as Mock<(operationId: string, input?: OperationMockInput) => Promise<unknown>>
+type OperationMockInput = { parameters?: { path?: Record<string, string>; query?: Record<string, unknown> }; body?: unknown; signal?: AbortSignal }
 vi.mock('../../api/query-keys', async importOriginal => ({
   ...await importOriginal<typeof import('../../api/query-keys')>(),
   invalidateControl: vi.fn(() => Promise.resolve()),
@@ -146,7 +150,7 @@ describe('VirtualMappingsPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'View photos' }))
     const dialog = await screen.findByRole('dialog', { name: 'Mapping details' })
-    expect(api).toHaveBeenCalledWith('/admin/ui/virtual-buckets/mapping-id')
+    expect(api).toHaveBeenCalledWith('getVirtualMapping', { parameters: { path: { id: 'mapping-id' } } })
     expect(within(dialog).getByText('mapping-id')).toBeTruthy()
     expect(within(dialog).getByText('Legacy account: legacyaccount / photos-container')).toBeTruthy()
   })
@@ -166,11 +170,10 @@ describe('VirtualMappingsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Review changes' }))
 
     expect(await screen.findByRole('dialog', { name: 'Confirm mapping change' })).toBeTruthy()
-    expect(api).toHaveBeenNthCalledWith(1, '/admin/ui/mapping-backends/backend-id')
+    expect(api).toHaveBeenNthCalledWith(1, 'reviewMappingBackend', { parameters: { path: { id: 'backend-id' } } })
     fireEvent.click(screen.getByRole('button', { name: 'Confirm change' }))
-    await waitFor(() => expect(api).toHaveBeenNthCalledWith(2, '/admin/ui/virtual-buckets', {
-      method: 'POST',
-      body: JSON.stringify({ virtual_bucket_name: 'new-photos', azure_container: 'new-container', credential_id: 'identity-id', backend_id: 'backend-id', endpoint_prefix: 'media', expected_backend_revision: 7 }),
+    await waitFor(() => expect(api).toHaveBeenNthCalledWith(2, 'createVirtualMapping', {
+      body: { virtual_bucket_name: 'new-photos', azure_container: 'new-container', credential_id: 'identity-id', backend_id: 'backend-id', endpoint_prefix: 'media', expected_backend_revision: 7 },
     }))
     expect(invalidateControl).toHaveBeenCalledOnce()
   })
@@ -204,9 +207,9 @@ describe('VirtualMappingsPage', () => {
     expect(await screen.findByRole('dialog', { name: 'Confirm mapping change' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Confirm change' }))
 
-    await waitFor(() => expect(api).toHaveBeenNthCalledWith(2, '/admin/ui/virtual-buckets/mapping-id', {
-      method: 'PUT',
-      body: JSON.stringify({ expected_impact_token: 'impact-token', azure_container: 'updated-container' }),
+    await waitFor(() => expect(api).toHaveBeenNthCalledWith(2, 'updateVirtualMapping', {
+      parameters: { path: { id: 'mapping-id' } },
+      body: { expected_impact_token: 'impact-token', azure_container: 'updated-container' },
     }))
   })
 
@@ -242,7 +245,7 @@ describe('VirtualMappingsPage', () => {
     expect(await screen.findByRole('dialog', { name: 'Mapping review expired' })).toBeTruthy()
     expect(screen.getByRole('alert').textContent).toContain('mapping changed')
     fireEvent.click(screen.getByRole('button', { name: 'Reload and review' }))
-    await waitFor(() => expect(api).toHaveBeenNthCalledWith(3, '/admin/ui/virtual-buckets/mapping-id'))
+    await waitFor(() => expect(api).toHaveBeenNthCalledWith(3, 'getVirtualMapping', { parameters: { path: { id: 'mapping-id' } } }))
     expect(await screen.findByRole('dialog', { name: 'Edit mapping' })).toBeTruthy()
   })
 
@@ -263,8 +266,8 @@ describe('VirtualMappingsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Remove photos' }))
     await screen.findByRole('alertdialog', { name: 'Remove bucket routing' })
     fireEvent.click(screen.getByRole('button', { name: 'Remove photos' }))
-    await waitFor(() => expect(api).toHaveBeenLastCalledWith('/admin/ui/virtual-buckets/mapping-id', {
-      method: 'DELETE', body: JSON.stringify({ expected_impact_token: 'impact-token' }),
+    await waitFor(() => expect(api).toHaveBeenLastCalledWith('deleteVirtualMapping', {
+      parameters: { path: { id: 'mapping-id' } }, body: { expected_impact_token: 'impact-token' },
     }))
     expect(invalidateControl).toHaveBeenCalledOnce()
   })
@@ -324,6 +327,6 @@ describe('VirtualMappingsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Confirm change' }))
     await waitFor(() => expect(invalidateControl).toHaveBeenCalledOnce())
     expect(api).toHaveBeenCalledTimes(2)
-    for (const [path] of vi.mocked(api).mock.calls) expect(path).toBe('/admin/ui/virtual-buckets')
+    for (const [operationId] of vi.mocked(api).mock.calls) expect(operationId).toBe('createVirtualMapping')
   })
 })

@@ -61,7 +61,7 @@ describe('typed read boundaries', () => {
     const query = controlQueries.identityPage(null, null).queryFn
     if (typeof query !== 'function') throw new Error('Expected identity page query function')
 
-    await expect(query({} as never)).rejects.toThrow('Invalid identity page response')
+    await expect(query({} as never)).rejects.toMatchObject({ status: 502, message: 'The control service returned an invalid response.' })
   })
 
   it('pages backend options and resolves off-page selections by stable ID', async () => {
@@ -93,6 +93,6 @@ describe('typed read boundaries', () => {
     const query = controlQueries.backendOptionPage(null).queryFn
     if (typeof query !== 'function') throw new Error('Expected backend option page query function')
 
-    await expect(query({} as never)).rejects.toThrow('Invalid backend option page response')
+    await expect(query({} as never)).rejects.toMatchObject({ status: 502, message: 'The control service returned an invalid response.' })
   })
 })

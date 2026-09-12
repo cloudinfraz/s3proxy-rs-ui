@@ -43,7 +43,7 @@ jobs:
             exit 1
           }
           npm run generate:api
-          git diff --exit-code -- src/api/schema.d.ts
+          git diff --exit-code -- src/api/schema.d.ts src/api/generated
 
       - name: Lint, coverage, deployment tests, and build
         run: |

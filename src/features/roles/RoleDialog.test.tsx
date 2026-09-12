@@ -2,13 +2,17 @@
 import type { ReactNode } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useQuery } from '@tanstack/react-query'
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { api, ApiError } from '../../api/client'
+import { afterEach, describe, expect, it, vi, type Mock } from 'vitest'
+import { ApiError } from '../../api/client'
+import { invokeOperation } from '../../api/operations'
 import type { Schema } from '../../api/control'
 import RoleDialog from './RoleDialog'
 
 vi.mock('@tanstack/react-query', async importOriginal => ({ ...(await importOriginal<typeof import('@tanstack/react-query')>()), useQuery: vi.fn(), useQueryClient: () => ({ invalidateQueries: vi.fn() }) }))
-vi.mock('../../api/client', () => ({ api: vi.fn(), ApiError: class extends Error { status = 409 } }))
+vi.mock('../../api/client', () => ({ ApiError: class extends Error { status = 409 } }))
+vi.mock('../../api/operations', () => ({ invokeOperation: vi.fn() }))
+const api = invokeOperation as unknown as Mock<(operationId: string, input?: OperationMockInput) => Promise<unknown>>
+type OperationMockInput = { parameters?: { path?: Record<string, string>; query?: Record<string, unknown> }; body?: unknown; signal?: AbortSignal }
 vi.mock('../../api/query-keys', async importOriginal => ({ ...(await importOriginal<typeof import('../../api/query-keys')>()), invalidateControl: vi.fn(), controlKeys: { list: (value: string) => ['control', value], identityPage: (afterId: string | null) => ['control', 'identities', 'page', afterId], detail: (resource: string, id: string) => ['control', resource, 'detail', id] } }))
 vi.mock('../../components/control', () => ({
   ErrorBanner: ({ error }: { error: Error }) => <div role="alert">{error.message}</div>,
@@ -61,7 +65,7 @@ describe('RoleDialog', () => {
     fireEvent.submit(screen.getByRole('button', { name: 'Review change' }).closest('form')!)
     expect(await screen.findByRole('dialog', { name: 'Confirm: Create IAM role' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Confirm change' }))
-    await waitFor(() => expect(api).toHaveBeenCalledWith('/admin/ui/roles', expect.objectContaining({ method: 'POST' })))
+    await waitFor(() => expect(api).toHaveBeenCalledWith('createAdminRole', expect.objectContaining({ body: expect.objectContaining({ role_name: 'Reader' }) })))
     expect(changed).toHaveBeenCalledWith(detail)
     expect(close).toHaveBeenCalledOnce()
   })
@@ -89,7 +93,7 @@ describe('RoleDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Confirm change' }))
 
     await waitFor(() => expect(changed).toHaveBeenCalledWith(latest))
-    expect(api).toHaveBeenLastCalledWith('/admin/ui/roles/role-id')
+    expect(api).toHaveBeenLastCalledWith('getAdminRole', { parameters: { path: { role_id: 'role-id' } } })
   })
 
   it('rejects create review when the selected owner becomes unavailable', async () => {
@@ -129,7 +133,7 @@ describe('RoleDialog', () => {
     expect(await screen.findByText('ReadOnly')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Confirm change' }))
 
-    await waitFor(() => expect(api).toHaveBeenLastCalledWith('/admin/ui/roles/role-id/policies', expect.objectContaining({ method: 'POST' })))
+    await waitFor(() => expect(api).toHaveBeenLastCalledWith('attachReviewedRolePolicy', expect.objectContaining({ parameters: { path: { role_id: 'role-id' } } })))
     expect(changed).toHaveBeenCalledWith(expect.objectContaining({ policies: [policy] }))
     expect(close).toHaveBeenCalledOnce()
   })
