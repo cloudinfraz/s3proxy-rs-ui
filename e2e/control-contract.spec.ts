@@ -53,3 +53,43 @@ test('UI068-06 malformed envelopes fail visibly instead of appearing empty', asy
   await page.reload()
   await expect(page.getByText('fixture-access', { exact: true })).toBeVisible()
 })
+
+test('UI068-07 overview and identity selectors never request the unbounded inventory', async ({ page }) => {
+  const identityReads: string[] = []
+  page.on('request', request => {
+    if (!['fetch', 'xhr'].includes(request.resourceType())) return
+    const path = new URL(request.url()).pathname
+    if (path === '/admin/ui/identities' || path === '/admin/ui/identity-pages') identityReads.push(path)
+  })
+  const verifyRequests = await mockControlApi(page)
+
+  await page.goto('/admin/ui/')
+  await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible()
+  await page.waitForLoadState('networkidle')
+  expect(identityReads).toEqual([])
+
+  identityReads.length = 0
+  await page.goto('/admin/ui/buckets')
+  await expect(page.getByRole('heading', { name: 'Bucket routing' })).toBeVisible()
+  await expect.poll(() => identityReads).toContain('/admin/ui/identity-pages')
+  expect(identityReads).not.toContain('/admin/ui/identities')
+
+  identityReads.length = 0
+  await navigateTo(page, 'Policies')
+  await page.getByRole('tab', { name: 'Identity attachments' }).click()
+  await expect(page.getByRole('region', { name: 'Identity attachments' }).getByRole('combobox', { name: 'Identity', exact: true })).toBeVisible()
+  await expect.poll(() => identityReads).toContain('/admin/ui/identity-pages')
+  expect(identityReads).not.toContain('/admin/ui/identities')
+  await page.getByRole('tab', { name: 'Diagnostics' }).click()
+  await expect(page.getByRole('region', { name: 'Identity policy simulator' })).toBeVisible()
+  expect(identityReads).not.toContain('/admin/ui/identities')
+
+  identityReads.length = 0
+  await page.goto('/admin/ui/')
+  await navigateTo(page, 'IAM roles')
+  await page.getByRole('button', { name: 'Create role', exact: true }).click()
+  await expect(page.getByLabel('Resource owner')).toBeVisible()
+  await expect.poll(() => identityReads).toContain('/admin/ui/identity-pages')
+  expect(identityReads).not.toContain('/admin/ui/identities')
+  verifyRequests()
+})

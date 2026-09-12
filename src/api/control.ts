@@ -22,7 +22,6 @@ const identityPageSize = 100
 const backendOptionPageSize = 100
 
 export const controlQueries = {
-  identities: queryOptions({ queryKey: controlKeys.list('identities'), queryFn: async () => envelopeRows(await api<Schema['IdentityProjectionListResponse']>('/admin/ui/identities')) }),
   identityPage: (afterId: string | null, accessMode: 'direct' | 'virtual' | null) => queryOptions({
     queryKey: controlKeys.identityPage(afterId, accessMode),
     queryFn: async () => {
