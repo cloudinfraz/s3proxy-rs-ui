@@ -49,18 +49,28 @@ committed lockfile and official npm registry with install scripts disabled.
 | `npm run test:deploy` | Test deployment scripts and manifests |
 | `npm run test:release` | Test release scripts |
 | `npm run test:e2e` | Run mocked browser tests on the built app |
+| `npm run test:e2e:a11y` | Run axe checks on representative Chromium states |
+| `npm run test:e2e:cross-browser` | Run bounded Firefox and WebKit smoke tests |
+| `npm run test:e2e:cross-browser:container` | Run cross-browser smoke in the pinned official container |
 | `make check` | Install dependencies, audit, lint, test, build, and run browser tests |
 
-Before browser tests, install Playwright's Chromium and its system dependencies:
+Before browser tests, install the required Playwright engines and system dependencies:
 
 ```bash
-npx playwright install --with-deps chromium
+npx playwright install --with-deps chromium firefox webkit
 ```
 
 This downloads browser binaries and may require elevated privileges for system
 packages. Run `npm run build` before running `npm run test:e2e` on its own.
 
-Default browser tests use synthetic data on desktop and mobile. **Live tests are
+On WSL or another host where WebKit system dependencies cannot be installed,
+use `npm run test:e2e:cross-browser:container`. It runs the same smoke suite as
+the current non-root user in an immutable, version-matched Microsoft Playwright
+image with external container networking disabled.
+
+The full mocked suite runs on desktop and mobile Chromium. Accessibility checks
+scan representative Chromium states, while a bounded core workflow runs in
+Firefox and WebKit. All use synthetic data. **Live tests are
 destructive and require a disposable local backend.** Never run them against
 production, staging, shared services, or retained data. See the
 [browser testing guide](e2e/README.md).

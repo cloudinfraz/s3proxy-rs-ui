@@ -36,7 +36,6 @@ button:hover {
 
 button:disabled {
   cursor: wait;
-  opacity: .65;
 }
 
 button.primary {
@@ -48,6 +47,10 @@ button.primary {
   border-color: #176b4d;
   color: #fff;
   font-weight: 600;
+}
+
+button.primary:disabled {
+  opacity: 1;
 }
 
 input,textarea {

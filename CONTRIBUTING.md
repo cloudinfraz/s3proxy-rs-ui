@@ -73,13 +73,23 @@ To iterate on a smaller change, use the relevant commands first:
 npm run lint
 npm test
 npm run test:deploy
+npm run test:release
 npm run build
 npm run test:e2e
+npm run test:e2e:a11y
+npm run test:e2e:cross-browser
 ```
 
-Install Chromium once with `npx playwright install --with-deps chromium` before
-running browser tests. The live suite has additional isolation requirements in
+Install the required engines once with
+`npx playwright install --with-deps chromium firefox webkit` before running
+browser tests. Do not add axe rule exclusions to make a check pass; fix the
+rendered accessibility problem or document a narrowly scoped, expiring exception
+in a separately reviewed change. The live suite has additional isolation requirements in
 [`e2e/README.md`](e2e/README.md).
+
+If local WebKit dependencies are unavailable, run
+`npm run test:e2e:cross-browser:container`. The fallback is pinned to an
+immutable official Playwright image digest and does not modify host packages.
 
 ## Pull requests
 

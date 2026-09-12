@@ -11,10 +11,8 @@ actual="$(sha256sum contracts/admin-openapi.json | awk '{print $1}')"
 }
 npm run generate:api
 git diff --exit-code -- src/api/schema.d.ts src/api/generated
-npm run lint
-npm test
-npm run test:deploy
-npm run test:release
-npm run build
-npx playwright install --with-deps chromium
+scripts/release/validate-source.sh
+npx playwright install --with-deps chromium firefox webkit
 npm run test:e2e
+npm run test:e2e:a11y
+npm run test:e2e:cross-browser
