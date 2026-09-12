@@ -54,7 +54,7 @@ describe('bucket scopes, simulation, and cache separation', () => {
   })
 
   it('separates managed, identity, bucket, preflight, and simulation query assumptions', () => {
-    const keys = [policyKeys.managedList(null), policyKeys.managedDetail(policy.id), policyKeys.identity(identity.credential_id, null), policyKeys.bucketList(null), policyKeys.preflight, policyKeys.simulation]
+    const keys = [policyKeys.managedList(null), policyKeys.managedDetail(policy.id), policyKeys.identity(identity.credential_id, null), policyKeys.bucketList('direct', null), policyKeys.bucketList('virtual', null), policyKeys.preflight, policyKeys.simulation]
     expect(new Set(keys.map(key => JSON.stringify(key)))).toHaveLength(keys.length)
   })
 })

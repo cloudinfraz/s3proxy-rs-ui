@@ -2,6 +2,38 @@ import { expect, test } from '@playwright/test'
 import { collections, mockControlApi, navigateTo } from './control-fixtures'
 import type { components } from '../src/api/schema'
 
+test('S3 identities use bounded cursor pagination', async ({ page }) => {
+  const verify = await mockControlApi(page)
+  const cursor = collections['/admin/ui/identities'].items[0].credential_id
+  const second = { ...collections['/admin/ui/identities'].items[0], credential_id: '00000000-0000-4000-8000-000000000002', s3_access_key: 'second-access' }
+  const requests: string[] = []
+  await page.route('**/admin/ui/identity-pages?*', route => {
+    const url = new URL(route.request().url())
+    requests.push(url.search)
+    return route.fulfill({ json: {
+      items: url.searchParams.get('after_id') ? [second] : collections['/admin/ui/identities'].items,
+      next_after_id: url.searchParams.get('after_id') ? null : cursor,
+      default_page_size: 100,
+      max_page_size: 200,
+    } satisfies components['schemas']['IdentityProjectionPage'] })
+  })
+
+  await page.goto('/admin/ui/credentials')
+  await expect(page.getByText('fixture-access', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Previous identity page' })).toBeDisabled()
+  await page.getByRole('button', { name: 'Next identity page' }).click()
+  await expect(page.getByText('second-access', { exact: true })).toBeVisible()
+  await expect(page.getByText('Page 2', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Previous identity page' }).click()
+  await expect(page.getByText('fixture-access', { exact: true })).toBeVisible()
+
+  expect(requests).toEqual([
+    '?limit=100',
+    `?limit=100&after_id=${cursor}`,
+  ])
+  verify()
+})
+
 test('UI070-02 replacement reviews safe settings, validates and retries without changing the original', async ({ page }) => {
   const verify = await mockControlApi(page)
   const bodies: components['schemas']['CreateCredentialRequest'][] = []
@@ -47,9 +79,10 @@ for (const mode of ['direct', 'virtual'] as const) {
   test(`UI070-02 ${mode} identity details hide stale metadata after failed refresh`, async ({ page }) => {
     const verify = await mockControlApi(page)
     let fail = false
-    await page.route('**/admin/ui/identities', route => route.fulfill(fail ? { status: 503 } : { json: {
-      count: 1, items: [{ ...collections['/admin/ui/identities'].items[0], access_mode: mode, policy_attachment_count: null }],
-    } satisfies components['schemas']['IdentityProjectionListResponse'] }))
+    await page.route('**/admin/ui/identity-pages?*', route => route.fulfill(fail ? { status: 503 } : { json: {
+      items: [{ ...collections['/admin/ui/identities'].items[0], access_mode: mode, policy_attachment_count: null }],
+      next_after_id: null, default_page_size: 100, max_page_size: 200,
+    } }))
     await page.goto('/admin/ui/credentials')
     await page.getByRole('button', { name: 'View fixture-access', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: 'Identity details', exact: true })
@@ -72,13 +105,17 @@ for (const backendState of ['disabled', 'missing'] as const) {
   test(`UI070-02 edits preserve ${backendState} backend and unknown enabled metadata across failures`, async ({ page }) => {
     const verify = await mockControlApi(page)
     const backendId = '00000000-0000-4000-8000-000000000001'
-    await page.route('**/admin/ui/identities', route => route.fulfill({ json: {
-      count: 1, items: [{ ...collections['/admin/ui/identities'].items[0], default_backend_id: backendId, enabled: null }],
-    } satisfies components['schemas']['IdentityProjectionListResponse'] }))
-    await page.route('**/admin/ui/backends', route => route.fulfill({ json: {
-      count: backendState === 'missing' ? 0 : 1,
-      items: backendState === 'missing' ? [] : [{ ...collections['/admin/ui/backends'].items[0], enabled: false }],
-    } satisfies components['schemas']['StorageBackendProjectionListResponse'] }))
+    await page.route('**/admin/ui/identity-pages?*', route => route.fulfill({ json: {
+      items: [{ ...collections['/admin/ui/identities'].items[0], default_backend_id: backendId, enabled: null }],
+      next_after_id: null, default_page_size: 100, max_page_size: 200,
+    } }))
+    await page.route('**/admin/ui/backend-options?*', route => route.fulfill({ json: {
+      items: backendState === 'missing' ? [] : [{ ...collections['/admin/ui/backend-options'].items[0], enabled: false }],
+      next_after_id: null, default_page_size: 100, max_page_size: 200,
+    } satisfies components['schemas']['StorageBackendOptionPage'] }))
+    await page.route(`**/admin/ui/backend-options/${backendId}`, route => route.fulfill(backendState === 'missing'
+      ? { status: 404, body: 'Unavailable' }
+      : { json: { ...collections['/admin/ui/backend-options'].items[0], enabled: false } satisfies components['schemas']['StorageBackendOption'] }))
     const updates: unknown[] = []
     let status = 400
     await page.route('**/admin/credentials/fixture-access', route => {
@@ -117,9 +154,9 @@ test('UI070-02 failed deletion retains the identity and allows an explicit retry
   const verify = await mockControlApi(page)
   let deleted = false
   let attempts = 0
-  await page.route('**/admin/ui/identities', route => route.fulfill({ json: deleted
-    ? { count: 0, items: [] } satisfies components['schemas']['IdentityProjectionListResponse']
-    : collections['/admin/ui/identities'] }))
+  await page.route('**/admin/ui/identity-pages?*', route => route.fulfill({ json: deleted
+    ? { items: [], next_after_id: null, default_page_size: 100, max_page_size: 200 } satisfies components['schemas']['IdentityProjectionPage']
+    : collections['/admin/ui/identity-pages'] }))
   await page.route('**/admin/credentials/fixture-access', route => {
     expect(route.request().method()).toBe('DELETE')
     attempts += 1

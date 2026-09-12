@@ -140,7 +140,16 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     throw interceptApiError(error, context)
   }
   if (response.status === 204) return undefined as T
-  return response.json() as Promise<T>
+  const contentType = response.headers.get('content-type') ?? ''
+  if (!/\bapplication\/(?:[\w.+-]+\+)?json\b/i.test(contentType)) {
+    await response.body?.cancel().catch(() => undefined)
+    throw interceptApiError(new ApiError(502, 'The control service returned an invalid response.'), context)
+  }
+  try {
+    return await response.json() as T
+  } catch {
+    throw interceptApiError(new ApiError(502, 'The control service returned an invalid response.'), context)
+  }
 }
 
 function invalidSessionResponse(): ApiError {

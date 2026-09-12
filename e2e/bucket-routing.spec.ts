@@ -16,13 +16,19 @@ test('UI072-04 direct details are read-only and fail closed for unavailable rout
       denied.push('non-read or external request'); return route.abort()
     }
     if (path === '/admin/ui/identities') return route.fulfill({ json: { count: 1, items: [{ ...collections['/admin/ui/identities'].items[0], default_backend_id: scenario === 'legacy' ? null : backend.id }] } })
+    if (path === '/admin/ui/identity-pages') return route.fulfill({ json: { items: [{ ...collections['/admin/ui/identities'].items[0], default_backend_id: scenario === 'legacy' ? null : backend.id }], next_after_id: null, default_page_size: 100, max_page_size: 200 } })
     if (path === '/admin/capabilities') {
       if (scenario === 'capability-error') return route.fulfill({ status: 503, body: 'Unavailable' })
       return route.fulfill({ json: { ...capabilities, backend_routing_enabled: scenario !== 'gate-off', public_s3_endpoint: scenario === 'unsafe-endpoint' ? 'https://user:synthetic@example.test?sig=synthetic' : 'https://public-s3.example.test' } })
     }
-    if (path === '/admin/ui/backends') {
+    if (path === '/admin/ui/backend-options') {
       if (scenario === 'backend-error') return route.fulfill({ status: 503, body: 'Unavailable' })
-      return route.fulfill({ json: { count: scenario === 'missing' ? 0 : 1, items: scenario === 'missing' ? [] : [{ ...backend, azure_account: 'selectedaccount', enabled: scenario !== 'disabled', auth_mode: scenario === 'unsupported' ? 'sas_token' : 'managed_identity' }] } })
+      return route.fulfill({ json: { items: scenario === 'missing' ? [] : [{ id: backend.id, name: backend.name, azure_account: 'selectedaccount', enabled: scenario !== 'disabled', auth_mode: scenario === 'unsupported' ? 'sas_token' : 'managed_identity' }], next_after_id: null, default_page_size: 100, max_page_size: 200 } })
+    }
+    if (path === `/admin/ui/backend-options/${backend.id}`) {
+      if (scenario === 'backend-error') return route.fulfill({ status: 503, body: 'Unavailable' })
+      if (scenario === 'missing') return route.fulfill({ status: 404, body: 'Unavailable' })
+      return route.fulfill({ json: { id: backend.id, name: backend.name, azure_account: 'selectedaccount', enabled: scenario !== 'disabled', auth_mode: scenario === 'unsupported' ? 'sas_token' : 'managed_identity' } })
     }
     if (path === '/admin/session') return route.fallback()
     denied.push(path); return route.abort()
@@ -88,7 +94,7 @@ async function mappingFixture(page: Page, empty = false) {
   const nextToken = () => (token++).toString(16).padStart(32, '0')
   const initial: Mapping = { ...collections['/admin/ui/virtual-buckets'].items[0], credential_default_backend_id: ownerId, impact_token: nextToken() }
   let rows: Mapping[] = empty ? [] : [initial, { ...initial, id: secondOwnerId, credential_id: secondOwnerId, impact_token: nextToken() }]
-  const flags = { conflict: false, removalFailure: false, backendDisabled: false }
+  const flags = { conflict: false, removalFailure: false, backendDisabled: false, effectiveBackendDisabled: false }
   await page.route('**/*', async route => {
     const request = route.request()
     if (!['fetch', 'xhr'].includes(request.resourceType())) return route.fallback()
@@ -96,12 +102,15 @@ async function mappingFixture(page: Page, empty = false) {
     const method = request.method()
     const path = url.pathname
     if (url.origin !== new URL(page.url()).origin) { denied.push('external'); return route.abort() }
-    if (path === '/admin/ui/identities' && method === 'GET') return route.fulfill({ json: { count: 3, items: [
+    if (path === '/admin/ui/identity-pages' && method === 'GET') return route.fulfill({ json: { items: [
       { ...collections['/admin/ui/identities'].items[0], access_mode: 'virtual', default_backend_id: ownerId },
       { ...collections['/admin/ui/identities'].items[0], access_mode: 'virtual', credential_id: secondOwnerId, s3_access_key: 'second-owner', default_backend_id: ownerId },
-      { ...collections['/admin/ui/identities'].items[0], credential_id: selectedBackend, s3_access_key: 'direct-owner' },
-    ] } })
-    if (path === '/admin/ui/backends' && method === 'GET') return route.fulfill({ json: { count: 2, items: [collections['/admin/ui/backends'].items[0], { ...collections['/admin/ui/backends'].items[0], id: selectedBackend, name: 'second-backend', azure_account: 'otheraccount' }] } })
+    ], next_after_id: null, default_page_size: 100, max_page_size: 200 } })
+    if (path === `/admin/ui/identities/${ownerId}` && method === 'GET') return route.fulfill({ json: { ...collections['/admin/ui/identities'].items[0], access_mode: 'virtual', default_backend_id: ownerId } })
+    if (path === `/admin/ui/identities/${secondOwnerId}` && method === 'GET') return route.fulfill({ json: { ...collections['/admin/ui/identities'].items[0], access_mode: 'virtual', credential_id: secondOwnerId, s3_access_key: 'second-owner', default_backend_id: ownerId } })
+    if (path === '/admin/ui/backend-options' && method === 'GET') return route.fulfill({ json: { items: [{ ...collections['/admin/ui/backend-options'].items[0], enabled: !flags.effectiveBackendDisabled }, { ...collections['/admin/ui/backend-options'].items[0], id: selectedBackend, name: 'second-backend', azure_account: 'otheraccount' }], next_after_id: null, default_page_size: 100, max_page_size: 200 } })
+    if (path === `/admin/ui/backend-options/${ownerId}` && method === 'GET') return route.fulfill({ json: { ...collections['/admin/ui/backend-options'].items[0], enabled: !flags.effectiveBackendDisabled } })
+    if (path === `/admin/ui/backend-options/${selectedBackend}` && method === 'GET') return route.fulfill({ json: { ...collections['/admin/ui/backend-options'].items[0], id: selectedBackend, name: 'second-backend', azure_account: 'otheraccount' } })
     if (path === `/admin/ui/mapping-backends/${selectedBackend}` && method === 'GET') return route.fulfill({ json: { id: selectedBackend, azure_account: 'otheraccount', auth_mode: 'managed_identity', enabled: !flags.backendDisabled, revision: 7 } })
     if (path === '/admin/ui/virtual-buckets' && method === 'GET') return route.fulfill({ json: { items: rows, next_after_id: null } })
     if (path === '/admin/ui/virtual-buckets' && method === 'POST') {
@@ -150,7 +159,8 @@ test('UI077-01 generates a virtual identity then creates and updates its bucket 
     if (!['fetch', 'xhr'].includes(request.resourceType())) return route.fallback()
     const path = new URL(request.url()).pathname
     const method = request.method()
-    if (path === '/admin/ui/identities' && method === 'GET') return route.fulfill({ json: { count: identity ? 1 : 0, items: identity ? [identity] : [] } })
+    if (path === '/admin/ui/identity-pages' && method === 'GET') return route.fulfill({ json: { items: identity ? [identity] : [], next_after_id: null, default_page_size: 100, max_page_size: 200 } })
+    if (identity && path === `/admin/ui/identities/${identity.credential_id}` && method === 'GET') return route.fulfill({ json: identity })
     if (path === '/admin/ui/virtual-buckets' && method === 'GET') return route.fulfill({ json: { items: mapping ? [mapping] : [], next_after_id: null } })
     if (path === '/admin/credentials' && method === 'POST') {
       credentialRequests.push(request.postDataJSON())
@@ -199,9 +209,9 @@ test('UI077-01 generates a virtual identity then creates and updates its bucket 
   await page.getByLabel('Azure container', { exact: true }).fill('workflow-container')
   await page.getByRole('button', { name: 'Review changes', exact: true }).click()
   await page.getByRole('button', { name: 'Confirm change', exact: true }).click()
-  await expect(page.getByText('workflow-bucket', { exact: true })).toBeVisible()
-
-  await page.getByRole('button', { name: 'Edit workflow-bucket', exact: true }).click()
+  const editMapping = page.getByRole('button', { name: 'Edit workflow-bucket', exact: true })
+  await expect(editMapping).toBeVisible()
+  await editMapping.click()
   await expect(page.getByRole('dialog')).toContainText('changing ownership requires a new mapping.')
   await expect(page.getByRole('combobox', { name: 'Identity', exact: true })).toBeDisabled()
   await page.getByLabel('Azure container', { exact: true }).fill('updated-container')
@@ -307,6 +317,25 @@ test('UI072-02 unavailable selections and stale review cannot silently persist',
   await expect(page.getByRole('dialog').or(page.getByRole('alertdialog'))).toHaveCount(0)
   expect(fixture.requests).toHaveLength(2)
   expect(fixture.rows()[0].azure_container).toBe('after-reload')
+  fixture.verify()
+})
+
+test('UI072-06 disables a mapping without changing its unavailable route', async ({ page }) => {
+  const fixture = await mappingFixture(page)
+  fixture.flags.effectiveBackendDisabled = true
+  await page.goto('/admin/ui/buckets')
+  await page.getByRole('button', { name: 'Edit fixture-bucket', exact: true }).first().click()
+  await expect(page.getByText(/Selected backend is disabled/)).toBeVisible()
+  await page.getByRole('checkbox', { name: 'Enabled', exact: true }).uncheck()
+  await page.getByRole('button', { name: 'Review changes', exact: true }).click()
+  await page.getByRole('button', { name: 'Confirm change', exact: true }).click()
+
+  expect(fixture.requests).toEqual([{ method: 'PUT', id: ownerId, body: {
+    expected_impact_token: '1'.padStart(32, '0'),
+    enabled: false,
+  } }])
+  expect(fixture.rows()[0].enabled).toBe(false)
+  expect(fixture.rows()[0].backend_id).toBeNull()
   fixture.verify()
 })
 

@@ -2,10 +2,11 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { api, ApiError } from '../../api/client'
-import { controlQueries, type Schema } from '../../api/control'
+import type { Schema } from '../../api/control'
 import { controlKeys, invalidateControl } from '../../api/query-keys'
 import { DestructiveDialog, ErrorBanner, Modal } from '../../components/control'
 import { completionGuard } from '../operations/state'
+import { IdentitySelectorPagination, useIdentitySelectorPage } from '../identities/identity-selector'
 import { createRoleRequest, mutationRequest, retainedLabel, roleDraft, validateRoleDraft, type RoleDetail, type RoleDraft, type RoleLimits, type RoleOperation, type RolePolicy } from './role-state'
 import TrustEditor from './TrustEditor'
 
@@ -27,7 +28,8 @@ export default function RoleDialog({ operation, initial, limits, close, changed 
   close: () => void; changed: (detail: RoleDetail | null) => void
 }) {
   const client = useQueryClient()
-  const identities = useQuery({ ...controlQueries.identities, enabled: operation === 'create' || operation === 'trust' })
+  const identitySelector = useIdentitySelectorPage(null, operation === 'create' || operation === 'trust')
+  const identities = identitySelector.query
   const [cursors, setCursors] = useState<Array<string | null>>([null])
   const cursor = cursors[cursors.length - 1]
   const policies = useQuery({ queryKey: [...controlKeys.list('policies'), 'role-options', cursor], enabled: operation === 'attach', queryFn: () => api<Schema['AdminIamRolePolicyPage']>(`/admin/ui/role-policies?limit=100${cursor ? `&after_id=${encodeURIComponent(cursor)}` : ''}`) })
@@ -51,7 +53,7 @@ export default function RoleDialog({ operation, initial, limits, close, changed 
     try {
       if (operation === 'create') {
         const owners = await identities.refetch()
-        if (owners.isError || !owners.data?.some(owner => owner.credential_id === draft.owner && owner.enabled)) throw new Error('Selected resource owner is unavailable')
+        if (owners.isError || !owners.data?.items.some(owner => owner.credential_id === draft.owner && owner.enabled)) throw new Error('Selected resource owner is unavailable')
         createRoleRequest(draft, limits)
         if (guard.current.current(request)) setReview({})
       } else {
@@ -127,9 +129,9 @@ export default function RoleDialog({ operation, initial, limits, close, changed 
         {operation === 'retire' && <><dt>Maximum this batch</dt><dd>{draft.batch}</dd></>}
       </dl>{!destructiveReview && <div className="dialog-actions"><button disabled={pending} onClick={() => setReview(null)}>Back</button><button className="primary" disabled={pending} onClick={() => { void persist() }}>{pending ? 'Applying...' : 'Confirm change'}</button></div>}</>
         : <form className="operation-form" onSubmit={event => { void prepare(event) }}>
-          {operation === 'create' && <><label>Account ID<input required pattern="[0-9]{12}" maxLength={12} value={draft.account} onChange={event => { update('account', event.target.value); update('trust', draft.trust.map(statement => ({ ...statement, principals: [] }))) }} /></label><label>Role path<input required value={draft.path} maxLength={512} onChange={event => update('path', event.target.value)} /></label><label>Role name<input required maxLength={64} value={draft.name} onChange={event => update('name', event.target.value)} /></label><label>Resource owner<select required value={draft.owner} onChange={event => update('owner', event.target.value)}><option value="">Select identity</option>{identities.data?.map(identity => <option key={identity.credential_id} value={identity.credential_id} disabled={!identity.enabled}>{identity.s3_access_key}</option>)}</select></label></>}
+          {operation === 'create' && <><label>Account ID<input required pattern="[0-9]{12}" maxLength={12} value={draft.account} onChange={event => { update('account', event.target.value); update('trust', draft.trust.map(statement => ({ ...statement, principals: [] }))) }} /></label><label>Role path<input required value={draft.path} maxLength={512} onChange={event => update('path', event.target.value)} /></label><label>Role name<input required maxLength={64} value={draft.name} onChange={event => update('name', event.target.value)} /></label><label>Resource owner<select required value={draft.owner} onChange={event => update('owner', event.target.value)}><option value="">Select identity</option>{identities.data?.items.map(identity => <option key={identity.credential_id} value={identity.credential_id} disabled={!identity.enabled}>{identity.s3_access_key}</option>)}</select></label></>}
           {(operation === 'create' || operation === 'settings') && <label>Maximum duration (seconds)<input type="number" required min={limits.min_duration_seconds} max={limits.max_duration_seconds} step={1} value={draft.duration} onChange={event => update('duration', event.target.value)} /></label>}
-          {(operation === 'create' || operation === 'trust') && <TrustEditor account={draft.account} statements={draft.trust} identities={identities.data ?? []} change={value => update('trust', value)} />}
+          {(operation === 'create' || operation === 'trust') && <><TrustEditor account={draft.account} statements={draft.trust} identities={identities.data?.items ?? []} change={value => update('trust', value)} /><IdentitySelectorPagination page={identitySelector.page} pending={identities.isFetching} canPrevious={identitySelector.canPrevious} canNext={identitySelector.canNext} previous={identitySelector.previous} next={identitySelector.next} /></>}
           {operation === 'trust' && <label className="checkbox-field"><input type="checkbox" required checked={draft.acknowledge} onChange={event => update('acknowledge', event.target.checked)} /> Replace all existing trust statements and conditions, including hidden values.</label>}
           {operation === 'enabled' && <label className="checkbox-field"><input type="checkbox" checked={draft.enabled} onChange={event => update('enabled', event.target.checked)} /> Enabled</label>}
           {(operation === 'attach' || operation === 'detach') && <><label>Policy<select required value={draft.policy} onChange={event => update('policy', event.target.value)}><option value="">Select policy</option>{policyOptions?.map(policy => <option key={policy.id} value={policy.id}>{policy.name}</option>)}</select></label>{operation === 'attach' && <div className="role-pagination"><button type="button" className="icon-button" aria-label="Previous policy page" title="Previous policy page" disabled={cursors.length === 1 || policies.isFetching} onClick={() => { update('policy', ''); setCursors(current => current.slice(0, -1)) }}><ChevronLeft size={16} /></button><span>Policy page {cursors.length}</span><button type="button" className="icon-button" aria-label="Next policy page" title="Next policy page" disabled={!policies.data?.next_after_id || policies.isFetching} onClick={() => { if (policies.data?.next_after_id) { update('policy', ''); setCursors(current => [...current, policies.data.next_after_id]) } }}><ChevronRight size={16} /></button></div>}</>}

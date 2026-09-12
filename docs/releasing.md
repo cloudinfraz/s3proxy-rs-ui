@@ -26,28 +26,28 @@ Start from the latest `main`. The branch name and package version must agree.
 ```bash
 git switch main
 git pull --ff-only origin main
-git switch -c release/v0.6.4
+git switch -c release/v0.6.5
 
-npm version 0.6.4 --no-git-tag-version --allow-same-version
+npm version 0.6.5 --no-git-tag-version --allow-same-version
 ```
 
 Move completed entries from `Unreleased` into a dated changelog heading:
 
 ```markdown
-## [0.6.4] - 2026-10-01
+## [0.6.5] - 2026-10-01
 ```
 
 Validate and push the candidate:
 
 ```bash
-node scripts/release/prepare-release.mjs 0.6.4
+node scripts/release/prepare-release.mjs 0.6.5
 make check
 git add package.json package-lock.json CHANGELOG.md
-git commit -m "release: prepare v0.6.4"
-git push -u origin release/v0.6.4
+git commit -m "release: prepare v0.6.5"
+git push -u origin release/v0.6.5
 ```
 
-Open a pull request from `release/v0.6.4` to `main`. Opening and updating the PR
+Open a pull request from `release/v0.6.5` to `main`. Opening and updating the PR
 triggers the release-candidate gate, which validates metadata and the API
 contract, runs all local checks and browser acceptance, creates a reproducible
 static archive, and verifies the runtime image.
@@ -61,9 +61,9 @@ Create the pull request after pushing the prepared branch:
 ```bash
 gh pr create \
    --base main \
-   --head release/v0.6.4 \
-   --title "release: v0.6.4" \
-   --body "Prepare s3proxy-rs UI v0.6.4."
+   --head release/v0.6.5 \
+   --title "release: v0.6.5" \
+   --body "Prepare s3proxy-rs UI v0.6.5."
 ```
 
 Opening or updating the pull request runs **Validate release candidate** but
@@ -90,7 +90,7 @@ version without the `v` prefix, and choose **Run workflow**.
 The equivalent GitHub CLI commands are:
 
 ```bash
-gh workflow run release.yml --ref main -f version=0.6.4
+gh workflow run release.yml --ref main -f version=0.6.5
 gh run list --workflow release.yml --event workflow_dispatch --limit 1
 ```
 

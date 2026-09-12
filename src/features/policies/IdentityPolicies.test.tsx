@@ -19,7 +19,7 @@ vi.mock('../../components/control', () => ({
 }))
 
 const credentialId = '11111111-1111-4111-8111-111111111111'
-const identityResponse = { count: 1, items: [{ credential_id: credentialId, s3_access_key: 'IDENTITY_ONE', enabled: true }] }
+const identityResponse = { items: [{ credential_id: credentialId, s3_access_key: 'IDENTITY_ONE', enabled: true }], next_after_id: null }
 const policy = { id: 'policy-id', name: 'ReadOnly', revision: 3, description: null, built_in: false, deletable: true, credential_attachment_count: 0, role_attachment_count: 0, updated_at: '2026-01-01T00:00:00Z' }
 const relationship = { credential_id: credentialId, credential_revision: 2, impact_token: 'impact', items: [], next_after_id: null, max_page_size: 100, default_page_size: 100 }
 const query = (data?: unknown, overrides: Record<string, unknown> = {}) => ({ data, isError: false, isPending: false, isFetching: false, error: null, refetch: vi.fn().mockResolvedValue({ data, isError: false }), ...overrides })
@@ -43,7 +43,7 @@ describe('IdentityPolicies', () => {
   })
 
   it('reviews and persists an attachment for the selected identity', async () => {
-    mockQueries(query(identityResponse.items))
+    mockQueries(query(identityResponse))
     vi.mocked(api).mockResolvedValueOnce(relationship).mockResolvedValueOnce({ changed: true, detail: relationship })
     renderView()
     fireEvent.change(await screen.findByLabelText('Identity'), { target: { value: credentialId } })
@@ -56,7 +56,7 @@ describe('IdentityPolicies', () => {
 
   it('does not reopen a delayed review after selecting another identity', async () => {
     const secondCredentialId = '22222222-2222-4222-8222-222222222222'
-    mockQueries(query([...identityResponse.items, { credential_id: secondCredentialId, s3_access_key: 'IDENTITY_TWO', enabled: true }]))
+    mockQueries(query({ ...identityResponse, items: [...identityResponse.items, { credential_id: secondCredentialId, s3_access_key: 'IDENTITY_TWO', enabled: true }] }))
     let release: (value: typeof relationship) => void = () => {}
     vi.mocked(api).mockImplementationOnce(() => new Promise(resolve => { release = resolve }))
     renderView()
@@ -76,7 +76,7 @@ describe('IdentityPolicies', () => {
   it('excludes attached policies and completes a reviewed detach', async () => {
     const attachment = { policy_id: policy.id, policy_name: policy.name, policy_revision: policy.revision, attached_at: '2026-01-01T00:00:00Z' }
     const attachedRelationship = { ...relationship, items: [attachment] }
-    mockQueries(query(identityResponse.items), query({ items: [policy], next_after_id: null }), query(attachedRelationship))
+    mockQueries(query(identityResponse), query({ items: [policy], next_after_id: null }), query(attachedRelationship))
     vi.mocked(api).mockResolvedValueOnce(attachedRelationship).mockResolvedValueOnce({ changed: true, detail: relationship })
     renderView()
     fireEvent.change(screen.getByLabelText('Identity'), { target: { value: credentialId } })

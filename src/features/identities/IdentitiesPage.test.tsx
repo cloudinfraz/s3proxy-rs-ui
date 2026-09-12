@@ -35,11 +35,18 @@ const identity: Schema['IdentityProjection'] = {
 const query = (overrides: Record<string, unknown> = {}) => ({ data: undefined, isError: false, isPending: false, isFetching: false, error: null, refetch: vi.fn(), ...overrides })
 
 function mockQueries(identities: ReturnType<typeof query>, backends = query({ data: [] }), capabilities = query()) {
+  const identityData = Array.isArray(identities.data)
+    ? { ...identities, data: { items: identities.data, next_after_id: null, default_page_size: 100, max_page_size: 200 } }
+    : identities
+  const backendData = Array.isArray(backends.data)
+    ? { ...backends, data: { items: backends.data, next_after_id: null, default_page_size: 100, max_page_size: 200 } }
+    : backends
   vi.mocked(useQuery).mockImplementation(options => {
     const key = (options as { queryKey?: readonly unknown[] }).queryKey ?? []
-    if (key.includes('backends')) return backends as never
+    if (key[1] === 'backends' && key[3] === 'page') return backendData as never
+    if (key[1] === 'backends') return query() as never
     if (key.includes('capabilities')) return capabilities as never
-    return identities as never
+    return identityData as never
   })
 }
 
@@ -74,6 +81,31 @@ describe('IdentitiesPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete ACCESS_ONE' }))
     fireEvent.click(within(screen.getByRole('alertdialog', { name: 'Delete identity' })).getByRole('button', { name: 'Delete ACCESS_ONE' }))
     await waitFor(() => expect(api).toHaveBeenCalledWith('/admin/credentials/ACCESS_ONE', { method: 'DELETE' }))
+  })
+
+  it('moves through server-backed identity pages and resets the cursor when filtering', () => {
+    const second = { ...identity, credential_id: '22222222-2222-4222-8222-222222222222', s3_access_key: 'ACCESS_TWO' }
+    vi.mocked(useQuery).mockImplementation(options => {
+      const key = (options as { queryKey?: readonly unknown[] }).queryKey ?? []
+      if (key[1] === 'backends' && key[3] === 'page') return query({ data: { items: [], next_after_id: null, default_page_size: 100, max_page_size: 200 } }) as never
+      if (key[1] === 'backends') return query() as never
+      if (key.includes('capabilities')) return query() as never
+      const page = key.at(-1) as { afterId: string | null; accessMode: 'direct' | null }
+      return query({ data: page.afterId
+        ? { items: [second], next_after_id: null, default_page_size: 100, max_page_size: 200 }
+        : { items: [identity], next_after_id: identity.credential_id, default_page_size: 100, max_page_size: 200 } }) as never
+    })
+    render(<IdentitiesPage />)
+
+    expect(screen.getByText('ACCESS_ONE')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Previous identity page' })).toHaveProperty('disabled', true)
+    fireEvent.click(screen.getByRole('button', { name: 'Next identity page' }))
+    expect(screen.getByText('ACCESS_TWO')).toBeTruthy()
+    expect(screen.getByText('Page 2')).toBeTruthy()
+
+    fireEvent.change(screen.getByLabelText('View'), { target: { value: 'direct' } })
+    expect(routerMocks.setSearchParams).toHaveBeenCalledWith({ mode: 'direct' })
+    expect(screen.getByText('Page 1')).toBeTruthy()
   })
 
   it('creates an identity and reports asynchronous creation failure', async () => {

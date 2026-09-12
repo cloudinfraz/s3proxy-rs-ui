@@ -15,7 +15,7 @@ export const policyKeys = {
   managedList: (afterId: string | null) => ['control', 'policy-workspace', 'managed', 'list', { afterId }] as const,
   managedDetail: (policyId: string) => ['control', 'policy-workspace', 'managed', 'detail', policyId] as const,
   identity: (credentialId: string, afterId: string | null) => ['control', 'policy-workspace', 'identity', credentialId, { afterId }] as const,
-  bucketList: (afterKey: string | null) => ['control', 'policy-workspace', 'bucket', 'list', { afterKey }] as const,
+  bucketList: (kind: PolicyScope['kind'], afterKey: string | null) => ['control', 'policy-workspace', 'bucket', 'list', { kind, afterKey }] as const,
   bucketDetail: (scope: PolicyScope) => ['control', 'policy-workspace', 'bucket', scope.kind, scope.kind === 'direct' ? scope.bucket : scope.bucket_id] as const,
   preflight: ['control', 'policy-workspace', 'preflight'] as const,
   simulation: ['control', 'policy-workspace', 'simulation'] as const,

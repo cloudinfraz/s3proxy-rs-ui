@@ -23,7 +23,7 @@ async function fixture(page: Page, empty = false) {
     const path = url.pathname
     if (url.origin !== new URL(page.url()).origin) { denied.push('external'); return route.abort() }
     if (!path.startsWith('/admin/ui/roles') && path !== '/admin/ui/role-policies') {
-      if (['/admin/session', '/admin/ui/identities', '/admin/capabilities'].includes(path)) return route.fallback()
+      if (['/admin/session', '/admin/ui/identities', '/admin/ui/identity-pages', '/admin/capabilities'].includes(path)) return route.fallback()
       denied.push(path); return route.abort()
     }
     if (request.method() === 'GET') {

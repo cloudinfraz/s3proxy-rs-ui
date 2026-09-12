@@ -5,6 +5,42 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Added cursor-based identity pagination and paginated identity selectors for
+  administration workflows.
+- Added paginated backend option selectors and selected-backend lookups for
+  identity and bucket mapping forms.
+- Expanded unit and browser coverage for pagination, backend selection, policy
+  validation, and stale asynchronous responses.
+
+### Changed
+
+- Switched overview resource counts to the backend summary instead of deriving
+  totals from resource lists.
+- Moved bucket policy scope filtering to the backend and separated query caches
+  by scope so pagination follows the selected policy type.
+- Updated the pinned backend contract and generated API types for pagination,
+  backend options, overview summaries, and health responses.
+- Updated npm dependencies and GitHub Actions, retained a compatible TypeScript
+  version, and explicitly enabled strict application type checking.
+- Simplified the README with a clearer quick start, command reference, container
+  build instructions, and links to detailed guides.
+
+### Fixed
+
+- Preserved the existing identity-list response contract while adding the
+  paginated identity API, and routed pagination requests through Vite and Nginx.
+- Guarded bucket and managed policy dialogs against late asynchronous results
+  and invalidated validation and review state when drafts change.
+- Bound policy mutation confirmation to the reviewed request rather than a
+  subsequently edited draft.
+- Cleared stale policy simulation results when inputs change, ignored outdated
+  responses, and displayed the identity, action, resource, and conditions that
+  produced each result.
+
 ## [0.6.4] - 2026-09-07
 
 ### Added

@@ -5,7 +5,7 @@ import config from '../../../vite.config'
 it('proxies role metadata without intercepting the IAM roles document route', () => {
   const pattern = Object.keys(config.server!.proxy!).find(value => value.startsWith('^/admin/ui/'))!
   const matcher = new RegExp(pattern)
-  for (const path of ['/admin/ui/roles', '/admin/ui/roles?limit=100', '/admin/ui/roles/role-id/settings', '/admin/ui/role-policies?limit=100', '/admin/ui/identities']) expect(matcher.test(path)).toBe(true)
+  for (const path of ['/admin/ui/roles', '/admin/ui/roles?limit=100', '/admin/ui/roles/role-id/settings', '/admin/ui/role-policies?limit=100', '/admin/ui/identities', '/admin/ui/identity-pages?limit=100']) expect(matcher.test(path)).toBe(true)
   for (const path of ['/admin/ui/iam-roles', '/admin/ui/login', '/admin/ui/roles-other']) expect(matcher.test(path)).toBe(false)
   const nginx = readFileSync(new URL('../../../nginx.conf', import.meta.url), 'utf8')
   expect(nginx).toContain(`location ~ ${pattern} {`)

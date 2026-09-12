@@ -3,16 +3,18 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, Link as LinkIcon, Unlink } from 'lucide-react'
 import { Link } from 'react-router'
 import { api, ApiError } from '../../api/client'
-import { controlQueries, type Schema } from '../../api/control'
+import type { Schema } from '../../api/control'
 import { invalidateControl } from '../../api/query-keys'
 import { DataTable, DestructiveDialog, ErrorBanner, Modal, RefreshButton } from '../../components/control'
+import { IdentitySelectorPagination, useIdentitySelectorPage } from '../identities/identity-selector'
 import { identityPolicyRequest, policyKeys, type IdentityPolicyAttachment, type IdentityPolicyReview, type PolicySummary } from './policy-state'
 
 type Review = { operation: 'attach' | 'detach'; detail: IdentityPolicyReview; policy: PolicySummary | IdentityPolicyAttachment }
 
 export default function IdentityPolicies() {
   const client = useQueryClient()
-  const identities = useQuery(controlQueries.identities)
+  const identitySelector = useIdentitySelectorPage()
+  const identities = identitySelector.query
   const [policyCursors, setPolicyCursors] = useState<Array<string | null>>([null])
   const policyCursor = policyCursors[policyCursors.length - 1]
   const policies = useQuery({ queryKey: policyKeys.managedList(policyCursor), queryFn: () => api<Schema['AdminPolicyPage']>(`/admin/ui/policies?limit=100${policyCursor ? `&after_id=${encodeURIComponent(policyCursor)}` : ''}`) })
@@ -56,7 +58,8 @@ export default function IdentityPolicies() {
   const reviewPolicyName = review ? 'name' in review.policy ? review.policy.name : review.policy.policy_name : ''
   const reviewPolicyRevision = review ? 'revision' in review.policy ? review.policy.revision : review.policy.policy_revision : 0
   return <section className="policy-section" aria-labelledby="identity-policy-title"><div className="section-heading"><div><h2 id="identity-policy-title">Identity attachments</h2><p>Attach managed policies by stable credential and policy ID. Changes affect the identity's current effective permissions.</p></div><RefreshButton pending={relationships.isFetching} refresh={() => { void relationships.refetch() }} /></div>
-    <label className="policy-selector">Identity<select value={credentialId} onChange={event => { selectedCredential.current = event.target.value; setCredentialId(event.target.value); setPolicyId(''); setPolicyCursors([null]); setAttachmentCursors([null]); setReview(null); setError(null) }}><option value="">Select identity</option>{identities.data?.filter(identity => identity.credential_id).map(identity => <option key={identity.credential_id!} value={identity.credential_id!}>{identity.s3_access_key}</option>)}</select></label>
+    <label className="policy-selector">Identity<select value={credentialId} onChange={event => { selectedCredential.current = event.target.value; setCredentialId(event.target.value); setPolicyId(''); setPolicyCursors([null]); setAttachmentCursors([null]); setReview(null); setError(null) }}><option value="">Select identity</option>{identities.data?.items.map(identity => <option key={identity.credential_id} value={identity.credential_id}>{identity.s3_access_key}</option>)}</select></label>
+    <IdentitySelectorPagination page={identitySelector.page} pending={identities.isFetching} canPrevious={identitySelector.canPrevious} canNext={identitySelector.canNext} previous={() => { setCredentialId(''); identitySelector.previous() }} next={() => { setCredentialId(''); identitySelector.next() }} />
     {identities.isError && <ErrorBanner error={new Error('Identity metadata unavailable')} retry={() => { void identities.refetch() }} />}
     {policies.isError && <ErrorBanner error={new Error('Managed policy metadata unavailable')} retry={() => { void policies.refetch() }} />}
     {relationships.isError && <ErrorBanner error={relationships.error} retry={() => { void relationships.refetch() }} />}

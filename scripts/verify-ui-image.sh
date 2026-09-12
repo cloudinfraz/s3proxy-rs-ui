@@ -213,6 +213,12 @@ for required in \
   fi
 done
 
+identity_page_status="$(curl --silent --output /dev/null --write-out '%{http_code}' "${base_url}/admin/ui/identity-pages?limit=1")"
+if [[ "$identity_page_status" != "502" ]]; then
+  echo "ERROR: identity page API returned ${identity_page_status}, expected backend proxy status 502" >&2
+  exit 1
+fi
+
 asset_count=0
 while IFS= read -r -d '' packaged_asset; do
   relative="${packaged_asset#"$static_root"/}"

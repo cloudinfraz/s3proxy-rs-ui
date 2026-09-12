@@ -9,7 +9,7 @@ import RoleDialog from './RoleDialog'
 
 vi.mock('@tanstack/react-query', async importOriginal => ({ ...(await importOriginal<typeof import('@tanstack/react-query')>()), useQuery: vi.fn(), useQueryClient: () => ({ invalidateQueries: vi.fn() }) }))
 vi.mock('../../api/client', () => ({ api: vi.fn(), ApiError: class extends Error { status = 409 } }))
-vi.mock('../../api/query-keys', async importOriginal => ({ ...(await importOriginal<typeof import('../../api/query-keys')>()), invalidateControl: vi.fn(), controlKeys: { list: (value: string) => ['control', value] } }))
+vi.mock('../../api/query-keys', async importOriginal => ({ ...(await importOriginal<typeof import('../../api/query-keys')>()), invalidateControl: vi.fn(), controlKeys: { list: (value: string) => ['control', value], identityPage: (afterId: string | null) => ['control', 'identities', 'page', afterId] } }))
 vi.mock('../../components/control', () => ({
   ErrorBanner: ({ error }: { error: Error }) => <div role="alert">{error.message}</div>,
   Modal: ({ title, children }: { title: string; children: ReactNode }) => <section role="dialog" aria-label={title}>{children}</section>,
@@ -22,11 +22,12 @@ const identity = { credential_id: credentialId, s3_access_key: 'OWNER_KEY', enab
 const role: Schema['AdminIamRole'] = { id: 'role-id', role_id: 'stable-role', account_id: '123456789012', role_path: '/', role_name: 'Reader', role_arn: 'arn:aws:iam::123456789012:role/Reader', resource_credential_id: credentialId, max_session_duration_seconds: 3600, enabled: true, lifecycle_revision: 1, trust_revision: 1, attachment_revision: 1, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' }
 const detail: Schema['AdminIamRoleDetail'] = { role, trust: { statements: [] }, policies: [], retained_sessions: { count: 0, truncated: false, deletion_eligible: false }, impact_token: 'impact', limits }
 const policy: Schema['AdminIamRolePolicy'] = { id: 'policy-id', name: 'ReadOnly', revision: 2 }
-const identityQuery = { data: [identity], isError: false, isFetching: false, refetch: vi.fn().mockResolvedValue({ data: [identity], isError: false }) }
+const identityPage = { items: [identity], next_after_id: null }
+const identityQuery = { data: identityPage, isError: false, isFetching: false, refetch: vi.fn().mockResolvedValue({ data: identityPage, isError: false }) }
 const policyQuery = { data: { items: [], next_after_id: null }, isError: false, isFetching: false, refetch: vi.fn() }
 beforeEachMock()
 function beforeEachMock() {
-  identityQuery.refetch.mockResolvedValue({ data: [identity], isError: false })
+  identityQuery.refetch.mockResolvedValue({ data: identityPage, isError: false })
   policyQuery.refetch.mockResolvedValue(undefined)
   vi.mocked(useQuery).mockImplementation(options => ((options as { enabled?: boolean }).enabled === false ? policyQuery : identityQuery) as never)
 }
@@ -86,7 +87,7 @@ describe('RoleDialog', () => {
   })
 
   it('rejects create review when the selected owner becomes unavailable', async () => {
-    identityQuery.refetch.mockResolvedValueOnce({ data: [{ ...identity, enabled: false }], isError: false })
+    identityQuery.refetch.mockResolvedValueOnce({ data: { items: [{ ...identity, enabled: false }], next_after_id: null }, isError: false })
     render(<RoleDialog operation="create" limits={limits} close={vi.fn()} changed={vi.fn()} />)
     fireEvent.change(screen.getByLabelText('Account ID'), { target: { value: '123456789012' } })
     fireEvent.change(screen.getByLabelText('Role name'), { target: { value: 'Reader' } })

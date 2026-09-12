@@ -4,47 +4,27 @@
 [![CodeQL](https://github.com/cloudinfraz/s3proxy-rs-ui/actions/workflows/codeql.yml/badge.svg)](https://github.com/cloudinfraz/s3proxy-rs-ui/actions/workflows/codeql.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-The standalone administration interface for
-[`cloudinfraz/s3proxy-rs`](https://github.com/cloudinfraz/s3proxy-rs). It is an
-optional component and is not embedded in the proxy's control-plane or data-plane
-images.
+An optional web admin interface for
+[s3proxy-rs](https://github.com/cloudinfraz/s3proxy-rs). The UI runs separately
+from the proxy and requires its backend admin API.
 
-The UI provides browser-based administration for:
+Use it to manage:
 
-- service health and capability status;
-- identities, Azure backends, and virtual bucket mappings;
-- bucket policies, IAM roles, and temporary credentials;
-- administrator keys and audit events.
+- Identities, Azure backends, and virtual bucket mappings
+- Bucket policies, IAM roles, and temporary credentials
+- Administrator keys and audit events
+- Service health and capabilities
 
-The backend repository owns the authoritative admin API and runtime behavior.
-This repository owns the browser application, its Nginx runtime image, and its
-Kubernetes deployment manifests.
+Built with React and TypeScript. This repository contains the browser app,
+an Nginx container image, and Kubernetes manifests; the backend owns the API.
 
-## Architecture
+## Quick start
 
-The application is a React single-page application served by Nginx at
-`/admin/ui/`. Browser requests to `/admin/*` remain same-origin so the backend
-can enforce session-cookie and CSRF protections.
+You need Node.js **24.18.0**, npm **11.16.0**, and a separately running
+[s3proxy-rs backend](https://github.com/cloudinfraz/s3proxy-rs) at
+`http://127.0.0.1:8080`.
 
-```text
-Browser -> s3proxy-ui:8080 (Nginx) -> s3proxy-control:8081
-              |                         |
-              +-- /admin/ui/* assets    +-- /admin/* API
-```
-
-The fixed upstream name means the UI and the `s3proxy-control` Kubernetes
-Service must run in the same namespace.
-
-## Prerequisites
-
-- Node.js `24.18.0` (also recorded in `.node-version`)
-- npm, using the committed `package-lock.json`
-- Chromium installed by Playwright for browser tests
-- Docker with Buildx for the runtime image
-
-## Development
-
-Install the locked dependencies from the public npm registry and start Vite:
+From the repository root:
 
 ```bash
 npm ci --ignore-scripts --registry=https://registry.npmjs.org/
@@ -52,112 +32,88 @@ npm run generate:api
 npm run dev
 ```
 
-Vite serves the application at <http://localhost:5173/admin/ui/> and proxies
-admin and health requests to a locally running backend at
-`http://127.0.0.1:8080`.
+Open <http://localhost:5173/admin/ui/>. Vite forwards API requests to the
+backend; it does not start the backend for you.
 
-### API contract
+Dependency installation downloads third-party code. The command above uses the
+committed lockfile and official npm registry with install scripts disabled.
 
-`contracts/admin-openapi.json` is pinned to the backend revision and checksum in
-`contracts/backend-contract.json`. When the backend contract changes:
+## Development commands
 
-1. Update both contract files together.
-2. Run `npm run generate:api`.
-3. Commit the generated `src/api/schema.d.ts` changes.
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Start the development server |
+| `npm run lint` | Lint the code |
+| `npm test` | Run unit tests |
+| `npm run build` | Generate API types, type-check, and build to `dist/` |
+| `npm run test:deploy` | Test deployment scripts and manifests |
+| `npm run test:release` | Test release scripts |
+| `npm run test:e2e` | Run mocked browser tests on the built app |
+| `make check` | Install dependencies, audit, lint, test, build, and run browser tests |
 
-CI verifies the checksum and rejects stale generated types.
-
-### Routing notes
-
-The Azure backends page is `/admin/ui/azure-backends`.
-`/admin/ui/backends` belongs to the JSON API and is intentionally not a browser
-route. Bucket routing is available at `/admin/ui/buckets`; its JSON APIs use
-`/admin/ui/virtual-buckets` and `/admin/ui/mapping-backends/:id`.
-
-Vite and Nginx proxy these API paths before the SPA fallback. A routing change
-therefore requires a rebuilt UI image; updating only the control-plane image is
-not sufficient.
-
-## Validation
-
-Run the complete local gate:
+Before browser tests, install Playwright's Chromium and its system dependencies:
 
 ```bash
-make check
-```
-
-The gate installs locked dependencies, audits dependencies, lints, runs unit and
-deployment tests, builds the application, and runs mocked browser acceptance
-tests.
-
-Individual commands are also available:
-
-```bash
-npm run lint
-npm test
-npm run test:deploy
-npm run build
 npx playwright install --with-deps chromium
-npm run test:e2e
 ```
 
-The default Playwright suite uses synthetic API fixtures on desktop and mobile.
-The live suite requires a separately managed disposable backend. See
-[`e2e/README.md`](e2e/README.md) before running it; never target a retained or
-production environment.
+This downloads browser binaries and may require elevated privileges for system
+packages. Run `npm run build` before running `npm run test:e2e` on its own.
+
+Default browser tests use synthetic data on desktop and mobile. **Live tests are
+destructive and require a disposable local backend.** Never run them against
+production, staging, shared services, or retained data. See the
+[browser testing guide](e2e/README.md).
+
+### API and routing changes
+
+The backend API contract is pinned in
+[contracts/admin-openapi.json](contracts/admin-openapi.json) and
+[contracts/backend-contract.json](contracts/backend-contract.json). Follow
+[CONTRIBUTING.md](CONTRIBUTING.md#updating-the-backend-contract) when updating it;
+do not edit generated API types by hand.
+
+Browser routes live under `/admin/ui/`. The Azure backends page is
+`/admin/ui/azure-backends`, not the API path `/admin/ui/backends`. Keep the Vite
+and Nginx proxy rules aligned when changing routes, and rebuild the UI image.
 
 ## Container image
 
-Build the assets and the unprivileged Nginx runtime image separately:
+After installing dependencies, build the app and then the Docker image:
 
 ```bash
-docker run --rm -v "$PWD:/repo" -w /repo node:24.18.0-bookworm-slim \
-  /bin/sh -ec 'npm ci --ignore-scripts --registry=https://registry.npmjs.org/ && npm run lint && npm test && npm run build'
-
-docker buildx build \
-  --file Dockerfile \
-  --tag s3proxy-ui:local \
-  --load .
+npm run build
+docker build -t s3proxy-ui:local .
 ```
 
-The runtime image:
+The image serves the app at `/admin/ui/` on port `8080` using unprivileged Nginx.
+It contains neither the backend nor Node.js.
 
-- serves the SPA at `/admin/ui/`;
-- exposes `/health` and `/healthz` on port `8080`;
-- proxies `/admin/*` to `http://s3proxy-control:8081`;
-- contains no s3proxy binary or Node.js toolchain;
-- contains no PostgreSQL, Redis, or Azure credentials;
-- runs as the unprivileged Nginx user.
+```text
+Browser -> UI / Nginx :8080 -> s3proxy-control :8081
+```
 
-CI validates the image contract, scans for high and critical vulnerabilities,
-and produces an SPDX software bill of materials. Published images are signed
-and referenced by immutable digest.
+Nginx proxies admin API requests to `http://s3proxy-control:8081`, keeping browser
+requests same-origin for session cookies and CSRF protection. That backend name
+must resolve from the container. Both `/health` and `/healthz` check Nginx
+availability, not backend health.
 
 ## Deployment
 
-The Kustomize bases in `deploy/k8s/` deploy the UI as a separate Kubernetes
-workload. Staging publication and deployment use protected GitHub environments
-and Azure workload identity federation; no long-lived Azure credential is
-required by the workflow.
+The Kubernetes manifests deploy the UI in the `s3proxy` namespace alongside the
+`s3proxy-control` Service on port `8081`. They do not create an Ingress; external
+routing and TLS are operator-managed. Deploy published images by immutable digest.
 
-See [`docs/deployment.md`](docs/deployment.md) for manifest rendering,
-prerequisites, network policy behavior, and release workflow configuration.
+See [docs/deployment.md](docs/deployment.md) for setup and
+[docs/releasing.md](docs/releasing.md) for image publication and releases.
 
-Public releases are prepared through reviewed `release/vX.Y.Z` branches. See
-[`docs/releasing.md`](docs/releasing.md) for versioning, automated GHCR and
-GitHub Release publication, signing, and attached artifacts.
+## Help and contributing
 
-## Contributing
-
-Contributions are welcome. Read [`CONTRIBUTING.md`](CONTRIBUTING.md) for setup,
-testing, contract-update, and pull-request expectations. Participation is
-governed by the [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md).
-
-Questions and usage help are covered by [`SUPPORT.md`](SUPPORT.md).
-Release history is recorded in [`CHANGELOG.md`](CHANGELOG.md).
-
-For security vulnerabilities, do not open a public issue. Follow
-[`SECURITY.md`](SECURITY.md) to report them privately.
+- [CONTRIBUTING.md](CONTRIBUTING.md): development and pull-request guidelines
+- [SUPPORT.md](SUPPORT.md): questions and usage help
+- [CHANGELOG.md](CHANGELOG.md): release history
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md): community expectations
+- [SECURITY.md](SECURITY.md): report vulnerabilities privately, not in public issues
 
 ## License
 

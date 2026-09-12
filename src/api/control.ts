@@ -18,8 +18,30 @@ export function arrayRows<Row>(response: Row[]): Row[] {
   return response
 }
 
+const identityPageSize = 100
+const backendOptionPageSize = 100
+
 export const controlQueries = {
   identities: queryOptions({ queryKey: controlKeys.list('identities'), queryFn: async () => envelopeRows(await api<Schema['IdentityProjectionListResponse']>('/admin/ui/identities')) }),
+  identityPage: (afterId: string | null, accessMode: 'direct' | 'virtual' | null) => queryOptions({
+    queryKey: controlKeys.identityPage(afterId, accessMode),
+    queryFn: async () => {
+      const response = await api<Schema['IdentityProjectionPage']>(`/admin/ui/identity-pages?limit=${identityPageSize}${afterId ? `&after_id=${encodeURIComponent(afterId)}` : ''}${accessMode ? `&access_mode=${accessMode}` : ''}`)
+      if (!Array.isArray(response.items) || response.items.length > identityPageSize || !(response.next_after_id === null || typeof response.next_after_id === 'string')) throw new Error('Invalid identity page response')
+      return response
+    },
+  }),
+  identity: (credentialId: string) => queryOptions({ queryKey: controlKeys.detail('identities', credentialId), queryFn: () => api<Schema['IdentityProjection']>(`/admin/ui/identities/${encodeURIComponent(credentialId)}`) }),
+  backendOptionPage: (afterId: string | null) => queryOptions({
+    queryKey: controlKeys.backendOptionPage(afterId),
+    queryFn: async () => {
+      const response = await api<Schema['StorageBackendOptionPage']>(`/admin/ui/backend-options?limit=${backendOptionPageSize}${afterId ? `&after_id=${encodeURIComponent(afterId)}` : ''}`)
+      if (!Array.isArray(response.items) || response.items.length > backendOptionPageSize || !(response.next_after_id === null || typeof response.next_after_id === 'string')) throw new Error('Invalid backend option page response')
+      return response
+    },
+  }),
+  backendOption: (backendId: string) => queryOptions({ queryKey: controlKeys.backendOption(backendId), queryFn: () => api<Schema['StorageBackendOption']>(`/admin/ui/backend-options/${encodeURIComponent(backendId)}`) }),
+  overview: queryOptions({ queryKey: controlKeys.overview, queryFn: () => api<Schema['AdminOverviewSummary']>('/admin/ui/overview') }),
   policies: queryOptions({ queryKey: controlKeys.list('policies'), queryFn: async () => envelopeRows(await api<Schema['PolicyListResponse']>('/admin/policies')) }),
   buckets: queryOptions({ queryKey: controlKeys.list('buckets'), queryFn: async () => arrayRows(await api<Schema['VirtualBucketList']>('/admin/virtual-buckets')) }),
   backends: queryOptions({ queryKey: controlKeys.list('backends'), queryFn: async () => envelopeRows(await api<Schema['StorageBackendProjectionListResponse']>('/admin/ui/backends')) }),

@@ -13,20 +13,6 @@ vi.mock('../../api/client', async importOriginal => ({
   api: overviewMocks.api,
 }))
 
-const capabilities = {
-  plane: 'control',
-  authz_mode: 'enforce',
-  sts_enabled: false,
-  iam_assume_role_enabled: false,
-  assume_role_ready: false,
-  iam_account_configured: false,
-  backend_routing_enabled: true,
-  usable_registry_auth_modes: ['access_key'],
-  legacy_routing_available: false,
-  public_sts_endpoint: null,
-  public_s3_endpoint: null,
-}
-
 const health = {
   status: 'healthy',
   version: 'overview-test',
@@ -38,11 +24,9 @@ const health = {
 }
 
 function emptyResponse(path: string) {
-  if (path === '/admin/ui/identities' || path === '/admin/ui/backends' || path === '/admin/policies') return { count: 0, items: [] }
-  if (path === '/admin/ui/roles?limit=100') return { items: [], next_after_id: null, limits: { min_duration_seconds: 3600, max_duration_seconds: 43200, max_retirement_batch: 1000, retained_count_cap: 1000, default_page_size: 100, max_page_size: 200 } }
-  if (path === '/admin/capabilities') return capabilities
+  if (path === '/admin/ui/overview') return { identity_count: 11, bucket_routing_count: 12, backend_count: 13, policy_count: 14 }
   if (path === '/admin/health') return health
-  return []
+  throw new Error(`Unexpected request: ${path}`)
 }
 
 function renderOverview() {
@@ -61,33 +45,34 @@ afterEach(() => {
 })
 
 describe('OverviewPage interactions', () => {
-  it('renders resource counts, clear readiness, and the runtime summary', async () => {
+  it('renders authoritative resource counts and the runtime summary', async () => {
     overviewMocks.api.mockImplementation(async (path: string) => emptyResponse(path))
     renderOverview()
 
-    expect(await screen.findByText('No configuration findings')).toBeTruthy()
-    expect(screen.getByText('overview-test')).toBeTruthy()
-    for (const label of ['S3 identities', 'Bucket routing', 'Azure backends', 'Policies']) {
+    expect(await screen.findByText('Configuration readiness requires an authoritative backend summary.')).toBeTruthy()
+    expect(await screen.findByText('overview-test')).toBeTruthy()
+    for (const [label, count] of [['S3 identities', '11'], ['Bucket routing', '12'], ['Azure backends', '13'], ['Policies', '14']]) {
       const link = screen.getByRole('link', { name: label })
-      expect(link.parentElement?.querySelector('strong')?.textContent).toBe('0')
+      expect(link.parentElement?.querySelector('strong')?.textContent).toBe(count)
     }
+    expect(overviewMocks.api).toHaveBeenCalledWith('/admin/ui/overview')
   })
 
-  it('shows an unavailable count and retries only that failed resource', async () => {
-    let identityAttempts = 0
+  it('shows unavailable counts and retries the summary request', async () => {
+    let summaryAttempts = 0
     overviewMocks.api.mockImplementation(async (path: string) => {
-      if (path === '/admin/ui/identities' && ++identityAttempts === 1) throw new Error('identity request failed')
+      if (path === '/admin/ui/overview' && ++summaryAttempts === 1) throw new Error('summary request failed')
       return emptyResponse(path)
     })
     renderOverview()
 
-    expect(await screen.findByText('Unavailable')).toBeTruthy()
     const identityMetric = screen.getByRole('link', { name: 'S3 identities' }).parentElement
+    await waitFor(() => expect(identityMetric?.querySelector('strong')?.textContent).toBe('Unavailable'))
     const retry = identityMetric?.querySelector('button')
     if (!(retry instanceof HTMLButtonElement)) throw new Error('Expected the identity retry button')
     fireEvent.click(retry)
 
-    await waitFor(() => expect(identityAttempts).toBe(2))
-    await waitFor(() => expect(identityMetric?.querySelector('strong')?.textContent).toBe('0'))
+    await waitFor(() => expect(summaryAttempts).toBe(2))
+    await waitFor(() => expect(identityMetric?.querySelector('strong')?.textContent).toBe('11'))
   })
 })

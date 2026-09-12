@@ -15,6 +15,22 @@
   margin-bottom: 18px;
 }
 
+.identity-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 36px;
+  margin-top: 16px;
+}
+
+.identity-pagination span {
+  min-width: 64px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .operation-form select:focus {
   border-color: #176b4d;
   box-shadow: 0 0 0 2px rgba(23, 107, 77, 0.12);
