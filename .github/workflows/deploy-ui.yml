@@ -48,10 +48,13 @@ concurrency:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   deploy-ui:
+    if: github.repository == 'cloudinfraz/s3proxy-rs-ui' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      id-token: write
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: ${{ inputs.deployment_environment }}
@@ -63,9 +66,16 @@ jobs:
       UI_DIGEST: ${{ inputs.ui_digest }}
       UI_REVISION: ${{ inputs.ui_revision }}
       NETWORK_POLICY_ENABLED: ${{ inputs.network_policy_enabled }}
+      DEPLOYMENT_ENVIRONMENT: ${{ inputs.deployment_environment }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify trusted deployment source
+        run: node scripts/release/verify-release-source.mjs "$DEPLOYMENT_ENVIRONMENT" "$UI_REVISION"
 
       - name: Validate protected UI deployment inputs
         run: |
@@ -108,8 +118,8 @@ jobs:
       - name: Verify immutable UI image signature
         run: |
           set -euo pipefail
-          identity='^https://github.com/cloudinfraz/s3proxy-rs-ui/.github/workflows/publish-ui-image.yml@refs/.*$'
-          cosign verify --certificate-identity-regexp "$identity" \
+          identity='https://github.com/cloudinfraz/s3proxy-rs-ui/.github/workflows/publish-ui-image.yml@refs/heads/main'
+          cosign verify --certificate-identity "$identity" \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
             "${ACR_LOGIN_SERVER}/s3proxy-ui@${UI_DIGEST}"
 
@@ -124,9 +134,9 @@ jobs:
       - name: Verify pre-provisioned namespace
         run: kubectl get namespace s3proxy >/dev/null
 
-      - name: Remove UI NetworkPolicy when disabled
-        if: inputs.network_policy_enabled == false
-        run: kubectl -n s3proxy delete networkpolicy allow-ui-admin --ignore-not-found
+      - name: Require existing production network isolation when not rendering it
+        if: inputs.deployment_environment == 'production' && inputs.network_policy_enabled == false
+        run: kubectl -n s3proxy get networkpolicy allow-ui-admin >/dev/null
 
       - name: Prepare deployed UI browser
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -154,7 +164,7 @@ jobs:
           node scripts/deploy/verify-ui-runtime.mjs "$expected" "$UI_REVISION"
           kubectl -n s3proxy annotate deployment/s3proxy-ui s3proxy.rs/oci-revision="$UI_REVISION" --overwrite >/dev/null
           kubectl -n s3proxy run split-ui-check --rm -i --restart=Never \
-            --labels='s3proxy.rs/access-control=true' --image="$CURL_IMAGE" \
+            --labels='s3proxy.rs/access-ui=true' --image="$CURL_IMAGE" \
             --command -- curl -fsS http://s3proxy-ui.s3proxy.svc.cluster.local:8080/health
 
       - name: Run deployed UI browser acceptance

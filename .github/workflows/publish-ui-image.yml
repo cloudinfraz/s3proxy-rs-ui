@@ -50,23 +50,68 @@ concurrency:
 
 permissions:
   contents: read
-  id-token: write
-  attestations: write
 
 env:
   DOCKER_BUILD_RECORD_UPLOAD: "false"
 
 jobs:
+  validate:
+    if: github.repository == 'cloudinfraz/s3proxy-rs-ui' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    env:
+      RELEASE_ENVIRONMENT: ${{ inputs.release_environment }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify trusted release source
+        run: node scripts/release/verify-release-source.mjs "$RELEASE_ENVIRONMENT" "$GITHUB_SHA"
+
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Run shared release validation
+        run: bash scripts/release/validate-ui.sh
+
+      - name: Upload validated static assets
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: validated-ui-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 1
+
   publish:
+    needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: ${{ inputs.release_environment }}
+    permissions:
+      contents: read
+      id-token: write
     outputs:
       ui_digest: ${{ steps.ui.outputs.digest }}
       ui_revision: ${{ github.sha }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download validated static assets
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: validated-ui-${{ github.sha }}
+          path: dist/
 
       - name: Azure login
         uses: azure/login@7ddb5af1ef8758cf1353cf3b42f940aee27ba21c # v3.0.2
@@ -84,19 +129,6 @@ jobs:
           [[ -n "$ACR_NAME" ]] || { echo "Missing S3PROXY_ACR_NAME" >&2; exit 1; }
           az acr login --name "$ACR_NAME"
           echo "login_server=${ACR_NAME}.azurecr.io" >> "$GITHUB_OUTPUT"
-
-      - name: Install Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: .node-version
-          cache: npm
-
-      - name: Build and validate assets
-        run: |
-          npm ci --ignore-scripts --registry=https://registry.npmjs.org/
-          npm run lint
-          npm test
-          npm run build
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0

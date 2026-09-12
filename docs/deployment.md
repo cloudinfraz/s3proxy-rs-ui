@@ -55,8 +55,14 @@ When enabled, ingress to UI pods on port `8080` is accepted from either:
 
 Confirm that your ingress controller, gateway, or administrative client has the
 appropriate label before enabling the policy. Rendering without the policy does
-not remove a previously applied NetworkPolicy; the deployment workflow handles
-that cleanup when its option is disabled.
+not remove a previously applied NetworkPolicy, and neither does the deployment
+workflow. The default `network_policy_enabled=false` leaves existing isolation
+under operator control; it does not disable isolation. Production deployments
+with this option require an existing `allow-ui-admin` policy before applying
+resources. For the first production deployment, provision the policy separately
+or explicitly set `network_policy_enabled=true` after configuring access labels.
+The cluster network plugin must enforce NetworkPolicy; operators must verify
+the existing policy rules and actual allowed/denied traffic independently.
 
 ## Runtime contract
 
@@ -71,10 +77,20 @@ default seccomp profile.
 
 ## GitHub release workflows
 
-**Publish UI image** builds, validates, scans, signs, and publishes an immutable
-image. It can optionally invoke **Deploy UI**, which verifies the signature and
-embedded source revision before applying the manifest and running deployed
-browser acceptance tests.
+**Publish UI image** and **Deploy UI** run only from `main` in the canonical
+repository and accept only the `staging` and `production` environments. Before
+Azure login they verify that the requested source revision belongs to `main`.
+**Deploy UI** accepts only the exact Cosign identity of **Publish UI image** at
+`refs/heads/main`, not signatures from arbitrary branches or tags.
+
+Both image publication entrypoints use `scripts/release/validate-ui.sh` for
+dependency audit, pinned API contract validation, lint, unit/deployment/release
+tests, build, and browser acceptance. ACR validation runs in a separate job with
+only `contents: read`, no protected environment, and no OIDC permission. Only
+after success does the protected publisher download the validated static assets,
+build the image without npm execution, scan it, and sign its immutable digest.
+GitHub Release also reuses its validation job's static assets instead of
+rebuilding them in the privileged publishing job.
 
 Each protected `staging` or `production` GitHub environment requires:
 
@@ -95,11 +111,20 @@ staging, it is:
 repo:cloudinfraz/s3proxy-rs-ui:environment:staging
 ```
 
-Configure an equivalent protected subject for production. Grant only the ACR
-and AKS permissions required by the workflows.
+Configure an equivalent protected subject for production. Restrict both GitHub
+environments to the protected `main` branch, require production approval, and
+disable approval bypass where available. These server-side protections are
+required: workflow checks alone cannot stop an actor who can modify a workflow
+on another branch from removing those checks. Protect workflow and release-script
+changes through review. Grant only the ACR and AKS permissions required by the
+workflows; prefer separate publishing and deployment identities. These settings
+are managed outside this repository and are not provisioned by the workflows.
 
 ## Rollback
 
 Redeploy a previously verified image digest and its matching full source
 revision through **Deploy UI**. Do not retag an image or bypass signature and
-revision verification.
+revision verification. Run the workflow from `main`; older revisions already
+merged into `main` remain eligible, but images signed from another branch or tag
+are intentionally rejected. Rebuild those revisions through the trusted release
+process instead of widening the signature identity allowlist.
