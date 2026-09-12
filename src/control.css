@@ -375,6 +375,71 @@ td {
   padding-top: 15px;
 }
 
+.control-dialog-wide {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - var(--space-6) - max(var(--space-6), 6dvh));
+  overflow: hidden;
+}
+
+.control-dialog-wide .dialog-header {
+  flex: 0 0 auto;
+  border-bottom: 1px solid #e2e6e3;
+  padding-bottom: 12px;
+}
+
+.control-dialog .dialog-heading {
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.control-dialog .dialog-heading h2 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.control-dialog .dialog-heading .icon-button {
+  flex-shrink: 0;
+}
+
+.dialog-body {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding-top: 12px;
+}
+
+.dialog-toolbar,.dialog-discard {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.dialog-discard p {
+  flex-basis: 100%;
+}
+
+.control-dialog-wide .dialog-actions {
+  position: sticky;
+  bottom: 0;
+  background: var(--color-panel-solid);
+  padding-bottom: 4px;
+  flex-wrap: wrap;
+  z-index: 1;
+}
+
+.control-dialog-wide .policy-document {
+  max-height: none;
+}
+
+@media(max-width:560px) {
+  .dialog-toolbar button {
+    min-width: 0;
+    white-space: normal;
+  }
+}
+
 .icon-button {
   display: inline-grid;
   place-items: center;

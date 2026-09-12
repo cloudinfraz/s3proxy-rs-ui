@@ -10,11 +10,20 @@ import RolesPage from './RolesPage'
 vi.mock('@tanstack/react-query', async importOriginal => ({ ...(await importOriginal<typeof import('@tanstack/react-query')>()), useQuery: vi.fn() }))
 vi.mock('../../api/client', () => ({ api: vi.fn() }))
 vi.mock('../../components/control', () => ({
+  DialogFlow: ({ children }: { children: ReactNode }) => <>{children}</>,
+  Modal: ({ title, children, actions, onClose }: { title: string; children: ReactNode; actions?: ReactNode; onClose: () => void }) => <section role="dialog" aria-label={title}>{actions}{children}<button onClick={onClose}>Close dialog</button></section>,
   Page: ({ title, action, children }: { title: string; action: ReactNode; children: ReactNode }) => <main><h1>{title}</h1>{action}{children}</main>,
   RefreshButton: ({ refresh }: { refresh: () => void }) => <button onClick={refresh}>Refresh</button>,
   ErrorBanner: ({ error, retry }: { error: Error; retry?: () => void }) => <div role="alert">{error.message}{retry && <button onClick={retry}>Retry</button>}</div>,
   DataTable: ({ rows, loading, columns }: { rows: unknown[]; loading: boolean; columns: Array<{ label: string; value: (row: never) => ReactNode }> }) => loading ? <p role="status">Loading...</p> : <div>{rows.length ? rows.map((row, index) => <div key={index}>{columns.map(column => <span key={column.label}>{column.value(row as never)}</span>)}</div>) : 'No records'}</div>,
 }))
+vi.mock('@radix-ui/themes', () => ({ DropdownMenu: {
+  Root: ({ children }: { children: ReactNode }) => <>{children}</>,
+  Trigger: ({ children }: { children: ReactNode }) => <>{children}</>,
+  Content: ({ children }: { children: ReactNode }) => <>{children}</>,
+  Separator: () => <hr />,
+  Item: ({ children, onSelect, disabled }: { children: ReactNode; onSelect: () => void; disabled?: boolean }) => <button disabled={disabled} onClick={onSelect}>{children}</button>,
+} }))
 vi.mock('./RoleDialog', () => ({ default: ({ operation, close, changed }: { operation: string; close: () => void; changed: (detail: Schema['AdminIamRoleDetail'] | null) => void }) => <section role="dialog" aria-label={operation}><button onClick={close}>Close operation</button><button onClick={() => { changed(null); close() }}>Apply deletion</button></section> }))
 
 const limits: Schema['IamRoleLimits'] = { min_duration_seconds: 3600, max_duration_seconds: 43200, max_retirement_batch: 1000, retained_count_cap: 1000, default_page_size: 100, max_page_size: 200 }
@@ -74,6 +83,22 @@ describe('RolesPage', () => {
     expect(screen.getByRole('dialog', { name: 'create' })).toBeTruthy()
   })
 
+  it('does not reopen a closed detail popup when a delayed response arrives', async () => {
+    let resolveRequest: (value: Schema['AdminIamRoleDetail']) => void = () => undefined
+    const response = new Promise<Schema['AdminIamRoleDetail']>(resolve => { resolveRequest = resolve })
+    mockQueries(query({ data: { items: [role], next_after_id: null, limits } }))
+    vi.mocked(api).mockReturnValueOnce(response)
+    render(<RolesPage />)
+    fireEvent.click(screen.getByRole('button', { name: 'View Reader' }))
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    expect(screen.getByRole('status').textContent).toBe('Loading role...')
+    expect(screen.getByRole('button', { name: 'Change duration' })).toHaveProperty('disabled', true)
+    fireEvent.click(screen.getByRole('button', { name: 'Close dialog' }))
+    resolveRequest(detail)
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(screen.queryByText(role.role_arn)).toBeNull()
+  })
+
   it('moves between role pages and refreshes the selected detail', async () => {
     const roles = query({ data: { items: [role], next_after_id: 'next role', limits } })
     mockQueries(roles)
@@ -88,7 +113,7 @@ describe('RolesPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'View Reader' }))
     await screen.findByText(role.role_arn)
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+    fireEvent.click(screen.getAllByRole('button', { name: 'Refresh' })[0])
     await waitFor(() => expect(api).toHaveBeenCalledTimes(2))
     expect(roles.refetch).toHaveBeenCalledOnce()
   })
@@ -103,7 +128,10 @@ describe('RolesPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Change duration' }))
     expect(screen.getByRole('dialog', { name: 'settings' })).toBeTruthy()
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    expect(screen.queryByRole('region', { name: 'Role details' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Close operation' }))
+    expect(screen.getByRole('region', { name: 'Role details' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Delete role' }))
     expect(screen.getByRole('dialog', { name: 'delete' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Apply deletion' }))

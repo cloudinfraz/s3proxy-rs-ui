@@ -18,7 +18,7 @@
   overflow-wrap: anywhere;
 }
 
-.role-details h3 {
+.role-details h3,.role-detail-content h3 {
   font-size: 15px;
   margin: 24px 0 12px;
 }

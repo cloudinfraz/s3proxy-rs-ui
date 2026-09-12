@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, ChevronRight, Eye, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Eye, Pencil, Plus, Trash2 } from 'lucide-react'
 import { api, ApiError } from '../../api/client'
 import type { Schema } from '../../api/control'
 import { invalidateControl } from '../../api/query-keys'
-import { DataTable, DestructiveDialog, ErrorBanner, Modal, RefreshButton } from '../../components/control'
+import { DataTable, DestructiveDialog, DialogFlow, ErrorBanner, Modal, RefreshButton } from '../../components/control'
 import { completionGuard } from '../operations/state'
 import { createPolicyRequest, deletePolicyRequest, emptyPolicyDocument, formatPolicyDocument, policyKeys, updatePolicyRequest, validationRequest, type PolicyDetail, type PolicySummary } from './policy-state'
 
@@ -15,6 +15,7 @@ type PolicyReview = {
 }
 
 export default function ManagedPolicies() {
+  const createButton = useRef<HTMLButtonElement>(null)
   const [cursors, setCursors] = useState<Array<string | null>>([null])
   const cursor = cursors[cursors.length - 1]
   const policies = useQuery({ queryKey: policyKeys.managedList(cursor), queryFn: async () => {
@@ -28,7 +29,7 @@ export default function ManagedPolicies() {
 
   function select(policy: PolicySummary) { setSelectedId(policy.id); setOperation(null) }
   return <section className="policy-section" aria-labelledby="managed-policy-title">
-    <div className="section-heading"><div><h2 id="managed-policy-title">Managed policies</h2><p>Names are immutable after creation. Permission changes affect attached identities and active role sessions.</p></div><div className="page-actions"><RefreshButton pending={policies.isFetching || detail.isFetching} refresh={() => { void policies.refetch(); if (selectedId) void detail.refetch() }} /><button className="primary" onClick={() => setOperation('create')}><Plus size={16} />Create policy</button></div></div>
+    <div className="section-heading"><div><h2 id="managed-policy-title">Managed policies</h2><p>Names are immutable after creation. Permission changes affect attached identities and active role sessions.</p></div><div className="page-actions"><RefreshButton pending={policies.isFetching || detail.isFetching} refresh={() => { void policies.refetch(); if (selectedId) void detail.refetch() }} /><button ref={createButton} className="primary" onClick={() => setOperation('create')}><Plus size={16} />Create policy</button></div></div>
     {policies.isError && <ErrorBanner error={policies.error} retry={() => { void policies.refetch() }} />}
     <DataTable rows={policies.data?.items ?? []} loading={policies.isPending} rowKey={row => row.id} columns={[
       { label: 'Name', value: row => <strong>{row.name}</strong> },
@@ -38,12 +39,14 @@ export default function ManagedPolicies() {
       { label: 'Actions', value: row => <button className="icon-button" aria-label={`View ${row.name}`} title="View policy" onClick={() => select(row)}><Eye size={16} /></button> },
     ]} />
     <div className="policy-pagination"><button className="icon-button" aria-label="Previous policy page" title="Previous policy page" disabled={cursors.length === 1 || policies.isFetching} onClick={() => setCursors(value => value.slice(0, -1))}><ChevronLeft size={16} /></button><span>Page {cursors.length}</span><button className="icon-button" aria-label="Next policy page" title="Next policy page" disabled={!policies.data?.next_after_id || policies.isFetching} onClick={() => { if (policies.data?.next_after_id) setCursors(value => [...value, policies.data!.next_after_id]) }}><ChevronRight size={16} /></button></div>
-    {selectedId && <section className="policy-detail" aria-label="Managed policy detail"><div className="section-heading"><h2>{detail.data?.policy.name ?? 'Policy detail'}</h2><button className="icon-button" aria-label="Close policy detail" title="Close detail" onClick={() => setSelectedId(null)}><X size={16} /></button></div>
+    {(selectedId || operation) && <DialogFlow fallbackFocus={createButton}>
+    {selectedId && !operation && <Modal wide title={detail.data?.policy.name ?? 'Policy details'} description="Managed policy details" onClose={() => setSelectedId(null)} actions={<><RefreshButton pending={detail.isFetching} refresh={() => { void detail.refetch() }} /><button disabled={!detail.data || detail.isError || detail.isFetching} onClick={() => setOperation('edit')}><Pencil size={16} />Edit policy</button><button className="danger" disabled={!detail.data?.policy.deletable || detail.isError || detail.isFetching} onClick={() => setOperation('delete')}><Trash2 size={16} />Delete policy</button></>}><section aria-label="Managed policy detail">
       {detail.isError && <ErrorBanner error={detail.error} retry={() => { void detail.refetch() }} />}
       {detail.isPending && <p role="status">Loading policy...</p>}
-      {detail.data && <><dl className="policy-detail-grid"><dt>Policy ID</dt><dd>{detail.data.policy.id}</dd><dt>Name</dt><dd>{detail.data.policy.name}</dd><dt>Description</dt><dd>{detail.data.policy.description ?? 'None'}</dd><dt>Revision</dt><dd>{detail.data.policy.revision}</dd><dt>Identity attachments</dt><dd>{detail.data.policy.credential_attachment_count}</dd><dt>Role attachments</dt><dd>{detail.data.policy.role_attachment_count}</dd><dt>Protection</dt><dd>{detail.data.policy.deletable ? 'Deletable' : 'Built in and protected'}</dd></dl><pre className="policy-document">{formatPolicyDocument(detail.data.document)}</pre><div className="policy-actions"><button onClick={() => setOperation('edit')}><Pencil size={16} />Edit policy</button><button className="danger" disabled={!detail.data.policy.deletable} onClick={() => setOperation('delete')}><Trash2 size={16} />Delete policy</button></div></>}
-    </section>}
-    {operation && <PolicyDialog operation={operation} initial={operation === 'create' ? undefined : detail.data} close={() => setOperation(null)} changed={changed => { setOperation(null); setCursors([null]); if (changed) setSelectedId(changed.policy.id); else setSelectedId(null) }} />}
+      {detail.data && <><dl className="policy-detail-grid"><dt>Policy ID</dt><dd>{detail.data.policy.id}</dd><dt>Name</dt><dd>{detail.data.policy.name}</dd><dt>Description</dt><dd>{detail.data.policy.description ?? 'None'}</dd><dt>Revision</dt><dd>{detail.data.policy.revision}</dd><dt>Identity attachments</dt><dd>{detail.data.policy.credential_attachment_count}</dd><dt>Role attachments</dt><dd>{detail.data.policy.role_attachment_count}</dd><dt>Protection</dt><dd>{detail.data.policy.deletable ? 'Deletable' : 'Built in and protected'}</dd></dl><pre className="policy-document">{formatPolicyDocument(detail.data.document)}</pre></>}
+    </section></Modal>}
+    {operation && <PolicyDialog operation={operation} initial={operation === 'create' ? undefined : detail.data} close={() => setOperation(null)} changed={changed => { setOperation(null); if (operation === 'create') setCursors([null]); if (changed) setSelectedId(changed.policy.id); else setSelectedId(null) }} />}
+    </DialogFlow>}
   </section>
 }
 
@@ -53,6 +56,8 @@ function PolicyDialog({ operation, initial, close, changed }: { operation: Opera
   const [draftName, setDraftName] = useState(name)
   const [description, setDescription] = useState(initial?.policy.description ?? '')
   const [document, setDocument] = useState(initial ? formatPolicyDocument(initial.document) : emptyPolicyDocument)
+  const [initialDraft] = useState({ draftName, description, document })
+  const dirty = draftName !== initialDraft.draftName || description !== initialDraft.description || document !== initialDraft.document
   const [review, setReview] = useState<PolicyReview | null>(null)
   const [validation, setValidation] = useState<Schema['AdminPolicyDraftValidationResponse'] | null>(null)
   const [error, setError] = useState<Error | null>(null)
@@ -124,7 +129,7 @@ function PolicyDialog({ operation, initial, close, changed }: { operation: Opera
     <dl className="policy-detail-grid"><dt>Name</dt><dd>{review.authoritative.policy.name}</dd><dt>Reviewed revision</dt><dd>{review.authoritative.policy.revision}</dd><dt>Identity impact</dt><dd>{review.authoritative.policy.credential_attachment_count} attachments</dd><dt>Role impact</dt><dd>{review.authoritative.policy.role_attachment_count} attachments and active sessions</dd></dl>
   </DestructiveDialog>
 
-  return <Modal title={review ? `Confirm: ${title}` : title} description="This changes S3 authorization metadata only. Azure containers, blobs, and routing are unchanged." onClose={close} pending={pending}>
+  return <Modal wide dirty={dirty} title={review ? `Confirm: ${title}` : title} description="This changes S3 authorization metadata only. Azure containers, blobs, and routing are unchanged." onClose={close} pending={pending}>
     {error && <ErrorBanner error={error} retry={stale ? () => { void prepare() } : undefined} />}
     {stale && <p className="policy-notice" role="status">The review was stale. Authoritative state was refreshed; your unsaved draft is preserved for another review.</p>}
     {review ? <><dl className="policy-detail-grid"><dt>Name</dt><dd>{operation === 'create' ? draftName : review.authoritative?.policy.name ?? name}</dd>{operation !== 'delete' && <><dt>Description</dt><dd>{description || 'None'}</dd><dt>Validated bytes</dt><dd>{validation?.json_bytes ?? 'Unavailable'}</dd><dt>Statements</dt><dd>{validation?.statements ?? 'Unavailable'}</dd></>}{review.authoritative && <><dt>Reviewed revision</dt><dd>{review.authoritative.policy.revision}</dd><dt>Identity impact</dt><dd>{review.authoritative.policy.credential_attachment_count} attachments</dd><dt>Role impact</dt><dd>{review.authoritative.policy.role_attachment_count} attachments and active sessions</dd></>}</dl><div className="dialog-actions"><button disabled={pending} onClick={() => setReview(null)}>Back</button><button className="primary" disabled={pending} onClick={() => { void persist() }}>{pending ? 'Applying...' : 'Confirm change'}</button></div></>

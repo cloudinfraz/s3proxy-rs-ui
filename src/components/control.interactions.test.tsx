@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { StrictMode, useRef, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { DataTable, ErrorBanner, Page, RefreshButton } from './control'
+import { DataTable, DialogFlow, ErrorBanner, Modal, Page, RefreshButton } from './control'
 import { EphemeralCredentials } from './EphemeralCredentials'
 
 beforeEach(() => {
@@ -21,6 +22,61 @@ afterEach(() => {
 })
 
 describe('shared control interactions', () => {
+  it('keeps a single dialog active and returns focus to the row after a flow closes', async () => {
+    function Flow() {
+      const [view, setView] = useState<'detail' | 'edit' | null>(null)
+      const fallback = useRef<HTMLButtonElement>(null)
+      return <><button ref={fallback}>Create</button><button onClick={() => setView('detail')}>View record</button>{view && <DialogFlow fallbackFocus={fallback}>
+        <Modal key={view} wide title={view} description="Record" onClose={() => setView(null)}><button onClick={() => setView(view === 'detail' ? 'edit' : 'detail')}>{view === 'detail' ? 'Edit' : 'Cancel'}</button></Modal>
+      </DialogFlow>}</>
+    }
+    render(<StrictMode><Flow /></StrictMode>)
+    const opener = screen.getByRole('button', { name: 'View record' })
+    opener.focus()
+    fireEvent.click(opener)
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'detail' })))
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'edit' })))
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'detail' })))
+    fireEvent.click(screen.getByRole('button', { name: 'Close dialog' }))
+    await waitFor(() => expect(document.activeElement).toBe(opener))
+  })
+
+  it('restores fallback focus when deletion removes the originating row', async () => {
+    function Flow() {
+      const [open, setOpen] = useState(false)
+      const [deleted, setDeleted] = useState(false)
+      const fallback = useRef<HTMLButtonElement>(null)
+      return <><button ref={fallback}>Create</button>{!deleted && <button onClick={() => setOpen(true)}>View record</button>}{open && <DialogFlow fallbackFocus={fallback}><Modal title="Record" description="Details" onClose={() => setOpen(false)}><button onClick={() => { setDeleted(true); setOpen(false) }}>Delete</button></Modal></DialogFlow>}</>
+    }
+    render(<Flow />)
+    const opener = screen.getByRole('button', { name: 'View record' })
+    opener.focus()
+    fireEvent.click(opener)
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Create' })))
+  })
+
+  it('requires explicit discard when closing a dirty editor and blocks dismissal while pending', () => {
+    const close = vi.fn()
+    const view = render(<Modal wide dirty title="Edit" description="Draft" onClose={close}><input aria-label="Document" defaultValue="draft" /></Modal>)
+    fireEvent.click(screen.getByRole('button', { name: 'Close dialog' }))
+    expect(close).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert').textContent).toContain('Discard unsaved changes?')
+    fireEvent.click(screen.getByRole('button', { name: 'Keep editing' }))
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.getByLabelText('Document')).toHaveProperty('value', 'draft')
+    fireEvent.click(screen.getByRole('button', { name: 'Close dialog' }))
+    view.rerender(<Modal wide dirty pending title="Edit" description="Draft" onClose={close}><input aria-label="Document" defaultValue="draft" /></Modal>)
+    fireEvent.click(screen.getByRole('button', { name: 'Discard changes' }))
+    expect(close).not.toHaveBeenCalled()
+    view.rerender(<Modal wide dirty title="Edit" description="Draft" onClose={close}><input aria-label="Document" defaultValue="draft" /></Modal>)
+    fireEvent.click(screen.getByRole('button', { name: 'Discard changes' }))
+    expect(close).toHaveBeenCalledOnce()
+  })
+
   it('focuses page headings and emits retry and refresh callbacks', async () => {
     const retry = vi.fn()
     const refresh = vi.fn()
