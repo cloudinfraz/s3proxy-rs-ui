@@ -9,7 +9,7 @@ import RoleDialog from './RoleDialog'
 
 vi.mock('@tanstack/react-query', async importOriginal => ({ ...(await importOriginal<typeof import('@tanstack/react-query')>()), useQuery: vi.fn(), useQueryClient: () => ({ invalidateQueries: vi.fn() }) }))
 vi.mock('../../api/client', () => ({ api: vi.fn(), ApiError: class extends Error { status = 409 } }))
-vi.mock('../../api/query-keys', async importOriginal => ({ ...(await importOriginal<typeof import('../../api/query-keys')>()), invalidateControl: vi.fn(), controlKeys: { list: (value: string) => ['control', value], identityPage: (afterId: string | null) => ['control', 'identities', 'page', afterId] } }))
+vi.mock('../../api/query-keys', async importOriginal => ({ ...(await importOriginal<typeof import('../../api/query-keys')>()), invalidateControl: vi.fn(), controlKeys: { list: (value: string) => ['control', value], identityPage: (afterId: string | null) => ['control', 'identities', 'page', afterId], detail: (resource: string, id: string) => ['control', resource, 'detail', id] } }))
 vi.mock('../../components/control', () => ({
   ErrorBanner: ({ error }: { error: Error }) => <div role="alert">{error.message}</div>,
   Modal: ({ title, children }: { title: string; children: ReactNode }) => <section role="dialog" aria-label={title}>{children}</section>,
@@ -24,12 +24,18 @@ const detail: Schema['AdminIamRoleDetail'] = { role, trust: { statements: [] }, 
 const policy: Schema['AdminIamRolePolicy'] = { id: 'policy-id', name: 'ReadOnly', revision: 2 }
 const identityPage = { items: [identity], next_after_id: null }
 const identityQuery = { data: identityPage, isError: false, isFetching: false, refetch: vi.fn().mockResolvedValue({ data: identityPage, isError: false }) }
+const identityDetailQuery = { data: identity, isError: false, isFetching: false, refetch: vi.fn().mockResolvedValue({ data: identity, isError: false }) }
 const policyQuery = { data: { items: [], next_after_id: null }, isError: false, isFetching: false, refetch: vi.fn() }
 beforeEachMock()
 function beforeEachMock() {
   identityQuery.refetch.mockResolvedValue({ data: identityPage, isError: false })
+  identityDetailQuery.refetch.mockResolvedValue({ data: identity, isError: false })
   policyQuery.refetch.mockResolvedValue(undefined)
-  vi.mocked(useQuery).mockImplementation(options => ((options as { enabled?: boolean }).enabled === false ? policyQuery : identityQuery) as never)
+  vi.mocked(useQuery).mockImplementation(options => {
+    const key = (options as { queryKey?: unknown[] }).queryKey ?? []
+    if (key.includes('detail')) return identityDetailQuery as never
+    return ((options as { enabled?: boolean }).enabled === false ? policyQuery : identityQuery) as never
+  })
 }
 afterEach(() => { cleanup(); vi.resetAllMocks(); beforeEachMock() })
 
@@ -104,7 +110,12 @@ describe('RoleDialog', () => {
   it('pages policy options and persists a reviewed attachment', async () => {
     const firstPage = { items: [policy], next_after_id: 'next policy' }
     const attachQuery = { data: firstPage, isError: false, isFetching: false, refetch: vi.fn().mockResolvedValue({ data: firstPage, isError: false }) }
-    vi.mocked(useQuery).mockImplementation(options => ((options as { queryKey?: unknown[] }).queryKey?.includes('role-options') ? attachQuery : identityQuery) as never)
+    vi.mocked(useQuery).mockImplementation(options => {
+      const key = (options as { queryKey?: unknown[] }).queryKey ?? []
+      if (key.includes('role-options')) return attachQuery as never
+      if (key.includes('detail')) return identityDetailQuery as never
+      return identityQuery as never
+    })
     vi.mocked(api).mockResolvedValueOnce(detail).mockResolvedValueOnce({ detail: { ...detail, policies: [policy] }, retired_sessions: null })
     const close = vi.fn()
     const changed = vi.fn()
