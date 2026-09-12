@@ -3,8 +3,9 @@ import { flushSync } from 'react-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router'
 import { ChevronLeft, ChevronRight, Eye, KeyRound, Pencil, Plus, RotateCw, Trash2 } from 'lucide-react'
-import { api, ApiError } from '../../api/client'
+import { ApiError } from '../../api/client'
 import { controlQueries, type Schema } from '../../api/control'
+import { invokeOperation } from '../../api/operations'
 import { invalidateControl } from '../../api/query-keys'
 import { DataTable, DestructiveDialog, ErrorBanner, Modal, Page, RefreshButton } from '../../components/control'
 import { EphemeralCredentials, type EphemeralCredentialMaterial } from '../../components/EphemeralCredentials'
@@ -84,14 +85,13 @@ export default function IdentitiesPage() {
     }
     const request = begin()
     try {
-      const result = await api<Schema['CredentialCreatedResponse']>('/admin/credentials', {
-        method: 'POST',
-        body: JSON.stringify((directMappingsOnly ? createDirectMappingPayload : createIdentityPayload)({
+      const result = await invokeOperation('createCredential', {
+        body: (directMappingsOnly ? createDirectMappingPayload : createIdentityPayload)({
           azureAccount: String(form.get('azure_account')),
           accessMode: String(form.get('access_mode')) as Schema['CredentialAccessMode'],
           versioningEnabled: form.get('versioning_enabled') === 'on',
           defaultBackendId: backendId,
-        })),
+        }),
       })
       if (!guard.current.current(request)) return
       if (!isNonBlank(result.s3_access_key) || !isNonBlank(result.s3_secret_key)) throw new Error('The server did not return one-time credentials')
@@ -120,15 +120,15 @@ export default function IdentitiesPage() {
           versioningEnabled: form.get('versioning_enabled') === 'on',
           defaultBackendId: backendOptions.some(backend => backend.id === selectedBackendId && !backend.disabled) ? selectedBackendId : '',
         }
-        await api(`/admin/credentials/${encodeURIComponent(action.identity.s3_access_key)}`, {
-          method: 'PUT',
-          body: JSON.stringify(directMappingsOnly ? updateDirectMappingPayload(input) : updateIdentityPayload(input)),
+        await invokeOperation('updateCredential', {
+          parameters: { path: { access_key: action.identity.s3_access_key } },
+          body: directMappingsOnly ? updateDirectMappingPayload(input) : updateIdentityPayload(input),
         })
       } else if (action.kind === 'delete') {
-        await api(`/admin/credentials/${encodeURIComponent(action.identity.s3_access_key)}`, { method: 'DELETE' })
+        await invokeOperation('deleteCredential', { parameters: { path: { access_key: action.identity.s3_access_key } } })
       } else if (action.kind === 'rotate') {
         if (!action.identity.credential_id) throw new Error('Identity has no stable identifier')
-        const result = await api<Schema['RotateCredentialSecretResponse']>(`/admin/credentials/${encodeURIComponent(action.identity.credential_id)}/rotate-secret`, { method: 'POST' })
+        const result = await invokeOperation('rotateCredentialSecret', { parameters: { path: { credential_id: action.identity.credential_id } } })
         if (!guard.current.current(request)) return
         setAction(null)
         setOneTime({ credentialId: result.credential_id, accessMode: action.identity.access_mode, accessKey: result.s3_access_key, secretKey: result.s3_secret_key })

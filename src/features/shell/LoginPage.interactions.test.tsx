@@ -17,10 +17,13 @@ const clientMocks = vi.hoisted(() => ({
 
 vi.mock('../../api/client', async importOriginal => ({
   ...await importOriginal<typeof import('../../api/client')>(),
+  setCsrfToken: clientMocks.setCsrfToken,
+}))
+vi.mock('../../api/operations', async importOriginal => ({
+  ...await importOriginal<typeof import('../../api/operations')>(),
   getSession: clientMocks.getSession,
   login: clientMocks.login,
   logout: clientMocks.logout,
-  setCsrfToken: clientMocks.setCsrfToken,
 }))
 
 function renderLogin() {

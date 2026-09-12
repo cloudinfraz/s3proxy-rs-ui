@@ -82,9 +82,25 @@ test('UI072-04 direct details are read-only and fail closed for unavailable rout
 })
 
 type Mapping = components['schemas']['AdminVirtualMapping']
+type MappingSummary = components['schemas']['VirtualMappingSummary']
 const ownerId = collections['/admin/virtual-buckets'][0].credential_id
 const secondOwnerId = '00000000-0000-4000-8000-000000000002'
 const selectedBackend = '00000000-0000-4000-8000-000000000003'
+
+function mappingSummary(mapping: Mapping, credentialAccessKey: string): MappingSummary {
+  return {
+    id: mapping.id,
+    virtual_bucket_name: mapping.virtual_bucket_name,
+    azure_container: mapping.azure_container,
+    credential_id: mapping.credential_id,
+    credential_access_key: credentialAccessKey,
+    backend_id: mapping.backend_id,
+    endpoint_prefix: mapping.endpoint_prefix,
+    enabled: mapping.enabled,
+    created_at: mapping.created_at,
+    updated_at: mapping.updated_at,
+  }
+}
 
 async function mappingFixture(page: Page, empty = false) {
   const verifyControl = await mockControlApi(page)
@@ -92,7 +108,20 @@ async function mappingFixture(page: Page, empty = false) {
   const denied: string[] = []
   let token = 1
   const nextToken = () => (token++).toString(16).padStart(32, '0')
-  const initial: Mapping = { ...collections['/admin/ui/virtual-buckets'].items[0], credential_default_backend_id: ownerId, impact_token: nextToken() }
+  const summary = collections['/admin/ui/virtual-buckets'].items[0]
+  const initial: Mapping = {
+    id: summary.id,
+    virtual_bucket_name: summary.virtual_bucket_name,
+    azure_container: summary.azure_container,
+    credential_id: summary.credential_id,
+    backend_id: summary.backend_id,
+    endpoint_prefix: summary.endpoint_prefix,
+    enabled: summary.enabled,
+    created_at: summary.created_at,
+    updated_at: summary.updated_at,
+    credential_default_backend_id: ownerId,
+    impact_token: nextToken(),
+  }
   let rows: Mapping[] = empty ? [] : [initial, { ...initial, id: secondOwnerId, credential_id: secondOwnerId, impact_token: nextToken() }]
   const flags = { conflict: false, removalFailure: false, backendDisabled: false, effectiveBackendDisabled: false }
   await page.route('**/*', async route => {
@@ -112,7 +141,10 @@ async function mappingFixture(page: Page, empty = false) {
     if (path === `/admin/ui/backend-options/${ownerId}` && method === 'GET') return route.fulfill({ json: { ...collections['/admin/ui/backend-options'].items[0], enabled: !flags.effectiveBackendDisabled } })
     if (path === `/admin/ui/backend-options/${selectedBackend}` && method === 'GET') return route.fulfill({ json: { ...collections['/admin/ui/backend-options'].items[0], id: selectedBackend, name: 'second-backend', azure_account: 'otheraccount' } })
     if (path === `/admin/ui/mapping-backends/${selectedBackend}` && method === 'GET') return route.fulfill({ json: { id: selectedBackend, azure_account: 'otheraccount', auth_mode: 'managed_identity', enabled: !flags.backendDisabled, revision: 7 } })
-    if (path === '/admin/ui/virtual-buckets' && method === 'GET') return route.fulfill({ json: { items: rows, next_after_id: null } })
+    if (path === '/admin/ui/virtual-buckets' && method === 'GET') return route.fulfill({ json: {
+      items: rows.map(row => mappingSummary(row, row.credential_id === secondOwnerId ? 'second-owner' : 'fixture-access')),
+      next_after_id: null,
+    } satisfies components['schemas']['VirtualMappingPage'] })
     if (path === '/admin/ui/virtual-buckets' && method === 'POST') {
       const body = request.postDataJSON() as components['schemas']['CreateVirtualMapping']
       requests.push({ method, body })
@@ -135,7 +167,11 @@ async function mappingFixture(page: Page, empty = false) {
         rows = rows.filter(row => row.id !== id)
         return route.fulfill({ status: 204 })
       }
-      Object.assign(mapping, body, { impact_token: nextToken() })
+      if (body.azure_container !== undefined) mapping.azure_container = body.azure_container
+      if (body.backend_id !== undefined) mapping.backend_id = body.backend_id
+      if (body.endpoint_prefix !== undefined) mapping.endpoint_prefix = body.endpoint_prefix
+      if (body.enabled !== undefined) mapping.enabled = body.enabled
+      mapping.impact_token = nextToken()
       return route.fulfill({ json: mapping })
     }
     if (method === 'GET' && ['/admin/session', '/admin/capabilities'].includes(path)) return route.fallback()
@@ -161,7 +197,10 @@ test('UI077-01 generates a virtual identity then creates and updates its bucket 
     const method = request.method()
     if (path === '/admin/ui/identity-pages' && method === 'GET') return route.fulfill({ json: { items: identity ? [identity] : [], next_after_id: null, default_page_size: 100, max_page_size: 200 } })
     if (identity && path === `/admin/ui/identities/${identity.credential_id}` && method === 'GET') return route.fulfill({ json: identity })
-    if (path === '/admin/ui/virtual-buckets' && method === 'GET') return route.fulfill({ json: { items: mapping ? [mapping] : [], next_after_id: null } })
+    if (path === '/admin/ui/virtual-buckets' && method === 'GET') return route.fulfill({ json: {
+      items: mapping ? [mappingSummary(mapping, 'generated-ui077-access')] : [],
+      next_after_id: null,
+    } satisfies components['schemas']['VirtualMappingPage'] })
     if (path === '/admin/credentials' && method === 'POST') {
       credentialRequests.push(request.postDataJSON())
       identity = {

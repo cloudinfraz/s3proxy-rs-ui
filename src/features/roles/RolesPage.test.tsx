@@ -3,12 +3,12 @@ import type { ReactNode } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useQuery } from '@tanstack/react-query'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { api } from '../../api/client'
 import type { Schema } from '../../api/control'
+import { invokeOperation } from '../../api/operations'
 import RolesPage from './RolesPage'
 
 vi.mock('@tanstack/react-query', async importOriginal => ({ ...(await importOriginal<typeof import('@tanstack/react-query')>()), useQuery: vi.fn() }))
-vi.mock('../../api/client', () => ({ api: vi.fn() }))
+vi.mock('../../api/operations', () => ({ invokeOperation: vi.fn() }))
 vi.mock('../../components/control', () => ({
   DialogFlow: ({ children }: { children: ReactNode }) => <>{children}</>,
   Modal: ({ title, children, actions, onClose }: { title: string; children: ReactNode; actions?: ReactNode; onClose: () => void }) => <section role="dialog" aria-label={title}>{actions}{children}<button onClick={onClose}>Close dialog</button></section>,
@@ -51,7 +51,7 @@ describe('RolesPage', () => {
 
   it('loads role detail and routes major detail actions into dialogs', async () => {
     mockQueries(query({ data: { items: [role], next_after_id: null, limits } }), query({ data: { assume_role_ready: false } }))
-    vi.mocked(api).mockResolvedValue(detail)
+    vi.mocked(invokeOperation).mockResolvedValue(detail as never)
     render(<RolesPage />)
     expect(screen.getByText('/Reader')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'View Reader' }))
@@ -65,15 +65,15 @@ describe('RolesPage', () => {
     let rejectRequest: (reason: Error) => void = () => undefined
     const pending = new Promise<never>((_, reject) => { rejectRequest = reject })
     mockQueries(query({ data: { items: [role], next_after_id: null, limits } }))
-    vi.mocked(api).mockReturnValueOnce(pending)
+    vi.mocked(invokeOperation).mockReturnValueOnce(pending)
     render(<RolesPage />)
     fireEvent.click(screen.getByRole('button', { name: 'View Reader' }))
     expect(screen.getByRole('status').textContent).toBe('Loading role...')
     rejectRequest(new Error('detail denied'))
     expect(await screen.findByRole('alert')).toHaveProperty('textContent', expect.stringContaining('detail denied'))
-    vi.mocked(api).mockResolvedValueOnce(detail)
+    vi.mocked(invokeOperation).mockResolvedValueOnce(detail as never)
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
-    await waitFor(() => expect(api).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(invokeOperation).toHaveBeenCalledTimes(2))
   })
 
   it('opens create only after list metadata is ready', () => {
@@ -87,7 +87,7 @@ describe('RolesPage', () => {
     let resolveRequest: (value: Schema['AdminIamRoleDetail']) => void = () => undefined
     const response = new Promise<Schema['AdminIamRoleDetail']>(resolve => { resolveRequest = resolve })
     mockQueries(query({ data: { items: [role], next_after_id: null, limits } }))
-    vi.mocked(api).mockReturnValueOnce(response)
+    vi.mocked(invokeOperation).mockReturnValueOnce(response as never)
     render(<RolesPage />)
     fireEvent.click(screen.getByRole('button', { name: 'View Reader' }))
     expect(screen.getByRole('dialog')).toBeTruthy()
@@ -102,7 +102,7 @@ describe('RolesPage', () => {
   it('moves between role pages and refreshes the selected detail', async () => {
     const roles = query({ data: { items: [role], next_after_id: 'next role', limits } })
     mockQueries(roles)
-    vi.mocked(api).mockResolvedValue(detail)
+    vi.mocked(invokeOperation).mockResolvedValue(detail as never)
     render(<RolesPage />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Next role page' }))
@@ -114,14 +114,14 @@ describe('RolesPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'View Reader' }))
     await screen.findByText(role.role_arn)
     fireEvent.click(screen.getAllByRole('button', { name: 'Refresh' })[0])
-    await waitFor(() => expect(api).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(invokeOperation).toHaveBeenCalledTimes(2))
     expect(roles.refetch).toHaveBeenCalledOnce()
   })
 
   it('routes edit and delete actions and clears details after deletion', async () => {
     const deletable = { ...detail, role: { ...role, enabled: false }, retained_sessions: { count: 0, truncated: false, deletion_eligible: true } }
     mockQueries(query({ data: { items: [deletable.role], next_after_id: null, limits } }))
-    vi.mocked(api).mockResolvedValue(deletable)
+    vi.mocked(invokeOperation).mockResolvedValue(deletable as never)
     render(<RolesPage />)
     fireEvent.click(screen.getByRole('button', { name: 'View Reader' }))
     await screen.findByText(role.role_arn)

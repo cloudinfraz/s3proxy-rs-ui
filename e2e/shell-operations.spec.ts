@@ -66,7 +66,7 @@ test('UI069-04 one-time key dismissal, toggle and delete preserve metadata only'
   await page.route('**/admin/api-keys', async route => {
     if (route.request().method() === 'GET') return route.fulfill({ json: rows })
     mutations.push({ method: route.request().method(), body: route.request().postData() })
-    const created = { ...rows[0], id: 'new-key-id', key_name: 'new-admin' }
+    const created = { ...rows[0], id: '00000000-0000-4000-8000-000000000002', key_name: 'new-admin' }
     rows = [...rows, created]
     return route.fulfill({ status: 201, json: { id: created.id, key_name: created.key_name, api_key: synthetic, description: null, expires_at: null, created_at: created.created_at, warning: 'One time' } satisfies components['schemas']['CreateAdminApiKeyResponse'] })
   })
@@ -107,7 +107,7 @@ test(`UI069-06 late key response cannot restore a secret after ${transition}`, a
     if (route.request().method() === 'GET') return route.fulfill({ json: collections['/admin/api-keys'] })
     creates += 1
     await gate
-    return route.fulfill({ status: 201, json: { id: 'late-key-id', key_name: 'late-key', api_key: 'synthetic-late-secret', description: null, expires_at: null, created_at: health.timestamp, warning: 'One time' } satisfies components['schemas']['CreateAdminApiKeyResponse'] })
+    return route.fulfill({ status: 201, json: { id: '00000000-0000-4000-8000-000000000003', key_name: 'late-key', api_key: 'synthetic-late-secret', description: null, expires_at: null, created_at: health.timestamp, warning: 'One time' } satisfies components['schemas']['CreateAdminApiKeyResponse'] })
   })
   await page.goto('/admin/ui/')
   await navigateTo(page, 'Admin keys')
@@ -165,7 +165,7 @@ test('UI069-05 audit pages remain inside the selected recent event window', asyn
   await page.route('**/admin/audit?*', route => {
     const limit = Number(new URL(route.request().url()).searchParams.get('limit'))
     limits.push(limit)
-    const rows = Array.from({ length: Math.min(limit, 26) }, (_, index) => ({ id: `event-${index}`, entity_type: 'admin_key', entity_id: 'deleted-entity', action: `action-${index}`, changed_by: null, changes: { secret: 'synthetic-not-for-display' }, created_at: health.timestamp })) satisfies components['schemas']['AuditEventList']
+    const rows = Array.from({ length: Math.min(limit, 26) }, (_, index) => ({ id: `00000000-0000-4000-8000-${index.toString().padStart(12, '0')}`, entity_type: 'admin_key', entity_id: 'deleted-entity', action: `action-${index}`, changed_by: null, changes: { secret: 'synthetic-not-for-display' }, created_at: health.timestamp })) satisfies components['schemas']['AuditEventList']
     return route.fulfill({ json: rows })
   })
   await page.goto('/admin/ui/audit')

@@ -6,12 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router'
 import OverviewPage from './OverviewPage'
 
-const overviewMocks = vi.hoisted(() => ({ api: vi.fn() }))
+const overviewMocks = vi.hoisted(() => ({ invokeOperation: vi.fn() }))
 
-vi.mock('../../api/client', async importOriginal => ({
-  ...await importOriginal<typeof import('../../api/client')>(),
-  api: overviewMocks.api,
-}))
+vi.mock('../../api/operations', () => ({ invokeOperation: overviewMocks.invokeOperation }))
 
 const health = {
   status: 'healthy',
@@ -23,10 +20,10 @@ const health = {
   authorization: { mode: 'enforce', coherence: 'strict', resolver_ready: true, database_ready: true, audit_required: true, audit_dispatcher_ready: true },
 }
 
-function emptyResponse(path: string) {
-  if (path === '/admin/ui/overview') return { identity_count: 11, bucket_routing_count: 12, backend_count: 13, policy_count: 14 }
-  if (path === '/admin/health') return health
-  throw new Error(`Unexpected request: ${path}`)
+function emptyResponse(operationId: string) {
+  if (operationId === 'getAdminOverview') return { identity_count: 11, bucket_routing_count: 12, backend_count: 13, policy_count: 14 }
+  if (operationId === 'adminHealth') return health
+  throw new Error(`Unexpected operation: ${operationId}`)
 }
 
 function renderOverview() {
@@ -46,7 +43,7 @@ afterEach(() => {
 
 describe('OverviewPage interactions', () => {
   it('renders authoritative resource counts and the runtime summary', async () => {
-    overviewMocks.api.mockImplementation(async (path: string) => emptyResponse(path))
+    overviewMocks.invokeOperation.mockImplementation(async (operationId: string) => emptyResponse(operationId))
     renderOverview()
 
     expect(await screen.findByText('Configuration readiness requires an authoritative backend summary.')).toBeTruthy()
@@ -55,14 +52,14 @@ describe('OverviewPage interactions', () => {
       const link = screen.getByRole('link', { name: label })
       expect(link.parentElement?.querySelector('strong')?.textContent).toBe(count)
     }
-    expect(overviewMocks.api).toHaveBeenCalledWith('/admin/ui/overview')
+    expect(overviewMocks.invokeOperation).toHaveBeenCalledWith('getAdminOverview', expect.objectContaining({ signal: expect.any(AbortSignal) }))
   })
 
   it('shows unavailable counts and retries the summary request', async () => {
     let summaryAttempts = 0
-    overviewMocks.api.mockImplementation(async (path: string) => {
-      if (path === '/admin/ui/overview' && ++summaryAttempts === 1) throw new Error('summary request failed')
-      return emptyResponse(path)
+    overviewMocks.invokeOperation.mockImplementation(async (operationId: string) => {
+      if (operationId === 'getAdminOverview' && ++summaryAttempts === 1) throw new Error('summary request failed')
+      return emptyResponse(operationId)
     })
     renderOverview()
 

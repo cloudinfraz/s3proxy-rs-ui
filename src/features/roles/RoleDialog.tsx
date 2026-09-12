@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { api, ApiError } from '../../api/client'
+import { ApiError } from '../../api/client'
 import type { Schema } from '../../api/control'
+import { invokeOperation } from '../../api/operations'
 import { controlKeys, invalidateControl } from '../../api/query-keys'
 import { DestructiveDialog, ErrorBanner, Modal } from '../../components/control'
 import { completionGuard } from '../operations/state'
@@ -30,7 +31,7 @@ export default function RoleDialog({ operation, initial, limits, close, changed 
   const client = useQueryClient()
   const [cursors, setCursors] = useState<Array<string | null>>([null])
   const cursor = cursors[cursors.length - 1]
-  const policies = useQuery({ queryKey: [...controlKeys.list('policies'), 'role-options', cursor], enabled: operation === 'attach', queryFn: () => api<Schema['AdminIamRolePolicyPage']>(`/admin/ui/role-policies?limit=100${cursor ? `&after_id=${encodeURIComponent(cursor)}` : ''}`) })
+  const policies = useQuery({ queryKey: [...controlKeys.list('policies'), 'role-options', cursor], enabled: operation === 'attach', queryFn: ({ signal }) => invokeOperation('listRolePolicyOptions', { parameters: { query: { limit: 100, after_id: cursor ?? undefined } }, signal }) })
   const [draft, setDraft] = useState(() => roleDraft(limits, initial))
   const identitySelector = useIdentitySelectorPage(null, operation === 'create' || operation === 'trust', draft.owner)
   const identities = identitySelector.query
@@ -61,7 +62,7 @@ export default function RoleDialog({ operation, initial, limits, close, changed 
         if (guard.current.current(request)) setReview({})
       } else {
         if (!initial) throw new Error('Role review is unavailable')
-        const detail = await api<RoleDetail>(`/admin/ui/roles/${encodeURIComponent(initial.role.id)}`)
+        const detail = await invokeOperation('getAdminRole', { parameters: { path: { role_id: initial.role.id } } })
         let policy: RolePolicy | undefined
         if (operation === 'attach') {
           const options = await policies.refetch()
@@ -80,13 +81,12 @@ export default function RoleDialog({ operation, initial, limits, close, changed 
     const request = guard.current.begin(); setPending(true); setError(null)
     try {
       if (operation === 'create') {
-        const detail = await api<RoleDetail>('/admin/ui/roles', { method: 'POST', body: JSON.stringify(createRoleRequest(draft, limits)) })
+        const detail = await invokeOperation('createAdminRole', { body: createRoleRequest(draft, limits) })
         void invalidateControl(client)
         if (guard.current.current(request)) { changed(detail); close() }
       } else {
         if (!review.detail) throw new Error('Role review is unavailable')
-        const mutation = mutationRequest(operation, draft, review.detail, review.policy)
-        const result = await api<Schema['AdminIamRoleMutationResult']>(mutation.url, { method: mutation.method, body: JSON.stringify(mutation.body) })
+        const result = await invokeRoleMutation(operation, draft, review.detail, review.policy)
         void invalidateControl(client)
         if (!guard.current.current(request)) return
         changed(result.detail)
@@ -103,7 +103,7 @@ export default function RoleDialog({ operation, initial, limits, close, changed 
           await invalidateControl(client)
           if (initial && guard.current.current(request)) {
             try {
-              const latest = await api<RoleDetail>(`/admin/ui/roles/${encodeURIComponent(initial.role.id)}`)
+              const latest = await invokeOperation('getAdminRole', { parameters: { path: { role_id: initial.role.id } } })
               if (guard.current.current(request)) changed(latest)
             } catch {
               if (guard.current.current(request)) setError(new Error('The role changed, but current details could not be refreshed.'))
@@ -145,4 +145,17 @@ export default function RoleDialog({ operation, initial, limits, close, changed 
   </>
   if (destructiveReview) return <DestructiveDialog title={titles[operation]} description={impacts[operation]} confirmLabel={confirmLabel} pending={pending} onClose={() => setReview(null)} onConfirm={() => { void persist() }}>{content}</DestructiveDialog>
   return <Modal wide={operation === 'create' || operation === 'trust'} dirty={JSON.stringify(draft) !== initialDraft} title={review ? `Confirm: ${titles[operation]}` : titles[operation]} description={impacts[operation]} onClose={close} pending={pending}>{content}</Modal>
+}
+
+function invokeRoleMutation(operation: Exclude<RoleOperation, 'create'>, draft: RoleDraft, detail: RoleDetail, policy?: RolePolicy) {
+  const parameters = { path: { role_id: detail.role.id } }
+  switch (operation) {
+    case 'trust': return invokeOperation('replaceReviewedRoleTrust', { parameters, body: mutationRequest('trust', draft, detail, policy).body as Schema['ReviewRoleTrustRequest'] })
+    case 'settings': return invokeOperation('updateReviewedRoleSettings', { parameters, body: mutationRequest('settings', draft, detail, policy).body as Schema['ReviewRoleSettingsRequest'] })
+    case 'enabled': return invokeOperation('setReviewedRoleEnabled', { parameters, body: mutationRequest('enabled', draft, detail, policy).body as Schema['ReviewRoleEnabledRequest'] })
+    case 'retire': return invokeOperation('retireReviewedRoleSessions', { parameters, body: mutationRequest('retire', draft, detail, policy).body as Schema['ReviewRoleRetirementRequest'] })
+    case 'delete': return invokeOperation('deleteReviewedRole', { parameters, body: mutationRequest('delete', draft, detail, policy).body as Schema['ReviewRoleDeleteRequest'] })
+    case 'attach': return invokeOperation('attachReviewedRolePolicy', { parameters, body: mutationRequest('attach', draft, detail, policy).body as Schema['ReviewRolePolicyRequest'] })
+    case 'detach': return invokeOperation('detachReviewedRolePolicy', { parameters, body: mutationRequest('detach', draft, detail, policy).body as Schema['ReviewRolePolicyRequest'] })
+  }
 }

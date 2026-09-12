@@ -98,6 +98,19 @@ requests same-origin for session cookies and CSRF protection. That backend name
 must resolve from the container. Both `/health` and `/healthz` check Nginx
 availability, not backend health.
 
+## Control API boundary
+
+UI features call named operations generated from the pinned OpenAPI contract.
+Successful JSON is validated before it enters feature state. Malformed or
+undocumented success responses fail with a sanitized client error. React Query
+cancellation reaches the underlying request, and API requests use a uniform
+30-second timeout.
+
+Run `npm run generate:api` after updating the pinned contract. A second run must
+leave `src/api/schema.d.ts` and `src/api/generated/` unchanged. Backend contract
+changes must be implemented, deployed, and probed in the authoritative backend
+before dependent UI behavior is enabled.
+
 ## Deployment
 
 The Kubernetes manifests deploy the UI in the `s3proxy` namespace alongside the

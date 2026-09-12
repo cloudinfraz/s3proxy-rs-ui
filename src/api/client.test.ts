@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { addApiErrorInterceptor, ApiError, api, getSession, hasCsrfToken, login, logout, setCsrfToken, setProtectedForbiddenHandler } from './client'
+import { addApiErrorInterceptor, ApiError, hasCsrfToken, requestTransport, setCsrfToken, setProtectedForbiddenHandler } from './client'
+import { getSession, login, logout } from './operations'
+
+async function api<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
+  return (await requestTransport(path, init)).value as T
+}
 
 const response = (body: unknown, status = 200) => new Response(
   status === 204 ? null : JSON.stringify(body),
@@ -130,6 +135,49 @@ describe('browser API client', () => {
   it('does not expose transport exception details', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('synthetic-private-detail')))
     await expect(api('/admin/health')).rejects.toMatchObject({ status: 0, message: 'The control service could not be reached. Retry the request.' })
+  })
+
+  it('preserves caller cancellation without intercepting it as an API failure', async () => {
+    const interceptor = vi.fn()
+    const remove = addApiErrorInterceptor(interceptor)
+    const controller = new AbortController()
+    vi.stubGlobal('fetch', vi.fn((_path: string, init?: RequestInit) => new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), { once: true })
+    })))
+
+    const pending = api('/admin/health', { signal: controller.signal })
+    controller.abort(new DOMException('query cancelled', 'AbortError'))
+
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+    expect(interceptor).not.toHaveBeenCalled()
+    remove()
+  })
+
+  it('times out stalled requests after 30 seconds and clears its timer', async () => {
+    vi.useFakeTimers()
+    const interceptor = vi.fn()
+    const remove = addApiErrorInterceptor(interceptor)
+    vi.stubGlobal('fetch', vi.fn((_path: string, init?: RequestInit) => new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), { once: true })
+    })))
+
+    const pending = api('/admin/health')
+  const rejection = expect(pending).rejects.toMatchObject({ status: 408, message: 'The control service request timed out. Retry the request.' })
+    await vi.advanceTimersByTimeAsync(30_000)
+
+  await rejection
+    expect(interceptor).toHaveBeenCalledOnce()
+    expect(vi.getTimerCount()).toBe(0)
+    remove()
+    vi.useRealTimers()
+  })
+
+  it('clears the request timeout after a successful response', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ status: 'healthy' })))
+    await api('/admin/health')
+    expect(vi.getTimerCount()).toBe(0)
+    vi.useRealTimers()
   })
 
   it.each([

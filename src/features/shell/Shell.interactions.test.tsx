@@ -10,7 +10,7 @@ import { SessionRevocationProvider } from './revocation'
 import { useSessionRevocation } from './revocation-context'
 
 const shellMocks = vi.hoisted(() => ({
-  api: vi.fn(),
+  requestTransport: vi.fn(),
   logout: vi.fn(),
   readSession: vi.fn(),
   setCsrfToken: vi.fn(),
@@ -19,10 +19,13 @@ const shellMocks = vi.hoisted(() => ({
 
 vi.mock('../../api/client', async importOriginal => ({
   ...await importOriginal<typeof import('../../api/client')>(),
-  api: shellMocks.api,
-  logout: shellMocks.logout,
+  requestTransport: shellMocks.requestTransport,
   setCsrfToken: shellMocks.setCsrfToken,
   setProtectedForbiddenHandler: shellMocks.setProtectedForbiddenHandler,
+}))
+vi.mock('../../api/operations', async importOriginal => ({
+  ...await importOriginal<typeof import('../../api/operations')>(),
+  logout: shellMocks.logout,
 }))
 
 vi.mock('./session-lifecycle', () => ({
@@ -55,7 +58,7 @@ function LoginDestination() {
 
 beforeEach(() => {
   window.sessionStorage.clear()
-  shellMocks.api.mockResolvedValue({ plane: 'test' })
+  shellMocks.requestTransport.mockResolvedValue({ status: 200, value: { plane: 'test', authz_mode: 'off', sts_enabled: false, iam_assume_role_enabled: false, assume_role_ready: false, iam_account_configured: false, backend_routing_enabled: false, usable_registry_auth_modes: [], legacy_routing_available: true, public_sts_endpoint: null, public_s3_endpoint: null } })
   shellMocks.logout.mockResolvedValue(undefined)
   shellMocks.readSession.mockResolvedValue({ authenticated: true, expires_at: '2030-01-01T00:00:00Z' })
 })

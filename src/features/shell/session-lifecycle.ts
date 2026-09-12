@@ -1,4 +1,5 @@
-import { ApiError, getSession, setCsrfToken } from '../../api/client'
+import { ApiError, setCsrfToken } from '../../api/client'
+import { getSession } from '../../api/operations'
 
 export type SessionValue = {
   authenticated: boolean

@@ -1,5 +1,5 @@
 import { expect, test, type Request } from '@playwright/test'
-import { collections, mockControlApi, navigateTo } from './control-fixtures'
+import { collections, health, mockControlApi, navigateTo } from './control-fixtures'
 
 test('UI076-03 destructive confirmation retains pending and failure state', async ({ page }) => {
   const verify = await mockControlApi(page)
@@ -39,7 +39,18 @@ test('UI076-01 valid session revalidation preserves a denied edit draft and rota
   await page.route('**/admin/credentials/fixture-access', route => {
     tokens.push(route.request().headers()['x-csrf-token'])
     mutationCount += 1
-    return route.fulfill({ status: mutationCount === 1 ? 403 : 204 })
+    return mutationCount === 1
+      ? route.fulfill({ status: 403 })
+      : route.fulfill({ json: {
+        credential_id: '00000000-0000-4000-8000-000000000001',
+        s3_access_key: 'fixture-access',
+        azure_account: 'preserveddraft',
+        access_mode: 'direct',
+        use_managed_identity: true,
+        versioning_enabled: false,
+        default_backend_id: null,
+        credential_scope: null,
+      } satisfies components['schemas']['CredentialDetail'] })
   })
   await page.goto('/admin/ui/credentials?mode=direct')
   await page.getByRole('button', { name: 'Edit fixture-access', exact: true }).click()
@@ -306,7 +317,15 @@ test('UI076-02 stored markup stays text and secrets require acknowledgement', as
   page.on('request', request => requests.push(`${request.url()} ${request.postData() ?? ''}`))
   await page.route('**/admin/api-keys', route => route.request().method() === 'GET'
     ? route.fulfill({ json: [{ ...collections['/admin/api-keys'][0], key_name: hostileName }] })
-    : route.fulfill({ status: 201, json: { api_key: secret } }))
+    : route.fulfill({ status: 201, json: {
+      id: '00000000-0000-4000-8000-000000000076',
+      key_name: 'synthetic-key',
+      api_key: secret,
+      description: null,
+      expires_at: null,
+      created_at: health.timestamp,
+      warning: 'One time',
+    } satisfies components['schemas']['CreateAdminApiKeyResponse'] }))
   await page.goto('/admin/ui/keys')
   await expect(page.getByText(hostileName, { exact: true })).toBeVisible()
   await expect(page.locator('img[onerror]')).toHaveCount(0)

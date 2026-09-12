@@ -47,6 +47,18 @@ revision:
 
 Do not hand-edit the generated schema.
 
+### Using the control API
+
+Feature modules must use named operations from `src/api/operations.ts`; they
+must not construct control API URLs or call the private transport. Operation
+methods, parameters, bodies, success statuses, and runtime validators are
+generated from `contracts/admin-openapi.json`.
+
+Follow Red-Green-Refactor for boundary changes. Run generator tests with
+`node --test scripts/api/generate-operations.test.mjs`. Every React Query
+function must forward its `signal`; caller cancellation remains distinct from
+the sanitized 30-second timeout error.
+
 ## Testing
 
 Run the complete local validation gate before opening a pull request:

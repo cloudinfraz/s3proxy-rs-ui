@@ -2,12 +2,15 @@
 import type { ReactNode } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { useQuery } from '@tanstack/react-query'
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { api } from '../../api/client'
+import { afterEach, describe, expect, it, vi, type Mock } from 'vitest'
+import { invokeOperation } from '../../api/operations'
 import BucketPolicies from './BucketPolicies'
 
 vi.mock('@tanstack/react-query', async importOriginal => ({ ...(await importOriginal<typeof import('@tanstack/react-query')>()), useQuery: vi.fn(), useQueryClient: () => ({ invalidateQueries: vi.fn() }) }))
-vi.mock('../../api/client', () => ({ api: vi.fn(), ApiError: class extends Error { status = 409 } }))
+vi.mock('../../api/client', () => ({ ApiError: class extends Error { status = 409 } }))
+vi.mock('../../api/operations', () => ({ invokeOperation: vi.fn() }))
+const api = invokeOperation as unknown as Mock<(operationId: string, input?: OperationMockInput) => Promise<unknown>>
+type OperationMockInput = { parameters?: { path?: Record<string, string>; query?: Record<string, unknown> }; body?: unknown; signal?: AbortSignal }
 vi.mock('../../api/query-keys', async importOriginal => ({ ...(await importOriginal<typeof import('../../api/query-keys')>()), invalidateControl: vi.fn() }))
 vi.mock('../../components/control', () => ({
   DialogFlow: ({ children }: { children: ReactNode }) => <>{children}</>,
@@ -53,7 +56,7 @@ describe('BucketPolicies', () => {
     fireEvent.submit(within(screen.getByRole('dialog', { name: 'Edit bucket policy' })).getByRole('button', { name: 'Review change' }).closest('form')!)
     expect(await screen.findByText('Compiled bytes')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Confirm change' }))
-    await waitFor(() => expect(api).toHaveBeenCalledWith('/admin/ui/bucket-policies/direct/reports', expect.objectContaining({ method: 'PUT' })))
+    await waitFor(() => expect(api).toHaveBeenCalledWith('updateReviewedAdminDirectBucketPolicy', expect.objectContaining({ parameters: { path: { bucket: 'reports' } } })))
   })
 
   it('reviews and deletes only the selected scope', async () => {
@@ -64,7 +67,7 @@ describe('BucketPolicies', () => {
     fireEvent.click(screen.getByRole('button', { name: /Delete policy/ }))
     fireEvent.click(within(screen.getByRole('dialog', { name: 'Delete bucket policy' })).getByRole('button', { name: 'Review change' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Delete policy for Direct global bucket: reports' }))
-    await waitFor(() => expect(api).toHaveBeenCalledWith('/admin/ui/bucket-policies/direct/reports', expect.objectContaining({ method: 'DELETE' })))
+    await waitFor(() => expect(api).toHaveBeenCalledWith('deleteReviewedAdminDirectBucketPolicy', expect.objectContaining({ parameters: { path: { bucket: 'reports' } } })))
   })
 
   it('switches to virtual scopes and renders ownership metadata', () => {
@@ -104,39 +107,39 @@ describe('BucketPolicies', () => {
 
   it('requests the selected scope before server pagination', async () => {
     vi.mocked(useQuery).mockImplementation(options => {
-      const queryOptions = options as unknown as { enabled?: boolean; queryFn: () => Promise<unknown> }
+      const queryOptions = options as unknown as { enabled?: boolean; queryFn: (context: { signal: AbortSignal }) => Promise<unknown> }
       if (queryOptions.enabled !== undefined) return query(detail) as never
-      void queryOptions.queryFn()
+      void queryOptions.queryFn({ signal: new AbortController().signal })
       return query({ items: [], next_after_key: null }) as never
     })
     vi.mocked(api).mockResolvedValue({ items: [], next_after_key: null })
     render(<BucketPolicies />)
-    await waitFor(() => expect(api).toHaveBeenCalledWith('/admin/ui/bucket-policies?limit=100&scope_kind=direct'))
+    await waitFor(() => expect(api).toHaveBeenCalledWith('listAdminBucketPolicies', expect.objectContaining({ parameters: { query: { limit: 100, scope_kind: 'direct', after_key: undefined } } })))
     fireEvent.click(screen.getByRole('button', { name: 'Virtual scoped' }))
-    await waitFor(() => expect(api).toHaveBeenCalledWith('/admin/ui/bucket-policies?limit=100&scope_kind=virtual'))
+    await waitFor(() => expect(api).toHaveBeenCalledWith('listAdminBucketPolicies', expect.objectContaining({ parameters: { query: { limit: 100, scope_kind: 'virtual', after_key: undefined } } })))
   })
 
   it('keeps next and previous cursors inside their selected scope', async () => {
     vi.mocked(useQuery).mockImplementation(options => {
-      const queryOptions = options as unknown as { enabled?: boolean; queryKey: readonly unknown[]; queryFn: () => Promise<unknown> }
+      const queryOptions = options as unknown as { enabled?: boolean; queryKey: readonly unknown[]; queryFn: (context: { signal: AbortSignal }) => Promise<unknown> }
       if (queryOptions.enabled !== undefined) return query(detail) as never
-      void queryOptions.queryFn()
+      void queryOptions.queryFn({ signal: new AbortController().signal })
       const cursor = queryOptions.queryKey.at(-1) as { kind: string; afterKey: string | null }
       return query({ items: [], next_after_key: cursor.kind === 'direct' && cursor.afterKey === null ? 'direct-cursor' : null }) as never
     })
     vi.mocked(api).mockResolvedValue({ items: [], next_after_key: null })
     render(<BucketPolicies />)
-    await waitFor(() => expect(api).toHaveBeenCalledWith('/admin/ui/bucket-policies?limit=100&scope_kind=direct'))
+    await waitFor(() => expect(api).toHaveBeenCalledWith('listAdminBucketPolicies', expect.objectContaining({ parameters: { query: { limit: 100, scope_kind: 'direct', after_key: undefined } } })))
 
     fireEvent.click(screen.getByRole('button', { name: 'Next bucket policy page' }))
-    await waitFor(() => expect(api).toHaveBeenCalledWith('/admin/ui/bucket-policies?limit=100&scope_kind=direct&after_key=direct-cursor'))
+    await waitFor(() => expect(api).toHaveBeenCalledWith('listAdminBucketPolicies', expect.objectContaining({ parameters: { query: { limit: 100, scope_kind: 'direct', after_key: 'direct-cursor' } } })))
     fireEvent.click(screen.getByRole('button', { name: 'Previous bucket policy page' }))
-    await waitFor(() => expect(vi.mocked(api).mock.calls.filter(([url]) => url === '/admin/ui/bucket-policies?limit=100&scope_kind=direct')).toHaveLength(2))
+    await waitFor(() => expect(vi.mocked(api).mock.calls.filter(([, input]) => input?.parameters?.query?.scope_kind === 'direct' && input.parameters.query.after_key === undefined)).toHaveLength(2))
 
     fireEvent.click(screen.getByRole('button', { name: 'Next bucket policy page' }))
     fireEvent.click(screen.getByRole('button', { name: 'Virtual scoped' }))
-    await waitFor(() => expect(api).toHaveBeenCalledWith('/admin/ui/bucket-policies?limit=100&scope_kind=virtual'))
-    expect(vi.mocked(api).mock.calls.some(([url]) => String(url).includes('scope_kind=virtual&after_key='))).toBe(false)
+    await waitFor(() => expect(api).toHaveBeenCalledWith('listAdminBucketPolicies', expect.objectContaining({ parameters: { query: { limit: 100, scope_kind: 'virtual', after_key: undefined } } })))
+    expect(vi.mocked(api).mock.calls.some(([, input]) => input?.parameters?.query?.scope_kind === 'virtual' && input.parameters.query.after_key !== undefined)).toBe(false)
   })
 
   it('requires revalidation after a bucket policy changes during validation', async () => {
@@ -160,9 +163,9 @@ describe('BucketPolicies', () => {
     fireEvent.submit(screen.getByRole('button', { name: 'Review change' }).closest('form')!)
     fireEvent.click(await screen.findByRole('button', { name: 'Confirm change' }))
 
-    await waitFor(() => expect(api).toHaveBeenLastCalledWith('/admin/ui/bucket-policies/direct/reports', expect.objectContaining({
-      body: expect.stringContaining('s3:DeleteObject'),
+    await waitFor(() => expect(api).toHaveBeenLastCalledWith('updateReviewedAdminDirectBucketPolicy', expect.objectContaining({
+      body: expect.objectContaining({ document: expect.objectContaining({ Statement: [expect.objectContaining({ Action: 's3:DeleteObject' })] }) }),
     })))
-    expect(vi.mocked(api).mock.calls.at(-1)?.[1]?.body).not.toContain('s3:GetObject')
+    expect(JSON.stringify(vi.mocked(api).mock.calls.at(-1)?.[1]?.body)).not.toContain('s3:GetObject')
   })
 })

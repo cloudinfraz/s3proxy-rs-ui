@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Check, ChevronLeft, ChevronRight, Clipboard, RefreshCw } from 'lucide-react'
 import { Link } from 'react-router'
-import { api } from '../../api/client'
-import { controlQueries, type Schema } from '../../api/control'
+import { controlQueries } from '../../api/control'
+import { invokeOperation } from '../../api/operations'
 import { controlKeys } from '../../api/query-keys'
 import { DataTable, ErrorBanner, Page, RefreshButton } from '../../components/control'
 import { deriveStsReadiness, guidanceExamples } from './sts-state'
@@ -31,8 +31,8 @@ export default function TemporaryCredentialsPage() {
   const [cursors, setCursors] = useState<Array<string | null>>([null])
   const cursor = cursors[cursors.length - 1]
   const capabilities = useQuery(controlQueries.capabilities)
-  const roles = useQuery({ queryKey: [...controlKeys.list('roles'), 'sts-page', cursor], queryFn: async () => {
-    const result = await api<Schema['AdminIamRolePage']>(`/admin/ui/roles?limit=100${cursor ? `&after_id=${encodeURIComponent(cursor)}` : ''}`)
+  const roles = useQuery({ queryKey: [...controlKeys.list('roles'), 'sts-page', cursor], queryFn: async ({ signal }) => {
+    const result = await invokeOperation('listAdminRoles', { parameters: { query: { limit: 100, after_id: cursor ?? undefined } }, signal })
     if (!result || !Array.isArray(result.items) || result.items.length > 100 || !(result.next_after_id === null || typeof result.next_after_id === 'string')) throw new Error('Invalid role page response')
     return result
   } })

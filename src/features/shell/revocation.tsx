@@ -1,5 +1,6 @@
 import { useRef, useState, type ReactNode } from 'react'
-import { ApiError, getSession, logout, setCsrfToken } from '../../api/client'
+import { ApiError, setCsrfToken } from '../../api/client'
+import { getSession, logout } from '../../api/operations'
 import { RevocationContext, type RevocationState } from './revocation-context'
 
 const pendingRevocationKey = 's3proxy.pending-session-revocation'

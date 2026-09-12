@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, Link as LinkIcon, Unlink } from 'lucide-react'
 import { Link } from 'react-router'
-import { api, ApiError } from '../../api/client'
-import type { Schema } from '../../api/control'
+import { ApiError } from '../../api/client'
+import { invokeOperation } from '../../api/operations'
 import { invalidateControl } from '../../api/query-keys'
 import { DataTable, DestructiveDialog, ErrorBanner, Modal, RefreshButton } from '../../components/control'
 import { IdentitySelectorPagination, useIdentitySelectorPage } from '../identities/identity-selector'
@@ -19,10 +19,10 @@ export default function IdentityPolicies() {
   const identities = identitySelector.query
   const [policyCursors, setPolicyCursors] = useState<Array<string | null>>([null])
   const policyCursor = policyCursors[policyCursors.length - 1]
-  const policies = useQuery({ queryKey: policyKeys.managedList(policyCursor), queryFn: () => api<Schema['AdminPolicyPage']>(`/admin/ui/policies?limit=100${policyCursor ? `&after_id=${encodeURIComponent(policyCursor)}` : ''}`) })
+  const policies = useQuery({ queryKey: policyKeys.managedList(policyCursor), queryFn: ({ signal }) => invokeOperation('listAdminPolicies', { parameters: { query: { limit: 100, after_id: policyCursor ?? undefined } }, signal }) })
   const [attachmentCursors, setAttachmentCursors] = useState<Array<string | null>>([null])
   const attachmentCursor = attachmentCursors[attachmentCursors.length - 1]
-  const relationships = useQuery({ queryKey: policyKeys.identity(credentialId, attachmentCursor), enabled: credentialId.length > 0, queryFn: () => api<Schema['AdminIdentityPolicyPage']>(`/admin/ui/identities/${encodeURIComponent(credentialId)}/policies?limit=100${attachmentCursor ? `&after_id=${encodeURIComponent(attachmentCursor)}` : ''}`) })
+  const relationships = useQuery({ queryKey: policyKeys.identity(credentialId, attachmentCursor), enabled: credentialId.length > 0, queryFn: ({ signal }) => invokeOperation('listAdminIdentityPolicies', { parameters: { path: { credential_id: credentialId }, query: { limit: 100, after_id: attachmentCursor ?? undefined } }, signal }) })
   const [policyId, setPolicyId] = useState('')
   const [review, setReview] = useState<Review | null>(null)
   const [error, setError] = useState<Error | null>(null)
@@ -42,7 +42,7 @@ export default function IdentityPolicies() {
     const request = guard.current.begin()
     setPending(true); setError(null)
     try {
-      const detail = await api<Schema['AdminIdentityPolicyPage']>(`/admin/ui/identities/${encodeURIComponent(intent.credentialId)}/policies?limit=100`)
+      const detail = await invokeOperation('listAdminIdentityPolicies', { parameters: { path: { credential_id: intent.credentialId }, query: { limit: 100 } } })
       if (!guard.current.current(request)) return
       identityPolicyRequest(detail, intent.policy); setReview({ operation: intent.operation, detail, policy: intent.policy })
     } catch (cause) { if (guard.current.current(request)) setError(cause instanceof Error ? cause : new Error('Attachment review failed')) }
@@ -53,7 +53,9 @@ export default function IdentityPolicies() {
     if (!review || pending) return
     setPending(true); setError(null)
     try {
-      await api<Schema['AdminIdentityPolicyMutationResult']>(`/admin/ui/identities/${encodeURIComponent(review.detail.credential_id)}/policies`, { method: review.operation === 'attach' ? 'POST' : 'DELETE', body: JSON.stringify(identityPolicyRequest(review.detail, review.policy)) })
+      const input = { parameters: { path: { credential_id: review.detail.credential_id } }, body: identityPolicyRequest(review.detail, review.policy) }
+      if (review.operation === 'attach') await invokeOperation('attachReviewedAdminIdentityPolicy', input)
+      else await invokeOperation('detachReviewedAdminIdentityPolicy', input)
       await invalidateControl(client); setReview(null); setPolicyId(''); await relationships.refetch()
     } catch (cause) {
       setError(cause instanceof Error ? cause : new Error('Attachment change failed')); setReview(null)

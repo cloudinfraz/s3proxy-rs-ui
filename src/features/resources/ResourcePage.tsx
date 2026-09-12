@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Trash2 } from 'lucide-react'
-import { api } from '../../api/client'
+import type { Schema } from '../../api/control'
+import { invokeOperation } from '../../api/operations'
 import { fetchResourceRows, type ResourceListPath } from '../../api/resources'
 import { controlKeys, invalidateControl, type ControlResource } from '../../api/query-keys'
 import { DataTable, DestructiveDialog, ErrorBanner, Modal, Page } from '../../components/control'
@@ -20,7 +21,7 @@ const resources: Record<string, ResourceConfig> = {
 
 export default function ResourcePage({ resourceName }: { resourceName: string }) {
   const config = resources[resourceName]
-  const query = useQuery({ queryKey: controlKeys.list(config.resource), queryFn: () => fetchResourceRows(config.path) })
+  const query = useQuery({ queryKey: controlKeys.list(config.resource), queryFn: ({ signal }) => fetchResourceRows(config.path, signal) })
   const client = useQueryClient()
   const [creating, setCreating] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
@@ -43,7 +44,7 @@ export default function ResourcePage({ resourceName }: { resourceName: string })
     const request = guard.current.begin()
     setPending(true)
     setError(null)
-    try { await api(config.path, { method: 'POST', body: JSON.stringify(body) }); void invalidateControl(client); if (guard.current.current(request)) close() }
+    try { await createResource(config.resource, body); void invalidateControl(client); if (guard.current.current(request)) close() }
     catch { if (guard.current.current(request)) setError(new Error('Create failed. Check the values and retry.')) }
     finally { if (guard.current.current(request)) setPending(false) }
   }
@@ -51,7 +52,7 @@ export default function ResourcePage({ resourceName }: { resourceName: string })
     if (deleting === null || pending) return
     const request = guard.current.begin()
     setPending(true)
-    try { await api(`${config.path}/${encodeURIComponent(deleting)}`, { method: 'DELETE' }); void invalidateControl(client); if (guard.current.current(request)) close() }
+    try { await deleteResource(config.resource, deleting); void invalidateControl(client); if (guard.current.current(request)) close() }
     catch { if (guard.current.current(request)) setError(new Error('Delete failed. Retry after checking the resource.')) }
     finally { if (guard.current.current(request)) setPending(false) }
   }
@@ -61,4 +62,22 @@ export default function ResourcePage({ resourceName }: { resourceName: string })
     {creating && <Modal title={`Add ${config.title.toLowerCase()}`} description={config.title} onClose={close} pending={pending}><form className="operation-form" onSubmit={submit}>{config.fields.map(field => <label key={field.key}>{field.label}{field.key === 'document' ? <textarea name={field.key} required rows={8} defaultValue={'{"Version":"2012-10-17","Statement":[]}'} /> : <input name={field.key} type={field.type ?? 'text'} required={field.required} />}</label>)}{error && <ErrorBanner error={error} />}<div className="dialog-actions"><button type="button" disabled={pending} onClick={close}>Cancel</button><button className="primary" disabled={pending}>{pending ? 'Saving...' : 'Save'}</button></div></form></Modal>}
     {deleting !== null && <DestructiveDialog title="Delete record" description={config.resource === 'buckets' ? 'Removes routing metadata only. Azure containers and data are not deleted.' : 'Removes this control-plane record and may affect dependent access.'} confirmLabel={`Delete ${deleting}`} pending={pending} onClose={close} onConfirm={() => { void remove() }}>{error && <ErrorBanner error={error} />}</DestructiveDialog>}
   </Page>
+}
+
+function createResource(resource: ControlResource, body: RecordValue) {
+  if (resource === 'identities') return invokeOperation('createCredential', { body: {
+    s3_access_key: String(body.s3_access_key ?? ''), s3_secret_key: String(body.s3_secret_key ?? ''), azure_account: String(body.azure_account ?? ''),
+    use_managed_identity: body.use_managed_identity === true, access_mode: body.access_mode === 'virtual' ? 'virtual' : 'direct', versioning_enabled: body.versioning_enabled === true,
+  } })
+  if (resource === 'buckets') return invokeOperation('createVirtualBucket', { body: {
+    virtual_bucket_name: String(body.virtual_bucket_name ?? ''), azure_container: String(body.azure_container ?? ''), credential_id: String(body.credential_id ?? ''),
+    backend_id: typeof body.backend_id === 'string' ? body.backend_id : null, endpoint_prefix: typeof body.endpoint_prefix === 'string' ? body.endpoint_prefix : null,
+  } })
+  return invokeOperation('createPolicy', { body: { name: String(body.name ?? ''), description: typeof body.description === 'string' ? body.description : null, document: body.document as Schema['JsonValue'] } })
+}
+
+function deleteResource(resource: ControlResource, identity: string) {
+  if (resource === 'identities') return invokeOperation('deleteCredential', { parameters: { path: { access_key: identity } } })
+  if (resource === 'buckets') return invokeOperation('deleteVirtualBucket', { parameters: { path: { bucket_id: identity } } })
+  return invokeOperation('deletePolicy', { parameters: { path: { name: identity } } })
 }

@@ -4,14 +4,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { api } from '../../api/client'
 import type { Schema } from '../../api/control'
 import { IdentitySelectorPagination, useIdentitySelectorPage } from './identity-selector'
 
-vi.mock('../../api/client', async importOriginal => ({
-  ...await importOriginal<typeof import('../../api/client')>(),
-  api: vi.fn(),
-}))
+const operationMocks = vi.hoisted(() => ({ invokeOperation: vi.fn() }))
+vi.mock('../../api/operations', () => ({ invokeOperation: operationMocks.invokeOperation }))
 
 const first: Schema['IdentityProjection'] = {
   credential_id: '11111111-1111-4111-8111-111111111111', s3_access_key: 'FIRST', azure_account: 'first',
@@ -43,11 +40,11 @@ afterEach(() => { cleanup(); vi.clearAllMocks() })
 
 describe('identity selector pagination', () => {
   it('keeps an off-page selection through the bounded detail operation', async () => {
-    vi.mocked(api).mockImplementation(async path => {
-      if (path === '/admin/ui/identity-pages?limit=100&access_mode=direct') return { items: [first], next_after_id: first.credential_id, default_page_size: 100, max_page_size: 200 }
-      if (path === `/admin/ui/identity-pages?limit=100&after_id=${first.credential_id}&access_mode=direct`) return { items: [second], next_after_id: null, default_page_size: 100, max_page_size: 200 }
-      if (path === `/admin/ui/identities/${first.credential_id}`) return first
-      throw new Error(`Unexpected request: ${path}`)
+    operationMocks.invokeOperation.mockImplementation(async (operationId: string, input: { parameters?: { query?: { after_id?: string } } }) => {
+      if (operationId === 'getIdentityProjection') return first
+      if (operationId !== 'listIdentityProjectionPage') throw new Error(`Unexpected operation: ${operationId}`)
+      const query = 'parameters' in input ? input.parameters?.query : undefined
+      return query?.after_id ? { items: [second], next_after_id: null, default_page_size: 100, max_page_size: 200 } : { items: [first], next_after_id: first.credential_id, default_page_size: 100, max_page_size: 200 }
     })
     renderSelector()
     const select = await screen.findByLabelText('Identity')
@@ -58,16 +55,15 @@ describe('identity selector pagination', () => {
     await screen.findByRole('option', { name: 'SECOND' })
     await screen.findByRole('option', { name: 'FIRST' })
     expect(select).toHaveProperty('value', first.credential_id)
-    expect(api).toHaveBeenCalledWith(`/admin/ui/identities/${first.credential_id}`)
-    expect(vi.mocked(api).mock.calls.some(([path]) => path === '/admin/ui/identities')).toBe(false)
+    expect(operationMocks.invokeOperation).toHaveBeenCalledWith('getIdentityProjection', expect.objectContaining({ parameters: { path: { credential_id: first.credential_id } } }))
   })
 
   it('resets the server cursor when the access-mode filter changes', async () => {
-    vi.mocked(api).mockImplementation(async path => {
-      if (path === '/admin/ui/identity-pages?limit=100&access_mode=direct') return { items: [first], next_after_id: first.credential_id, default_page_size: 100, max_page_size: 200 }
-      if (path === `/admin/ui/identity-pages?limit=100&after_id=${first.credential_id}&access_mode=direct`) return { items: [second], next_after_id: null, default_page_size: 100, max_page_size: 200 }
-      if (path === '/admin/ui/identity-pages?limit=100&access_mode=virtual') return { items: [], next_after_id: null, default_page_size: 100, max_page_size: 200 }
-      throw new Error(`Unexpected request: ${path}`)
+    operationMocks.invokeOperation.mockImplementation(async (operationId: string, input: { parameters?: { query?: { after_id?: string; access_mode?: string } } }) => {
+      if (operationId !== 'listIdentityProjectionPage') throw new Error(`Unexpected operation: ${operationId}`)
+      const query = 'parameters' in input ? input.parameters?.query : undefined
+      if (query?.access_mode === 'virtual') return { items: [], next_after_id: null, default_page_size: 100, max_page_size: 200 }
+      return query?.after_id ? { items: [second], next_after_id: null, default_page_size: 100, max_page_size: 200 } : { items: [first], next_after_id: first.credential_id, default_page_size: 100, max_page_size: 200 }
     })
     renderSelector()
     await screen.findByRole('option', { name: 'FIRST' })
@@ -76,7 +72,6 @@ describe('identity selector pagination', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Change mode' }))
 
     await waitFor(() => expect(screen.getByText('Identity page 1')).toBeTruthy())
-    expect(api).toHaveBeenCalledWith('/admin/ui/identity-pages?limit=100&access_mode=virtual')
-    expect(vi.mocked(api).mock.calls.some(([path]) => String(path).includes(`after_id=${first.credential_id}&access_mode=virtual`))).toBe(false)
+    expect(operationMocks.invokeOperation).toHaveBeenCalledWith('listIdentityProjectionPage', expect.objectContaining({ parameters: { query: expect.objectContaining({ access_mode: 'virtual', after_id: undefined }) } }))
   })
 })
