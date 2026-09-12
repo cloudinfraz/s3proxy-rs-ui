@@ -61,37 +61,8 @@ jobs:
           node-version-file: .node-version
           cache: npm
 
-      - name: Install locked dependencies
-        run: npm ci --ignore-scripts --registry=https://registry.npmjs.org/
-
-      - name: Audit dependencies
-        run: npm audit --audit-level=high --registry=https://registry.npmjs.org/
-
-      - name: Validate generated API contract
-        run: |
-          set -euo pipefail
-          expected="$(node -e "console.log(require('./contracts/backend-contract.json').openapi_sha256)")"
-          actual="$(sha256sum contracts/admin-openapi.json | awk '{print $1}')"
-          [[ "$actual" == "$expected" ]] || {
-            echo "Pinned OpenAPI checksum does not match backend-contract.json" >&2
-            exit 1
-          }
-          npm run generate:api
-          git diff --exit-code -- src/api/schema.d.ts
-
-      - name: Lint, test, and build
-        run: |
-          npm run lint
-          npm test
-          npm run test:deploy
-          npm run test:release
-          npm run build
-
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
-
-      - name: Run browser acceptance
-        run: npm run test:e2e
+      - name: Run shared release validation
+        run: bash scripts/release/validate-ui.sh
 
       - name: Package static distribution
         env:
@@ -114,6 +85,14 @@ jobs:
             --build-arg "OCI_VERSION=${VERSION}" \
             --tag "$UI_IMAGE" .
           scripts/verify-ui-image.sh
+
+      - name: Upload validated static assets
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: validated-release-ui-${{ github.event.pull_request.merge_commit_sha || github.sha }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 1
 
   publish:
     name: Publish release
@@ -162,11 +141,15 @@ jobs:
           node-version-file: .node-version
           cache: npm
 
-      - name: Build release assets
+      - name: Download validated static assets
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: validated-release-ui-${{ env.RELEASE_REVISION }}
+          path: dist/
+
+      - name: Package validated release assets
         run: |
           set -euo pipefail
-          npm ci --ignore-scripts --registry=https://registry.npmjs.org/
-          npm run build
           node scripts/release/prepare-release.mjs "$VERSION"
           source_date_epoch="$(git show -s --format=%ct HEAD)"
           tar --sort=name --mtime="@${source_date_epoch}" --owner=0 --group=0 \
