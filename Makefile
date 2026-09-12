@@ -25,12 +25,10 @@ check: ui-check
 ## ui-check: Run dependency audit, lint, unit, deploy, build, and browser tests.
 ui-check: install
 	npm audit --audit-level=high --registry=$(NPM_REGISTRY)
-	npm run lint
-	npm test
-	npm run test:deploy
-	npm run test:release
-	npm run build
+	scripts/release/validate-source.sh
 	npm run test:e2e
+	npm run test:e2e:a11y
+	npm run test:e2e:cross-browser:container
 
 ## docker-build: Build the standalone UI image.
 docker-build: docker-build-ui

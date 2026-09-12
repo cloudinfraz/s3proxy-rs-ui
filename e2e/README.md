@@ -20,6 +20,34 @@ recovery, credential lifecycle behavior, stale-response rejection, and bounded
 pagination. Passing mocked tests does not establish compatibility with a live
 backend.
 
+## Browser quality suites
+
+The accessibility suite scans login, authenticated navigation, a data table,
+and critical dialog states with fixed WCAG A/AA axe tags:
+
+```bash
+npm run test:e2e:a11y
+```
+
+The cross-browser suite runs one core desktop workflow in Firefox and WebKit
+with one worker and no retries:
+
+```bash
+npm run test:e2e:cross-browser
+```
+
+For WSL or hosts without compatible WebKit libraries, use the version-matched
+official container fallback instead of changing system packages:
+
+```bash
+npm run test:e2e:cross-browser:container
+```
+
+These suites use synthetic data and mocked same-origin APIs. Trace, screenshot,
+video, and persisted authentication state remain disabled. Keep the full
+regression matrix in desktop/mobile Chromium; add Firefox/WebKit cases only when
+they extend the bounded core smoke contract.
+
 ## Live local suite
 
 The live suite is destructive and may create or revoke administrator material.

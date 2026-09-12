@@ -297,6 +297,7 @@ button:disabled {
   border-color: #9b2921;
   color: white;
   font-weight: 600;
+  opacity: 1;
 }
 
 .table-wrap {
