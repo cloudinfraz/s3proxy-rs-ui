@@ -34,6 +34,7 @@ export default function RoleDialog({ operation, initial, limits, close, changed 
   const cursor = cursors[cursors.length - 1]
   const policies = useQuery({ queryKey: [...controlKeys.list('policies'), 'role-options', cursor], enabled: operation === 'attach', queryFn: () => api<Schema['AdminIamRolePolicyPage']>(`/admin/ui/role-policies?limit=100${cursor ? `&after_id=${encodeURIComponent(cursor)}` : ''}`) })
   const [draft, setDraft] = useState(() => roleDraft(limits, initial))
+  const [initialDraft] = useState(() => JSON.stringify(draft))
   const [review, setReview] = useState<Review | null>(null)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<Error | null>(null)
@@ -140,5 +141,5 @@ export default function RoleDialog({ operation, initial, limits, close, changed 
         </form>}
   </>
   if (destructiveReview) return <DestructiveDialog title={titles[operation]} description={impacts[operation]} confirmLabel={confirmLabel} pending={pending} onClose={() => setReview(null)} onConfirm={() => { void persist() }}>{content}</DestructiveDialog>
-  return <Modal title={review ? `Confirm: ${titles[operation]}` : titles[operation]} description={impacts[operation]} onClose={close} pending={pending}>{content}</Modal>
+  return <Modal wide={operation === 'create' || operation === 'trust'} dirty={JSON.stringify(draft) !== initialDraft} title={review ? `Confirm: ${titles[operation]}` : titles[operation]} description={impacts[operation]} onClose={close} pending={pending}>{content}</Modal>
 }

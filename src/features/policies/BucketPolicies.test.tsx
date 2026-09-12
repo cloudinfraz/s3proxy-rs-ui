@@ -10,9 +10,10 @@ vi.mock('@tanstack/react-query', async importOriginal => ({ ...(await importOrig
 vi.mock('../../api/client', () => ({ api: vi.fn(), ApiError: class extends Error { status = 409 } }))
 vi.mock('../../api/query-keys', async importOriginal => ({ ...(await importOriginal<typeof import('../../api/query-keys')>()), invalidateControl: vi.fn() }))
 vi.mock('../../components/control', () => ({
+  DialogFlow: ({ children }: { children: ReactNode }) => <>{children}</>,
   RefreshButton: ({ refresh }: { refresh: () => void }) => <button onClick={refresh}>Refresh</button>,
   ErrorBanner: ({ error }: { error: Error }) => <div role="alert">{error.message}</div>,
-  Modal: ({ title, children }: { title: string; children: ReactNode }) => <section role="dialog" aria-label={title}>{children}</section>,
+  Modal: ({ title, children, actions }: { title: string; children: ReactNode; actions?: ReactNode }) => <section role="dialog" aria-label={title}>{actions}{children}</section>,
   DestructiveDialog: ({ title, confirmLabel, children, onConfirm }: { title: string; confirmLabel: string; children: ReactNode; onConfirm: () => void }) => <section role="alertdialog" aria-label={title}>{children}<button onClick={onConfirm}>{confirmLabel}</button></section>,
   DataTable: ({ rows, loading, columns }: { rows: unknown[]; loading: boolean; columns: Array<{ label: string; value: (row: never) => ReactNode }> }) => loading ? <p role="status">Loading...</p> : <div>{rows.map((row, index) => <div key={index}>{columns.map(column => <span key={column.label}>{column.value(row as never)}</span>)}</div>)}</div>,
 }))
@@ -45,7 +46,10 @@ describe('BucketPolicies', () => {
     render(<BucketPolicies />)
     fireEvent.click(screen.getByRole('button', { name: 'View Direct global bucket: reports' }))
     expect(screen.getByRole('region', { name: 'Bucket policy detail' }).textContent).toContain('"Version": "2012-10-17"')
+    expect(screen.getByRole('dialog', { name: 'Direct global bucket: reports' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /Edit policy/ }))
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    expect(screen.queryByRole('region', { name: 'Bucket policy detail' })).toBeNull()
     fireEvent.submit(within(screen.getByRole('dialog', { name: 'Edit bucket policy' })).getByRole('button', { name: 'Review change' }).closest('form')!)
     expect(await screen.findByText('Compiled bytes')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Confirm change' }))

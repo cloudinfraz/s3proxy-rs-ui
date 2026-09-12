@@ -9,9 +9,10 @@ import ManagedPolicies from './ManagedPolicies'
 vi.mock('../../api/client', () => ({ api: vi.fn(), ApiError: class extends Error { status = 409 } }))
 vi.mock('../../api/query-keys', async importOriginal => ({ ...(await importOriginal<typeof import('../../api/query-keys')>()), invalidateControl: vi.fn() }))
 vi.mock('../../components/control', () => ({
+  DialogFlow: ({ children }: { children: ReactNode }) => <>{children}</>,
   RefreshButton: ({ refresh }: { refresh: () => void }) => <button onClick={refresh}>Refresh</button>,
   ErrorBanner: ({ error, retry }: { error: Error; retry?: () => void }) => <div role="alert">{error.message}{retry && <button onClick={retry}>Retry</button>}</div>,
-  Modal: ({ title, children }: { title: string; children: ReactNode }) => <section role="dialog" aria-label={title}>{children}</section>,
+  Modal: ({ title, children, actions }: { title: string; children: ReactNode; actions?: ReactNode }) => <section role="dialog" aria-label={title}>{actions}{children}</section>,
   DestructiveDialog: ({ title, confirmLabel, children, onConfirm }: { title: string; confirmLabel: string; children: ReactNode; onConfirm: () => void }) => <section role="alertdialog" aria-label={title}>{children}<button onClick={onConfirm}>{confirmLabel}</button></section>,
   DataTable: ({ rows, loading, columns }: { rows: unknown[]; loading: boolean; columns: Array<{ label: string; value: (row: never) => ReactNode }> }) => loading ? <p role="status">Loading...</p> : <div>{rows.map((row, index) => <div key={index}>{columns.map(column => <span key={column.label}>{column.value(row as never)}</span>)}</div>)}</div>,
 }))
@@ -42,7 +43,10 @@ describe('ManagedPolicies', () => {
     renderView()
     fireEvent.click(await screen.findByRole('button', { name: 'View ReadOnly' }))
     expect(await screen.findByText('read access')).toBeTruthy()
+    expect(screen.getByRole('dialog', { name: 'ReadOnly' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /Delete policy/ }))
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    expect(screen.queryByRole('region', { name: 'Managed policy detail' })).toBeNull()
     fireEvent.click(within(screen.getByRole('dialog', { name: 'Delete ReadOnly' })).getByRole('button', { name: 'Review change' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Delete ReadOnly' }))
     await waitFor(() => expect(api).toHaveBeenCalledWith('/admin/ui/policies/policy-id', expect.objectContaining({ method: 'DELETE' })))

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { AlertDialog, Dialog } from '@radix-ui/themes'
 import { Box, RefreshCw, X } from 'lucide-react'
 
@@ -33,19 +33,46 @@ export function EmptyState({ loading = false }: { loading?: boolean }) {
   return <div className="empty-state" role="status"><Box size={22} /><strong>{loading ? 'Loading...' : 'No records'}</strong></div>
 }
 
-export function Modal({ title, description, onClose, children, pending = false }: { title: string; description: string; onClose: () => void; children: ReactNode; pending?: boolean }) {
+const DialogFlowContext = createContext(false)
+
+export function DialogFlow({ children, fallbackFocus }: { children: ReactNode; fallbackFocus: RefObject<HTMLElement | null> }) {
+  const trigger = useRef(document.activeElement)
+  const restoreTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  useEffect(() => {
+    clearTimeout(restoreTimer.current)
+    const opener = trigger.current
+    const fallback = fallbackFocus.current
+    return () => { restoreTimer.current = setTimeout(() => {
+      const target = opener instanceof HTMLElement && opener.isConnected ? opener : fallback
+      target?.focus({ preventScroll: true })
+    }, 0) }
+  }, [fallbackFocus])
+  return <DialogFlowContext.Provider value>{children}</DialogFlowContext.Provider>
+}
+
+export function Modal({ title, description, onClose, children, pending = false, wide = false, dirty = false, actions }: { title: string; description: string; onClose: () => void; children: ReactNode; pending?: boolean; wide?: boolean; dirty?: boolean; actions?: ReactNode }) {
   const trigger = useRef(typeof document === 'undefined' ? null : document.activeElement)
-  return <Dialog.Root open onOpenChange={open => { if (!open && !pending) onClose() }}><Dialog.Content maxWidth="520px" className="control-dialog" onCloseAutoFocus={event => {
+  const flow = useContext(DialogFlowContext)
+  const heading = useRef<HTMLHeadingElement>(null)
+  const [discard, setDiscard] = useState(false)
+  function requestClose() {
+    if (pending) return
+    if (dirty) setDiscard(true)
+    else onClose()
+  }
+  return <Dialog.Root open onOpenChange={open => { if (!open) requestClose() }}><Dialog.Content maxWidth={wide ? '900px' : '520px'} className={`control-dialog${wide ? ' control-dialog-wide' : ''}`} onOpenAutoFocus={wide ? event => { event.preventDefault(); heading.current?.focus() } : undefined} onCloseAutoFocus={event => {
     event.preventDefault()
+    if (flow) return
     const nextDialog = document.querySelector('[role="dialog"], [role="alertdialog"]')
     if (nextDialog) (nextDialog.querySelector('button:not(:disabled), input:not(:disabled)') as HTMLElement | null)?.focus()
     else if (trigger.current instanceof HTMLElement && trigger.current.isConnected) trigger.current.focus()
-  }}><div className="dialog-heading"><Dialog.Title>{title}</Dialog.Title><button className="icon-button" type="button" aria-label="Close dialog" disabled={pending} onClick={onClose}><X size={18} /></button></div><Dialog.Description>{description}</Dialog.Description>{children}</Dialog.Content></Dialog.Root>
+  }}><div className="dialog-header"><div className="dialog-heading"><Dialog.Title ref={heading} tabIndex={-1}>{title}</Dialog.Title><button className="icon-button" type="button" aria-label="Close dialog" disabled={pending} onClick={requestClose}><X size={18} /></button></div><Dialog.Description>{description}</Dialog.Description>{actions && <div className="dialog-toolbar">{actions}</div>}{discard && <div className="dialog-discard" role="alert"><p>Discard unsaved changes?</p><button type="button" disabled={pending} onClick={() => setDiscard(false)}>Keep editing</button><button type="button" className="danger" disabled={pending} onClick={onClose}>Discard changes</button></div>}</div>{wide ? <div className="dialog-body">{children}</div> : children}</Dialog.Content></Dialog.Root>
 }
 
 export function DestructiveDialog({ title, description, confirmLabel, pending, onClose, onConfirm, children }: { title: string; description: string; confirmLabel: string; pending: boolean; onClose: () => void; onConfirm: () => void; children?: ReactNode }) {
   const trigger = useRef(typeof document === 'undefined' ? null : document.activeElement)
-  return <AlertDialog.Root open onOpenChange={open => { if (!open && !pending) onClose() }}><AlertDialog.Content maxWidth="520px" className="control-dialog" onEscapeKeyDown={event => { event.preventDefault(); if (!pending) onClose() }} onCloseAutoFocus={event => { event.preventDefault(); if (trigger.current instanceof HTMLElement && trigger.current.isConnected) trigger.current.focus() }}><AlertDialog.Title>{title}</AlertDialog.Title><AlertDialog.Description>{description}</AlertDialog.Description>{children}<div className="dialog-actions"><AlertDialog.Cancel><button disabled={pending}>Cancel</button></AlertDialog.Cancel><AlertDialog.Action><button className="danger-button" disabled={pending} onClick={event => { event.preventDefault(); onConfirm() }}>{pending ? 'Applying...' : confirmLabel}</button></AlertDialog.Action></div></AlertDialog.Content></AlertDialog.Root>
+  const flow = useContext(DialogFlowContext)
+  return <AlertDialog.Root open onOpenChange={open => { if (!open && !pending) onClose() }}><AlertDialog.Content maxWidth="520px" className="control-dialog" onEscapeKeyDown={event => { event.preventDefault(); if (!pending) onClose() }} onCloseAutoFocus={event => { event.preventDefault(); if (!flow && trigger.current instanceof HTMLElement && trigger.current.isConnected) trigger.current.focus() }}><AlertDialog.Title>{title}</AlertDialog.Title><AlertDialog.Description>{description}</AlertDialog.Description>{children}<div className="dialog-actions"><AlertDialog.Cancel><button disabled={pending}>Cancel</button></AlertDialog.Cancel><AlertDialog.Action><button className="danger-button" disabled={pending} onClick={event => { event.preventDefault(); onConfirm() }}>{pending ? 'Applying...' : confirmLabel}</button></AlertDialog.Action></div></AlertDialog.Content></AlertDialog.Root>
 }
 
 export function OneTimeSecretDialog({ title, description, acknowledge, acknowledgeLabel = 'I have stored this securely', pending = false, children }: { title: string; description: string; acknowledge: () => void; acknowledgeLabel?: string; pending?: boolean; children: ReactNode }) {
