@@ -37,6 +37,22 @@ Move completed entries from `Unreleased` into a dated changelog heading:
 ## [0.6.5] - 2026-10-01
 ```
 
+Before validating the candidate, install the locked dependencies with `make install`
+and run the same contract gate as CI. `make check` regenerates the API types but
+does not check the pinned OpenAPI checksum or reject generated-schema drift:
+
+```bash
+set -euo pipefail
+expected="$(node -p "require('./contracts/backend-contract.json').openapi_sha256")"
+actual="$(sha256sum contracts/admin-openapi.json | awk '{print $1}')"
+[[ "$actual" == "$expected" ]] || {
+   echo "Pinned OpenAPI checksum does not match backend-contract.json" >&2
+   exit 1
+}
+npm run generate:api
+git diff --exit-code -- src/api/schema.d.ts
+```
+
 Validate and push the candidate:
 
 ```bash
@@ -106,7 +122,7 @@ publish an unmerged feature-branch revision.
 
 ## Published output
 
-The publication job automatically:
+The release workflow automatically:
 
 1. Repeats release validation at the merged revision.
 2. Confirms that revision is contained in `origin/main`.
@@ -135,7 +151,29 @@ Future versions should use the release branch trigger.
 ## Failure and retry behavior
 
 No GitHub Release is created until build, verification, scanning, SBOM creation,
-and signing succeed. If a run fails before release creation, fix the cause on a
-new pull request and manually rerun the workflow from the corrected `main`
-revision using the same version. If the GitHub Release already exists, prepare a
-new patch version rather than replacing published artifacts.
+and signing succeed. Container tags may already have been pushed before a later
+verification or signing step fails.
+
+If a release-candidate PR is still open, push the fix to that branch to trigger
+validation again. If the PR is already merged and no GitHub Release exists, merge
+the fix through a new pull request, then use the [manual trigger](#manual-trigger)
+from the corrected `main` revision with the same version. GitHub's **Re-run jobs**
+uses the original revision and will not pick up a newly merged fix. The selected
+revision must still contain matching package, lockfile, and changelog versions.
+
+If the GitHub Release already exists, prepare a new patch version rather than
+replacing published artifacts.
+
+### Pinned OpenAPI checksum mismatch
+
+If **Validate generated API contract** reports
+`Pinned OpenAPI checksum does not match backend-contract.json`, verify the
+checked-in OpenAPI file against the authoritative backend export at the intended
+reviewed revision. Do not simply replace the checksum to bypass the gate.
+
+Follow [Updating the backend contract](../CONTRIBUTING.md#updating-the-backend-contract):
+record the verified full backend revision and checksum together, regenerate the
+API types, and commit any resulting contract and schema changes. Run the contract
+preflight above before retrying. A stale pin can require only a change to
+`contracts/backend-contract.json` when the existing OpenAPI file and generated
+types already match the verified backend export.
