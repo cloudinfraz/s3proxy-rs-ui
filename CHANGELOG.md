@@ -7,6 +7,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [0.6.5] - 2026-09-12
 
+Compared with `v0.6.4`, this update adds paginated administration workflows,
+popup policy and IAM role details, missing API proxy routes, and stronger
+release and deployment checks. The backend contract is pinned to the
+[s3proxy-rs 0.6.3 release revision][s3proxy-rs-0.6.3].
+
 ### Added
 
 - Added cursor-based identity pagination and paginated identity selectors for
@@ -15,9 +20,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   identity and bucket mapping forms.
 - Expanded unit and browser coverage for pagination, backend selection, policy
   validation, and stale asynchronous responses.
+- Added contract-wide tests that require every documented `/admin/ui/*` API
+  to be covered by matching Vite and Nginx proxy rules.
+- Added desktop and mobile regression coverage for long-list popup placement,
+  keyboard navigation, focus restoration, and unsaved-draft dismissal.
 
 ### Changed
 
+- Moved managed policy, bucket policy, and IAM role details from below-table
+  sections into responsive dialogs with visible action controls. IAM role
+  status, attachment, retirement, and deletion operations use an Actions menu.
+- Kept one active dialog during detail, edit, and review transitions, restored
+  focus when closing, and preserved list pagination during edits.
+- Added wider policy and trust editors with bounded scrolling and protection
+  against accidental dismissal of unsaved drafts.
 - Switched overview resource counts to the backend summary instead of deriving
   totals from resource lists.
 - Moved bucket policy scope filtering to the backend and separated query caches
@@ -31,6 +47,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- Routed `/admin/ui/overview` and `/admin/ui/backend-options` requests through
+  Vite and Nginx instead of returning the SPA document, fixing unavailable
+  overview counts and invalid-response errors in backend selectors.
+- Kept policy and role actions within the viewport instead of requiring a
+  scroll to the end of the resource list, including on mobile screens.
+- Prevented delayed role-detail responses from reopening dismissed dialogs.
 - Preserved the existing identity-list response contract while adding the
   paginated identity API, and routed pagination requests through Vite and Nginx.
 - Guarded bucket and managed policy dialogs against late asynchronous results
@@ -40,6 +62,34 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Cleared stale policy simulation results when inputs change, ignored outdated
   responses, and displayed the identity, action, resource, and conditions that
   produced each result.
+
+### Deployment
+
+- Added shared UI release validation and trusted source-revision checks before
+  Azure login in publication and deployment workflows.
+- Restricted deployment to the canonical repository's `main` branch and
+  required image signatures from the exact `main` publication workflow identity.
+- Preserved existing network isolation when policy rendering is disabled and
+  required an existing UI NetworkPolicy for that production deployment mode.
+- Corrected the deployment health-check pod label to use UI access permissions.
+
+### Compatibility and upgrade notes
+
+- The checked-in contract targets [cloudinfraz/s3proxy-rs][s3proxy-rs] revision
+  `7f0cb6c00454d71316a7f118a201490fbbdbc19e`, with OpenAPI SHA-256
+  `9f768a4264c3f5088972b7400cd46b7c3b9d18f8b6bc93d11a0923eb44ae6424`.
+  UI and backend release numbers are independent.
+- Deploy a backend supporting the pinned identity pagination, backend options,
+  overview summary, and bucket policy filtering contracts before this UI.
+  Validate real authenticated API responses in the target environment; mocked
+  browser tests and a matching contract pin do not prove deployment compatibility.
+- Rebuild and deploy the UI image to apply the Nginx proxy fixes; refreshing
+  the browser alone does not update the deployed proxy configuration.
+- Popup workflows retain server-side validation, impact-token review,
+  concurrency checks, and role lifecycle gates without introducing new APIs.
+- See the [backend changelog][s3proxy-rs-0.6.3] for SigV4 canonical URI fixes,
+  `ListObjectsV2` improvements, and backend security changes. These are backend
+  changes, not storage operations added to the administration UI.
 
 ## [0.6.4] - 2026-09-07
 
@@ -265,6 +315,9 @@ and release automation previously developed alongside the backend.
 - Policy simulation and configuration review do not perform signed S3 requests,
   Azure storage I/O, or data migration.
 
-[Unreleased]: https://github.com/cloudinfraz/s3proxy-rs-ui/compare/v0.6.4...HEAD
+[Unreleased]: https://github.com/cloudinfraz/s3proxy-rs-ui/compare/v0.6.5...HEAD
+[0.6.5]: https://github.com/cloudinfraz/s3proxy-rs-ui/compare/v0.6.4...v0.6.5
 [0.6.4]: https://github.com/cloudinfraz/s3proxy-rs-ui/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/cloudinfraz/s3proxy-rs-ui/releases/tag/v0.6.3
+[s3proxy-rs]: https://github.com/cloudinfraz/s3proxy-rs
+[s3proxy-rs-0.6.3]: https://github.com/cloudinfraz/s3proxy-rs/blob/7f0cb6c00454d71316a7f118a201490fbbdbc19e/CHANGELOG.md#063---2026-09-12
