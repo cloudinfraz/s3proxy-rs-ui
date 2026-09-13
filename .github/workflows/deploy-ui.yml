@@ -62,7 +62,6 @@ jobs:
       ACR_NAME: ${{ vars.S3PROXY_ACR_NAME }}
       AKS_NAME: ${{ vars.S3PROXY_AKS_NAME }}
       AKS_RG: ${{ vars.S3PROXY_AKS_RG }}
-      CURL_IMAGE: ${{ vars.S3PROXY_CURL_IMAGE }}
       UI_DIGEST: ${{ inputs.ui_digest }}
       UI_REVISION: ${{ inputs.ui_revision }}
       NETWORK_POLICY_ENABLED: ${{ inputs.network_policy_enabled }}
@@ -80,11 +79,10 @@ jobs:
       - name: Validate protected UI deployment inputs
         run: |
           set -euo pipefail
-          for name in ACR_NAME AKS_NAME AKS_RG CURL_IMAGE UI_DIGEST UI_REVISION; do
+          for name in ACR_NAME AKS_NAME AKS_RG UI_DIGEST UI_REVISION; do
             [[ -n "${!name:-}" ]] || { echo "Missing protected value: ${name}" >&2; exit 1; }
           done
           [[ "$UI_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "Invalid immutable UI digest" >&2; exit 1; }
-          [[ "$CURL_IMAGE" == *@sha256:* ]] || { echo "S3PROXY_CURL_IMAGE must be digest-pinned" >&2; exit 1; }
           [[ "$UI_REVISION" =~ ^[0-9a-f]{40}$ ]] || { echo "UI revision must be a full Git commit SHA" >&2; exit 1; }
 
       - name: Azure login
@@ -138,17 +136,10 @@ jobs:
         if: inputs.deployment_environment == 'production' && inputs.network_policy_enabled == false
         run: kubectl -n s3proxy get networkpolicy allow-ui-admin >/dev/null
 
-      - name: Prepare deployed UI browser
+      - name: Prepare UI deployment verifier
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .node-version
-          cache: npm
-
-      - name: Install deployed UI browser dependencies
-        run: |
-          npm ci --ignore-scripts --registry=https://registry.npmjs.org/
-          npx playwright install --with-deps chromium
-          mkdir -p target/deploy
 
       - name: Deploy and verify UI
         env:
@@ -163,25 +154,15 @@ jobs:
           [[ "$deployed" == "$expected" ]] || { echo "Deployed UI image digest mismatch" >&2; exit 1; }
           node scripts/deploy/verify-ui-runtime.mjs "$expected" "$UI_REVISION"
           kubectl -n s3proxy annotate deployment/s3proxy-ui s3proxy.rs/oci-revision="$UI_REVISION" --overwrite >/dev/null
-          kubectl -n s3proxy run split-ui-check --rm -i --restart=Never \
-            --labels='s3proxy.rs/access-ui=true' --image="$CURL_IMAGE" \
-            --command -- curl -fsS http://s3proxy-ui.s3proxy.svc.cluster.local:8080/health
 
-      - name: Run deployed UI browser acceptance
-        env:
-          DEPLOYED_UI_BASE_URL: http://127.0.0.1:18080
+      - name: Run deployed UI in-cluster acceptance
         run: |
           set -euo pipefail
-          kubectl -n s3proxy port-forward service/s3proxy-ui 18080:8080 >target/deploy/ui-port-forward.log 2>&1 &
-          port_forward_pid=$!
-          trap 'kill "$port_forward_pid" 2>/dev/null || true' EXIT
-          for attempt in {1..30}; do
-            kill -0 "$port_forward_pid" 2>/dev/null || { echo "UI port-forward exited" >&2; exit 1; }
-            curl --silent --fail --output /dev/null "$DEPLOYED_UI_BASE_URL/healthz" && break
-            [[ "$attempt" != 30 ]] || { echo "UI port-forward did not become ready" >&2; exit 1; }
-            sleep 1
-          done
-          npx playwright test --config playwright.deployed.config.ts
+          expected="${ACR_LOGIN_SERVER}/s3proxy-ui@${UI_DIGEST}"
+          EXPECTED_KUBE_CONTEXT="$(kubectl config current-context)" \
+            UI_IMAGE="$expected" \
+            OUTPUT_DIR=target/deploy/ui-aks-test \
+            scripts/deploy/test-ui-aks-job.sh
 
       - name: Capture UI deployment evidence
         if: always()

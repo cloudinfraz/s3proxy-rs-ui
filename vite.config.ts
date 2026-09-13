@@ -16,7 +16,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '^/admin/ui/(overview(?:$|\\?)|backends(?:/|$|\\?)|backend-options(?:/|$|\\?)|virtual-buckets(?:/|$|\\?)|mapping-backends/|roles(?:/|$|\\?)|role-policies(?:$|\\?)|identities(?:/|$|\\?)|identity-pages(?:/|$|\\?)|policies(?:/|$|\\?)|bucket-policies(?:/|$|\\?))': { target: 'http://127.0.0.1:8080', changeOrigin: false, bypass: request => policyDocumentBypass(request) },
+      '^/admin/ui/(overview(?:$|\\?)|readiness(?:$|\\?)|backends(?:/|$|\\?)|backend-options(?:/|$|\\?)|virtual-buckets(?:/|$|\\?)|mapping-backends/|roles(?:/|$|\\?)|role-policies(?:$|\\?)|identities(?:/|$|\\?)|identity-pages(?:/|$|\\?)|policies(?:/|$|\\?)|bucket-policies(?:/|$|\\?))': { target: 'http://127.0.0.1:8080', changeOrigin: false, bypass: request => policyDocumentBypass(request) },
       '^/admin/(?!ui)': { target: 'http://127.0.0.1:8080', changeOrigin: false },
       '/health': 'http://127.0.0.1:8080',
     },

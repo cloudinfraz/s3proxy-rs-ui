@@ -21,8 +21,8 @@ export function Page({ title, subtitle, action, children }: { title: string; sub
   return <div className="page"><div className="page-heading"><div><div className="eyebrow">Administration</div><h1 ref={heading} tabIndex={-1}>{title}</h1>{subtitle && <p>{subtitle}</p>}</div>{action}</div>{children}</div>
 }
 
-export function ErrorBanner({ error, retry }: { error: unknown; retry?: () => void }) {
-  return <div className="error-banner" role="alert"><span>{error instanceof Error ? error.message : 'Request failed'}</span>{retry && <button onClick={retry}><RefreshCw size={15} /> Retry</button>}</div>
+export function ErrorBanner({ error, retry, retryLabel = 'Retry' }: { error: unknown; retry?: () => void; retryLabel?: string }) {
+  return <div className="error-banner" role="alert"><span>{error instanceof Error ? error.message : 'Request failed'}</span>{retry && <button onClick={retry}><RefreshCw size={15} /> {retryLabel}</button>}</div>
 }
 
 export function RefreshButton({ pending, refresh }: { pending: boolean; refresh: () => void }) {

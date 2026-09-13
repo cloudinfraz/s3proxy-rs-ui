@@ -3,516 +3,6 @@ import type { operations as OpenApiOperations } from '../schema'
 
 export type OperationId = keyof OpenApiOperations
 export const operationMetadata = {
-  "listAdminPolicies": {
-    "method": "GET",
-    "path": "/admin/ui/policies",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "createAdminPolicy": {
-    "method": "POST",
-    "path": "/admin/ui/policies",
-    "successes": [
-      {
-        "status": 201,
-        "kind": "json"
-      }
-    ]
-  },
-  "validateAdminPolicyDraft": {
-    "method": "POST",
-    "path": "/admin/ui/policies/validate",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "preflightAdminPolicies": {
-    "method": "GET",
-    "path": "/admin/ui/policies/preflight",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "simulateAdminIdentityPolicies": {
-    "method": "POST",
-    "path": "/admin/ui/policies/simulate",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "getAdminPolicy": {
-    "method": "GET",
-    "path": "/admin/ui/policies/{policy_id}",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "updateReviewedAdminPolicy": {
-    "method": "PUT",
-    "path": "/admin/ui/policies/{policy_id}",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "deleteReviewedAdminPolicy": {
-    "method": "DELETE",
-    "path": "/admin/ui/policies/{policy_id}",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "listAdminIdentityPolicies": {
-    "method": "GET",
-    "path": "/admin/ui/identities/{credential_id}/policies",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "attachReviewedAdminIdentityPolicy": {
-    "method": "POST",
-    "path": "/admin/ui/identities/{credential_id}/policies",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "detachReviewedAdminIdentityPolicy": {
-    "method": "DELETE",
-    "path": "/admin/ui/identities/{credential_id}/policies",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "listAdminBucketPolicies": {
-    "method": "GET",
-    "path": "/admin/ui/bucket-policies",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "getAdminDirectBucketPolicy": {
-    "method": "GET",
-    "path": "/admin/ui/bucket-policies/direct/{bucket}",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "updateReviewedAdminDirectBucketPolicy": {
-    "method": "PUT",
-    "path": "/admin/ui/bucket-policies/direct/{bucket}",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "deleteReviewedAdminDirectBucketPolicy": {
-    "method": "DELETE",
-    "path": "/admin/ui/bucket-policies/direct/{bucket}",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "getAdminVirtualBucketPolicy": {
-    "method": "GET",
-    "path": "/admin/ui/bucket-policies/virtual/{bucket_id}",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "updateReviewedAdminVirtualBucketPolicy": {
-    "method": "PUT",
-    "path": "/admin/ui/bucket-policies/virtual/{bucket_id}",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "deleteReviewedAdminVirtualBucketPolicy": {
-    "method": "DELETE",
-    "path": "/admin/ui/bucket-policies/virtual/{bucket_id}",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "listAdminRoles": {
-    "method": "GET",
-    "path": "/admin/ui/roles",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "createAdminRole": {
-    "method": "POST",
-    "path": "/admin/ui/roles",
-    "successes": [
-      {
-        "status": 201,
-        "kind": "json"
-      }
-    ]
-  },
-  "listRolePolicyOptions": {
-    "method": "GET",
-    "path": "/admin/ui/role-policies",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "getAdminRole": {
-    "method": "GET",
-    "path": "/admin/ui/roles/{role_id}",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "deleteReviewedRole": {
-    "method": "DELETE",
-    "path": "/admin/ui/roles/{role_id}",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "replaceReviewedRoleTrust": {
-    "method": "PUT",
-    "path": "/admin/ui/roles/{role_id}/trust",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "updateReviewedRoleSettings": {
-    "method": "PUT",
-    "path": "/admin/ui/roles/{role_id}/settings",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "setReviewedRoleEnabled": {
-    "method": "PUT",
-    "path": "/admin/ui/roles/{role_id}/enabled",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "retireReviewedRoleSessions": {
-    "method": "POST",
-    "path": "/admin/ui/roles/{role_id}/retire-sessions",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "attachReviewedRolePolicy": {
-    "method": "POST",
-    "path": "/admin/ui/roles/{role_id}/policies",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "detachReviewedRolePolicy": {
-    "method": "DELETE",
-    "path": "/admin/ui/roles/{role_id}/policies",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "listVirtualMappings": {
-    "method": "GET",
-    "path": "/admin/ui/virtual-buckets",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "createVirtualMapping": {
-    "method": "POST",
-    "path": "/admin/ui/virtual-buckets",
-    "successes": [
-      {
-        "status": 201,
-        "kind": "json"
-      }
-    ]
-  },
-  "getVirtualMapping": {
-    "method": "GET",
-    "path": "/admin/ui/virtual-buckets/{id}",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "updateVirtualMapping": {
-    "method": "PUT",
-    "path": "/admin/ui/virtual-buckets/{id}",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "deleteVirtualMapping": {
-    "method": "DELETE",
-    "path": "/admin/ui/virtual-buckets/{id}",
-    "successes": [
-      {
-        "status": 204,
-        "kind": "empty"
-      }
-    ]
-  },
-  "reviewMappingBackend": {
-    "method": "GET",
-    "path": "/admin/ui/mapping-backends/{id}",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "listBackendProjections": {
-    "method": "GET",
-    "path": "/admin/ui/backends",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "createBackendForUi": {
-    "method": "POST",
-    "path": "/admin/ui/backends",
-    "successes": [
-      {
-        "status": 201,
-        "kind": "json"
-      }
-    ]
-  },
-  "listBackendOptions": {
-    "method": "GET",
-    "path": "/admin/ui/backend-options",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "getBackendOption": {
-    "method": "GET",
-    "path": "/admin/ui/backend-options/{backend_id}",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "getBackendProjection": {
-    "method": "GET",
-    "path": "/admin/ui/backends/{name}",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "updateBackendForUi": {
-    "method": "PUT",
-    "path": "/admin/ui/backends/{name}",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "publicHealth": {
-    "method": "GET",
-    "path": "/health",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "liveness": {
-    "method": "GET",
-    "path": "/healthz",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "empty"
-      }
-    ]
-  },
-  "controlOpenApi": {
-    "method": "GET",
-    "path": "/admin/openapi.json",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "bootstrapAdminKey": {
-    "method": "POST",
-    "path": "/admin/bootstrap/api-key",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "login": {
-    "method": "POST",
-    "path": "/admin/session/login",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "getSession": {
-    "method": "GET",
-    "path": "/admin/session",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "logout": {
-    "method": "DELETE",
-    "path": "/admin/session",
-    "successes": [
-      {
-        "status": 204,
-        "kind": "empty"
-      }
-    ]
-  },
-  "adminHealth": {
-    "method": "GET",
-    "path": "/admin/health",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "getCapabilities": {
-    "method": "GET",
-    "path": "/admin/capabilities",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "listAuditEvents": {
-    "method": "GET",
-    "path": "/admin/audit",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
   "listAdminKeys": {
     "method": "GET",
     "path": "/admin/api-keys",
@@ -530,6 +20,16 @@ export const operationMetadata = {
       {
         "status": 201,
         "kind": "json"
+      }
+    ]
+  },
+  "deleteAdminKey": {
+    "method": "DELETE",
+    "path": "/admin/api-keys/{key_name}",
+    "successes": [
+      {
+        "status": 204,
+        "kind": "empty"
       }
     ]
   },
@@ -553,109 +53,9 @@ export const operationMetadata = {
       }
     ]
   },
-  "deleteAdminKey": {
-    "method": "DELETE",
-    "path": "/admin/api-keys/{key_name}",
-    "successes": [
-      {
-        "status": 204,
-        "kind": "empty"
-      }
-    ]
-  },
-  "listCredentials": {
+  "listAuditEvents": {
     "method": "GET",
-    "path": "/admin/credentials",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "createCredential": {
-    "method": "POST",
-    "path": "/admin/credentials",
-    "successes": [
-      {
-        "status": 201,
-        "kind": "json"
-      }
-    ]
-  },
-  "getAdminOverview": {
-    "method": "GET",
-    "path": "/admin/ui/overview",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "listIdentityProjections": {
-    "method": "GET",
-    "path": "/admin/ui/identities",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "listIdentityProjectionPage": {
-    "method": "GET",
-    "path": "/admin/ui/identity-pages",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "getIdentityProjection": {
-    "method": "GET",
-    "path": "/admin/ui/identities/{credential_id}",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "getCredential": {
-    "method": "GET",
-    "path": "/admin/credentials/{access_key}",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "updateCredential": {
-    "method": "PUT",
-    "path": "/admin/credentials/{access_key}",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "deleteCredential": {
-    "method": "DELETE",
-    "path": "/admin/credentials/{access_key}",
-    "successes": [
-      {
-        "status": 204,
-        "kind": "empty"
-      }
-    ]
-  },
-  "rotateCredentialSecret": {
-    "method": "POST",
-    "path": "/admin/credentials/{credential_id}/rotate-secret",
+    "path": "/admin/audit",
     "successes": [
       {
         "status": 200,
@@ -683,6 +83,16 @@ export const operationMetadata = {
       }
     ]
   },
+  "deleteBackend": {
+    "method": "DELETE",
+    "path": "/admin/backends/{name}",
+    "successes": [
+      {
+        "status": 204,
+        "kind": "empty"
+      }
+    ]
+  },
   "getBackend": {
     "method": "GET",
     "path": "/admin/backends/{name}",
@@ -703,19 +113,9 @@ export const operationMetadata = {
       }
     ]
   },
-  "deleteBackend": {
-    "method": "DELETE",
-    "path": "/admin/backends/{name}",
-    "successes": [
-      {
-        "status": 204,
-        "kind": "empty"
-      }
-    ]
-  },
-  "listVirtualBuckets": {
-    "method": "GET",
-    "path": "/admin/virtual-buckets",
+  "bootstrapAdminKey": {
+    "method": "POST",
+    "path": "/admin/bootstrap/api-key",
     "successes": [
       {
         "status": 200,
@@ -723,9 +123,59 @@ export const operationMetadata = {
       }
     ]
   },
-  "createVirtualBucket": {
+  "deleteBucketPolicy": {
+    "method": "DELETE",
+    "path": "/admin/buckets/{bucket}/policy",
+    "successes": [
+      {
+        "status": 204,
+        "kind": "empty"
+      }
+    ]
+  },
+  "getBucketPolicy": {
+    "method": "GET",
+    "path": "/admin/buckets/{bucket}/policy",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "setBucketPolicy": {
+    "method": "PUT",
+    "path": "/admin/buckets/{bucket}/policy",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "getCapabilities": {
+    "method": "GET",
+    "path": "/admin/capabilities",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "listCredentials": {
+    "method": "GET",
+    "path": "/admin/credentials",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "createCredential": {
     "method": "POST",
-    "path": "/admin/virtual-buckets",
+    "path": "/admin/credentials",
     "successes": [
       {
         "status": 201,
@@ -733,9 +183,9 @@ export const operationMetadata = {
       }
     ]
   },
-  "updateVirtualBucket": {
-    "method": "PUT",
-    "path": "/admin/virtual-buckets/{bucket_id}",
+  "deleteCredential": {
+    "method": "DELETE",
+    "path": "/admin/credentials/{access_key}",
     "successes": [
       {
         "status": 204,
@@ -743,13 +193,77 @@ export const operationMetadata = {
       }
     ]
   },
-  "deleteVirtualBucket": {
+  "getCredential": {
+    "method": "GET",
+    "path": "/admin/credentials/{access_key}",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "updateCredential": {
+    "method": "PUT",
+    "path": "/admin/credentials/{access_key}",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "attachPolicy": {
+    "method": "POST",
+    "path": "/admin/credentials/{access_key}/policies",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      },
+      {
+        "status": 201,
+        "kind": "json"
+      }
+    ]
+  },
+  "detachPolicy": {
     "method": "DELETE",
-    "path": "/admin/virtual-buckets/{bucket_id}",
+    "path": "/admin/credentials/{access_key}/policies/{name}",
     "successes": [
       {
         "status": 204,
         "kind": "empty"
+      }
+    ]
+  },
+  "rotateCredentialSecret": {
+    "method": "POST",
+    "path": "/admin/credentials/{credential_id}/rotate-secret",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "adminHealth": {
+    "method": "GET",
+    "path": "/admin/health",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "controlOpenApi": {
+    "method": "GET",
+    "path": "/admin/openapi.json",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
       }
     ]
   },
@@ -783,6 +297,16 @@ export const operationMetadata = {
       }
     ]
   },
+  "deletePolicy": {
+    "method": "DELETE",
+    "path": "/admin/policies/{name}",
+    "successes": [
+      {
+        "status": 204,
+        "kind": "empty"
+      }
+    ]
+  },
   "getPolicy": {
     "method": "GET",
     "path": "/admin/policies/{name}",
@@ -800,100 +324,6 @@ export const operationMetadata = {
       {
         "status": 200,
         "kind": "json"
-      }
-    ]
-  },
-  "deletePolicy": {
-    "method": "DELETE",
-    "path": "/admin/policies/{name}",
-    "successes": [
-      {
-        "status": 204,
-        "kind": "empty"
-      }
-    ]
-  },
-  "attachPolicy": {
-    "method": "POST",
-    "path": "/admin/credentials/{access_key}/policies",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      },
-      {
-        "status": 201,
-        "kind": "json"
-      }
-    ]
-  },
-  "detachPolicy": {
-    "method": "DELETE",
-    "path": "/admin/credentials/{access_key}/policies/{name}",
-    "successes": [
-      {
-        "status": 204,
-        "kind": "empty"
-      }
-    ]
-  },
-  "getBucketPolicy": {
-    "method": "GET",
-    "path": "/admin/buckets/{bucket}/policy",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "setBucketPolicy": {
-    "method": "PUT",
-    "path": "/admin/buckets/{bucket}/policy",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "deleteBucketPolicy": {
-    "method": "DELETE",
-    "path": "/admin/buckets/{bucket}/policy",
-    "successes": [
-      {
-        "status": 204,
-        "kind": "empty"
-      }
-    ]
-  },
-  "getVirtualBucketPolicy": {
-    "method": "GET",
-    "path": "/admin/virtual-buckets/{bucket_id}/policy",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "setVirtualBucketPolicy": {
-    "method": "PUT",
-    "path": "/admin/virtual-buckets/{bucket_id}/policy",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "deleteVirtualBucketPolicy": {
-    "method": "DELETE",
-    "path": "/admin/virtual-buckets/{bucket_id}/policy",
-    "successes": [
-      {
-        "status": 204,
-        "kind": "empty"
       }
     ]
   },
@@ -927,16 +357,6 @@ export const operationMetadata = {
       }
     ]
   },
-  "getRole": {
-    "method": "GET",
-    "path": "/admin/roles/{role_id}",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
   "deleteRole": {
     "method": "DELETE",
     "path": "/admin/roles/{role_id}",
@@ -947,19 +367,9 @@ export const operationMetadata = {
       }
     ]
   },
-  "updateRoleTrust": {
-    "method": "PUT",
-    "path": "/admin/roles/{role_id}/trust",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "updateRoleSettings": {
-    "method": "PUT",
-    "path": "/admin/roles/{role_id}/settings",
+  "getRole": {
+    "method": "GET",
+    "path": "/admin/roles/{role_id}",
     "successes": [
       {
         "status": 200,
@@ -970,16 +380,6 @@ export const operationMetadata = {
   "setRoleEnabled": {
     "method": "PUT",
     "path": "/admin/roles/{role_id}/enabled",
-    "successes": [
-      {
-        "status": 200,
-        "kind": "json"
-      }
-    ]
-  },
-  "retireRoleSessions": {
-    "method": "POST",
-    "path": "/admin/roles/{role_id}/retire-sessions",
     "successes": [
       {
         "status": 200,
@@ -1003,6 +403,616 @@ export const operationMetadata = {
     "successes": [
       {
         "status": 204,
+        "kind": "empty"
+      }
+    ]
+  },
+  "retireRoleSessions": {
+    "method": "POST",
+    "path": "/admin/roles/{role_id}/retire-sessions",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "updateRoleSettings": {
+    "method": "PUT",
+    "path": "/admin/roles/{role_id}/settings",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "updateRoleTrust": {
+    "method": "PUT",
+    "path": "/admin/roles/{role_id}/trust",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "logout": {
+    "method": "DELETE",
+    "path": "/admin/session",
+    "successes": [
+      {
+        "status": 204,
+        "kind": "empty"
+      }
+    ]
+  },
+  "getSession": {
+    "method": "GET",
+    "path": "/admin/session",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "login": {
+    "method": "POST",
+    "path": "/admin/session/login",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "listBackendOptions": {
+    "method": "GET",
+    "path": "/admin/ui/backend-options",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "getBackendOption": {
+    "method": "GET",
+    "path": "/admin/ui/backend-options/{backend_id}",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "listBackendProjections": {
+    "method": "GET",
+    "path": "/admin/ui/backends",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "createBackendForUi": {
+    "method": "POST",
+    "path": "/admin/ui/backends",
+    "successes": [
+      {
+        "status": 201,
+        "kind": "json"
+      }
+    ]
+  },
+  "getBackendProjection": {
+    "method": "GET",
+    "path": "/admin/ui/backends/{name}",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "updateBackendForUi": {
+    "method": "PUT",
+    "path": "/admin/ui/backends/{name}",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "listAdminBucketPolicies": {
+    "method": "GET",
+    "path": "/admin/ui/bucket-policies",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "deleteReviewedAdminDirectBucketPolicy": {
+    "method": "DELETE",
+    "path": "/admin/ui/bucket-policies/direct/{bucket}",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "getAdminDirectBucketPolicy": {
+    "method": "GET",
+    "path": "/admin/ui/bucket-policies/direct/{bucket}",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "updateReviewedAdminDirectBucketPolicy": {
+    "method": "PUT",
+    "path": "/admin/ui/bucket-policies/direct/{bucket}",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "deleteReviewedAdminVirtualBucketPolicy": {
+    "method": "DELETE",
+    "path": "/admin/ui/bucket-policies/virtual/{bucket_id}",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "getAdminVirtualBucketPolicy": {
+    "method": "GET",
+    "path": "/admin/ui/bucket-policies/virtual/{bucket_id}",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "updateReviewedAdminVirtualBucketPolicy": {
+    "method": "PUT",
+    "path": "/admin/ui/bucket-policies/virtual/{bucket_id}",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "listIdentityProjections": {
+    "method": "GET",
+    "path": "/admin/ui/identities",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "getIdentityProjection": {
+    "method": "GET",
+    "path": "/admin/ui/identities/{credential_id}",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "detachReviewedAdminIdentityPolicy": {
+    "method": "DELETE",
+    "path": "/admin/ui/identities/{credential_id}/policies",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "listAdminIdentityPolicies": {
+    "method": "GET",
+    "path": "/admin/ui/identities/{credential_id}/policies",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "attachReviewedAdminIdentityPolicy": {
+    "method": "POST",
+    "path": "/admin/ui/identities/{credential_id}/policies",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "listIdentityProjectionPage": {
+    "method": "GET",
+    "path": "/admin/ui/identity-pages",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "reviewMappingBackend": {
+    "method": "GET",
+    "path": "/admin/ui/mapping-backends/{id}",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "getAdminOverview": {
+    "method": "GET",
+    "path": "/admin/ui/overview",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "listAdminPolicies": {
+    "method": "GET",
+    "path": "/admin/ui/policies",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "createAdminPolicy": {
+    "method": "POST",
+    "path": "/admin/ui/policies",
+    "successes": [
+      {
+        "status": 201,
+        "kind": "json"
+      }
+    ]
+  },
+  "preflightAdminPolicies": {
+    "method": "GET",
+    "path": "/admin/ui/policies/preflight",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "simulateAdminIdentityPolicies": {
+    "method": "POST",
+    "path": "/admin/ui/policies/simulate",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "validateAdminPolicyDraft": {
+    "method": "POST",
+    "path": "/admin/ui/policies/validate",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "deleteReviewedAdminPolicy": {
+    "method": "DELETE",
+    "path": "/admin/ui/policies/{policy_id}",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "getAdminPolicy": {
+    "method": "GET",
+    "path": "/admin/ui/policies/{policy_id}",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "updateReviewedAdminPolicy": {
+    "method": "PUT",
+    "path": "/admin/ui/policies/{policy_id}",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "getAdminReadiness": {
+    "method": "GET",
+    "path": "/admin/ui/readiness",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "listRolePolicyOptions": {
+    "method": "GET",
+    "path": "/admin/ui/role-policies",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "listAdminRoles": {
+    "method": "GET",
+    "path": "/admin/ui/roles",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "createAdminRole": {
+    "method": "POST",
+    "path": "/admin/ui/roles",
+    "successes": [
+      {
+        "status": 201,
+        "kind": "json"
+      }
+    ]
+  },
+  "deleteReviewedRole": {
+    "method": "DELETE",
+    "path": "/admin/ui/roles/{role_id}",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "getAdminRole": {
+    "method": "GET",
+    "path": "/admin/ui/roles/{role_id}",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "setReviewedRoleEnabled": {
+    "method": "PUT",
+    "path": "/admin/ui/roles/{role_id}/enabled",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "detachReviewedRolePolicy": {
+    "method": "DELETE",
+    "path": "/admin/ui/roles/{role_id}/policies",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "attachReviewedRolePolicy": {
+    "method": "POST",
+    "path": "/admin/ui/roles/{role_id}/policies",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "retireReviewedRoleSessions": {
+    "method": "POST",
+    "path": "/admin/ui/roles/{role_id}/retire-sessions",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "updateReviewedRoleSettings": {
+    "method": "PUT",
+    "path": "/admin/ui/roles/{role_id}/settings",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "replaceReviewedRoleTrust": {
+    "method": "PUT",
+    "path": "/admin/ui/roles/{role_id}/trust",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "listVirtualMappings": {
+    "method": "GET",
+    "path": "/admin/ui/virtual-buckets",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "createVirtualMapping": {
+    "method": "POST",
+    "path": "/admin/ui/virtual-buckets",
+    "successes": [
+      {
+        "status": 201,
+        "kind": "json"
+      }
+    ]
+  },
+  "deleteVirtualMapping": {
+    "method": "DELETE",
+    "path": "/admin/ui/virtual-buckets/{id}",
+    "successes": [
+      {
+        "status": 204,
+        "kind": "empty"
+      }
+    ]
+  },
+  "getVirtualMapping": {
+    "method": "GET",
+    "path": "/admin/ui/virtual-buckets/{id}",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "updateVirtualMapping": {
+    "method": "PUT",
+    "path": "/admin/ui/virtual-buckets/{id}",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "listVirtualBuckets": {
+    "method": "GET",
+    "path": "/admin/virtual-buckets",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "createVirtualBucket": {
+    "method": "POST",
+    "path": "/admin/virtual-buckets",
+    "successes": [
+      {
+        "status": 201,
+        "kind": "json"
+      }
+    ]
+  },
+  "deleteVirtualBucket": {
+    "method": "DELETE",
+    "path": "/admin/virtual-buckets/{bucket_id}",
+    "successes": [
+      {
+        "status": 204,
+        "kind": "empty"
+      }
+    ]
+  },
+  "updateVirtualBucket": {
+    "method": "PUT",
+    "path": "/admin/virtual-buckets/{bucket_id}",
+    "successes": [
+      {
+        "status": 204,
+        "kind": "empty"
+      }
+    ]
+  },
+  "deleteVirtualBucketPolicy": {
+    "method": "DELETE",
+    "path": "/admin/virtual-buckets/{bucket_id}/policy",
+    "successes": [
+      {
+        "status": 204,
+        "kind": "empty"
+      }
+    ]
+  },
+  "getVirtualBucketPolicy": {
+    "method": "GET",
+    "path": "/admin/virtual-buckets/{bucket_id}/policy",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "setVirtualBucketPolicy": {
+    "method": "PUT",
+    "path": "/admin/virtual-buckets/{bucket_id}/policy",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "publicHealth": {
+    "method": "GET",
+    "path": "/health",
+    "successes": [
+      {
+        "status": 200,
+        "kind": "json"
+      }
+    ]
+  },
+  "liveness": {
+    "method": "GET",
+    "path": "/healthz",
+    "successes": [
+      {
+        "status": 200,
         "kind": "empty"
       }
     ]

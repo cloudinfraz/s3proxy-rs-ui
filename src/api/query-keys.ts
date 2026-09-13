@@ -7,6 +7,8 @@ export const controlKeys = {
   session: ['session'] as const,
   capabilities: ['control', 'capabilities'] as const,
   overview: ['control', 'overview'] as const,
+  readiness: ['control', 'readiness'] as const,
+  readinessPage: (afterKey: string | null) => ['control', 'readiness', 'page', { afterKey }] as const,
   health: ['control', 'health'] as const,
   list: (resource: ControlResource) => ['control', resource, 'list'] as const,
   identityPage: (afterId: string | null, accessMode: 'direct' | 'virtual' | null) => ['control', 'identities', 'page', { afterId, accessMode }] as const,

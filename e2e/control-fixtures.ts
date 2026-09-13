@@ -14,6 +14,16 @@ export const health = {
   authorization: { mode: 'off', coherence: 'strict', resolver_ready: false, database_ready: false, audit_required: false, audit_dispatcher_ready: false },
 } satisfies components['schemas']['AdminHealthResponse']
 
+export const readiness = {
+  evaluated_at: timestamp,
+  status: 'ready',
+  finding_count: 0,
+  items: [],
+  next_after_key: null,
+  default_page_size: 20,
+  max_page_size: 100,
+} satisfies components['schemas']['ConfigurationDiagnosticsResponse']
+
 export const collections = {
   '/admin/ui/overview': {
     identity_count: 1, bucket_routing_count: 1, backend_count: 1, policy_count: 1,
@@ -106,6 +116,7 @@ export async function mockControlApi(page: Page, empty = false) {
     if (path === '/admin/health' && request.method() === 'GET') {
       return route.fulfill({ json: { ...health, credentials: { count: empty ? 0 : 1 } } })
     }
+    if (path === '/admin/ui/readiness' && request.method() === 'GET') return route.fulfill({ json: readiness })
     if (path === '/admin/capabilities' && request.method() === 'GET') return route.fulfill({ json: capabilities })
     if (path === '/admin/roles' && request.method() === 'GET') return route.fulfill({ json: { count: 0, items: [] } satisfies components['schemas']['IamRoleListResponse'] })
     if (path === '/admin/ui/roles' && request.method() === 'GET') return route.fulfill({ json: { items: [], next_after_id: null, limits: { min_duration_seconds: 3600, max_duration_seconds: 43200, max_retirement_batch: 1000, retained_count_cap: 1000, default_page_size: 100, max_page_size: 200 } } satisfies components['schemas']['AdminIamRolePage'] })

@@ -53,6 +53,7 @@ committed lockfile and official npm registry with install scripts disabled.
 | `npm run test:e2e:cross-browser` | Run bounded Firefox and WebKit smoke tests |
 | `npm run test:e2e:cross-browser:container` | Run cross-browser smoke in the pinned official container |
 | `make check` | Install dependencies, audit, lint, test, build, and run browser tests |
+| `make aks-ui-test-job` | Schedule an in-cluster Job to validate the deployed UI |
 
 Before browser tests, install the required Playwright engines and system dependencies:
 
@@ -121,11 +122,18 @@ leave `src/api/schema.d.ts` and `src/api/generated/` unchanged. Backend contract
 changes must be implemented, deployed, and probed in the authoritative backend
 before dependent UI behavior is enabled.
 
+Overview loads `/admin/ui/readiness` on entry, on explicit refresh, and after configuration
+mutations invalidate control data. A successful result remains fresh in the client for 60 seconds;
+the UI does not interval-poll it or refetch it on window focus. This operation performs complete
+configuration analysis and is not a health probe. Operators and orchestration must use backend
+`/health` or `/admin/health` instead.
+
 ## Deployment
 
 The Kubernetes manifests deploy the UI in the `s3proxy` namespace alongside the
 `s3proxy-control` Service on port `8081`. They do not create an Ingress; external
-routing and TLS are operator-managed. Deploy published images by immutable digest.
+routing and TLS are operator-managed. UI deployment is CI/CD-only through the protected
+**Publish UI image** and **Deploy UI** GitHub workflows; do not apply local source images manually.
 
 See [docs/deployment.md](docs/deployment.md) for setup and
 [docs/releasing.md](docs/releasing.md) for image publication and releases.
