@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import { collections, mockControlApi } from './control-fixtures'
-import type { components } from '../src/api/schema'
+import type { components } from '../../src/api/schema'
 
 type Identity = components['schemas']['IdentityProjection']
 const backendId = '00000000-0000-4000-8000-000000000001'

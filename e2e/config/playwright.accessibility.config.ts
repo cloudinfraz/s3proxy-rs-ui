@@ -3,8 +3,7 @@ import { defineConfig, devices } from '@playwright/test'
 export const accessibilityTags = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] as const
 
 export default defineConfig({
-  testDir: './e2e',
-  testMatch: 'accessibility.spec.ts',
+  testDir: '../accessibility',
   fullyParallel: false,
   workers: 1,
   retries: 0,

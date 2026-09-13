@@ -5,7 +5,7 @@ const baseURL = env.DEPLOYED_UI_BASE_URL
 if (!baseURL) throw new Error('DEPLOYED_UI_BASE_URL is required')
 
 export default defineConfig({
-  testDir: './e2e/deployed',
+  testDir: '../deployed',
   fullyParallel: false,
   workers: 1,
   retries: 0,

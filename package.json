@@ -27,11 +27,12 @@
     "test:coverage": "vitest run src --coverage",
     "test:deploy": "node --test scripts/deploy/*.test.mjs && scripts/deploy/render-ui-manifest.test.sh",
     "test:release": "node --test scripts/release/*.test.mjs",
-    "test:e2e": "playwright test",
-    "test:e2e:a11y": "playwright test --config playwright.accessibility.config.ts",
-    "test:e2e:cross-browser": "playwright test --config playwright.cross-browser.config.ts",
+    "test:e2e": "playwright test --config e2e/config/playwright.config.ts",
+    "test:e2e:a11y": "playwright test --config e2e/config/playwright.accessibility.config.ts",
+    "test:e2e:cross-browser": "playwright test --config e2e/config/playwright.cross-browser.config.ts",
     "test:e2e:cross-browser:container": "scripts/release/run-cross-browser-container.sh",
-    "test:e2e:live": "playwright test --config playwright.live.config.ts",
+    "test:e2e:live": "playwright test --config e2e/config/playwright.live.config.ts",
+    "test:e2e:deployed": "playwright test --config e2e/config/playwright.deployed.config.ts",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {

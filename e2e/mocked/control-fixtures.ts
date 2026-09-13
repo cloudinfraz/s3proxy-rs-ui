@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test'
-import type { components } from '../src/api/schema'
+import type { components } from '../../src/api/schema'
 
 const timestamp = '2026-09-05T00:00:00Z'
 const fixtureId = '00000000-0000-4000-8000-000000000001'
