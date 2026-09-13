@@ -11,7 +11,7 @@ Compared with `v0.6.4`, this update adds paginated administration workflows,
 backend-authored configuration diagnostics, typed runtime-validated API
 operations, popup policy and IAM role details, broader browser quality gates,
 and stronger release and deployment checks. The backend contract is pinned to
-the reviewed [s3proxy-rs][s3proxy-rs] revision listed below.
+the reviewed [s3proxy-rs] revision listed below.
 
 ### Added
 
