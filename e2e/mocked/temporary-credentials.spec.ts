@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import type { components } from '../src/api/schema'
+import type { components } from '../../src/api/schema'
 import { capabilities as baseCapabilities, mockControlApi } from './control-fixtures'
 
 type Capabilities = components['schemas']['ControlCapabilities']

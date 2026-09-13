@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { collections, mockControlApi, navigateTo } from './control-fixtures'
-import type { components } from '../src/api/schema'
+import type { components } from '../../src/api/schema'
 
 test('S3 identities use bounded cursor pagination', async ({ page }) => {
   const verify = await mockControlApi(page)

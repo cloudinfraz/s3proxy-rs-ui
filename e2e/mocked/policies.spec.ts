@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import type { components } from '../src/api/schema'
+import type { components } from '../../src/api/schema'
 import { collections, mockControlApi } from './control-fixtures'
 
 type PolicyDetail = components['schemas']['AdminPolicyDetail']

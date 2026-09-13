@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import type { components } from '../src/api/schema'
+import type { components } from '../../src/api/schema'
 import { mockControlApi, navigateTo } from './control-fixtures'
 
 const fixtureId = '00000000-0000-4000-8000-000000000001'

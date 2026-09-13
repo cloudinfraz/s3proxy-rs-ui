@@ -16,16 +16,17 @@ function files(directory) {
 test('Playwright specs live only in active e2e roots', () => {
   const outside = files(root).filter(path => path.endsWith('.spec.ts') && !path.startsWith('e2e/'))
   assert.deepEqual(outside, [])
+  const rootConfigs = files(root).filter(path => /^playwright.*\.config\.ts$/.test(path))
+  assert.deepEqual(rootConfigs, [])
 })
 
 test('full Chromium config excludes specialized quality suites', () => {
-  const config = readFileSync(join(root, 'playwright.config.ts'), 'utf8')
-  assert.match(config, /\*\*\/smoke\/\*\*/)
-  assert.match(config, /\*\*\/accessibility\.spec\.ts/)
+  const config = readFileSync(join(root, 'e2e/config/playwright.config.ts'), 'utf8')
+  assert.match(config, /testDir:\s*['"]\.\.\/mocked['"]/)
 })
 
 test('accessibility config fixes scope, tags, retries, and sensitive artifacts', () => {
-  const config = readFileSync(join(root, 'playwright.accessibility.config.ts'), 'utf8')
+  const config = readFileSync(join(root, 'e2e/config/playwright.accessibility.config.ts'), 'utf8')
   for (const tag of ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']) assert.match(config, new RegExp(tag))
   assert.match(config, /Desktop Chrome/)
   assert.match(config, /reducedMotion:\s*['"]reduce['"]/)
@@ -35,8 +36,8 @@ test('accessibility config fixes scope, tags, retries, and sensitive artifacts',
 })
 
 test('cross-browser config is bounded, retry-free, and artifact-free', () => {
-  const config = readFileSync(join(root, 'playwright.cross-browser.config.ts'), 'utf8')
-  assert.match(config, /testDir:\s*['"]\.\/e2e\/smoke['"]/)
+  const config = readFileSync(join(root, 'e2e/config/playwright.cross-browser.config.ts'), 'utf8')
+  assert.match(config, /testDir:\s*['"]\.\.\/smoke['"]/)
   assert.match(config, /firefox-smoke/)
   assert.match(config, /Desktop Firefox/)
   assert.match(config, /webkit-smoke/)

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { capabilities, collections, health, mockControlApi, navigateTo } from './control-fixtures'
-import type { components } from '../src/api/schema'
+import type { components } from '../../src/api/schema'
 
 test('UI069-01 grouped navigation, deep links, history and responsive layout', async ({ page }, testInfo) => {
   const verify = await mockControlApi(page)
