@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import type { components } from '../src/api/schema'
+import type { components } from '../../src/api/schema'
 import { capabilities, collections, mockControlApi } from './control-fixtures'
 
 test('UI072-04 direct details are read-only and fail closed for unavailable routing metadata', async ({ page }, testInfo) => {

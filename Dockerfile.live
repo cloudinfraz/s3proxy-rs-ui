@@ -1,0 +1,29 @@
+ARG PLAYWRIGHT_IMAGE="mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27"
+
+FROM ${PLAYWRIGHT_IMAGE}
+
+ARG OCI_SOURCE="https://github.com/cloudinfraz/s3proxy-rs-ui"
+ARG OCI_REVISION="unknown"
+ARG NPM_REGISTRY="https://registry.npmjs.org/"
+
+LABEL org.opencontainers.image.source="$OCI_SOURCE" \
+      org.opencontainers.image.revision="$OCI_REVISION" \
+      org.opencontainers.image.title="s3proxy-rs UI live test"
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci --ignore-scripts --no-audit --no-fund \
+    --registry="$NPM_REGISTRY" \
+    --fetch-retries=3 \
+    --fetch-retry-mintimeout=1000 \
+    --fetch-retry-maxtimeout=10000 \
+    && npm cache clean --force
+
+COPY e2e/config/playwright.live.config.ts ./e2e/config/playwright.live.config.ts
+COPY e2e/live ./e2e/live
+COPY src/api/schema.d.ts ./src/api/schema.d.ts
+
+USER pwuser
+
+ENTRYPOINT ["./node_modules/.bin/playwright", "test", "--config", "e2e/config/playwright.live.config.ts"]

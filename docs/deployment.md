@@ -80,6 +80,50 @@ This Job is an HTTP/runtime contract test, not a replacement for the browser mat
 WebKit coverage. All AKS deployment remains owned by the protected GitHub workflows, signed images,
 environment approvals, and main-branch revision checks described below.
 
+## Dev AKS live authorization Job
+
+The credential-bearing live Job is separate from the anonymous deployed Job.
+Building or publishing its image does not authorize execution. Run it only
+after the dev environment owner explicitly approves that specific invocation.
+It creates and removes virtual identities, bucket mappings, and managed
+policies through the UI, then verifies allow and explicit-deny behavior through
+the S3 data Service.
+
+Build the test image from the pinned Playwright base image and publish it to ACR
+using the repository's approved image workflow. Pass the resulting immutable
+digest as `LIVE_TEST_IMAGE`; mutable tags are rejected.
+
+The administrator key must already be stored in a dedicated Kubernetes Secret.
+Label that Secret `s3proxy.rs/purpose=ui-live-test`. The script reads the key
+through `secretKeyRef` and never reads, decodes, or writes the value locally.
+The key must be the current plaintext key returned once by backend bootstrap or
+authenticated key creation for the deployed control database; a key name, hash,
+or key from another database returns HTTP 403. The Job performs a read-only
+authenticated health preflight and does not start Playwright when this check
+fails.
+Record the target cluster identity from the `kube-system` namespace UID during
+the approval review and pass it as `EXPECTED_CLUSTER_UID`.
+
+After explicit approval, the invocation shape is:
+
+```bash
+UI_LIVE_TEST_APPROVAL=I_APPROVE_DEV_AKS_LIVE_MUTATION \
+EXPECTED_KUBE_CONTEXT=aks-storage-test \
+EXPECTED_CLUSTER_UID='<approved-kube-system-uid>' \
+LIVE_TEST_IMAGE='<acr>/s3proxy-ui-live-test@sha256:<digest>' \
+ADMIN_KEY_SECRET='<dedicated-live-test-secret>' \
+UI_BASE_URL='http://s3proxy-ui:8080' \
+S3_ENDPOINT='http://s3proxy-data:8080' \
+make aks-ui-live-test-job
+```
+
+The approval phrase is an execution interlock, not standing authorization.
+Do not place it in a checked-in workflow, shell profile, or persistent secret.
+The wrapper generates a unique Job name, requires the immutable cluster UID and
+image digest, disables ServiceAccount token mounting, keeps the root filesystem
+read-only, and verifies deletion of the credential-bearing Job before reporting
+success.
+
 ## Network policy
 
 Set `NETWORK_POLICY_ENABLED=true` while rendering to include the optional

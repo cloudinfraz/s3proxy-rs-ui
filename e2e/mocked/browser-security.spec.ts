@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import type { components } from '../src/api/schema'
+import type { components } from '../../src/api/schema'
 import { emptyCollections, mockControlApi } from './control-fixtures'
 
 test('login and cookie mutation keep credential material out of browser storage', async ({ page }) => {

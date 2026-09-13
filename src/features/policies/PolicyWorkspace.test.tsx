@@ -22,4 +22,5 @@ describe('PolicyWorkspace', () => {
     fireEvent.click(screen.getByRole('tab', { name: /Diagnostics/ }))
     expect(screen.getByText('diagnostics content').closest('[data-state]')?.getAttribute('data-state')).toBe('active')
   })
+
 })

@@ -52,6 +52,8 @@ committed lockfile and official npm registry with install scripts disabled.
 | `npm run test:e2e:a11y` | Run axe checks on representative Chromium states |
 | `npm run test:e2e:cross-browser` | Run bounded Firefox and WebKit smoke tests |
 | `npm run test:e2e:cross-browser:container` | Run cross-browser smoke in the pinned official container |
+| `npm run test:e2e:live` | Run destructive tests against a disposable live backend |
+| `npm run test:e2e:deployed` | Run non-mutating checks against `DEPLOYED_UI_BASE_URL` |
 | `make check` | Install dependencies, audit, lint, test, build, and run browser tests |
 | `make aks-ui-test-job` | Schedule an in-cluster Job to validate the deployed UI |
 

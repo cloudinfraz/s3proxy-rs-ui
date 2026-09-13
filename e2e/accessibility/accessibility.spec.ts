@@ -1,8 +1,8 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
-import type { components } from '../src/api/schema'
-import { accessibilityTags } from '../playwright.accessibility.config'
-import { mockControlApi } from './control-fixtures'
+import type { components } from '../../src/api/schema'
+import { accessibilityTags } from '../config/playwright.accessibility.config'
+import { mockControlApi } from '../mocked/control-fixtures'
 
 async function expectNoBlockingViolations(page: Page) {
   const results = await new AxeBuilder({ page }).withTags([...accessibilityTags]).analyze()

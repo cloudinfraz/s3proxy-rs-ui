@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { mockControlApi } from '../control-fixtures'
+import { mockControlApi } from '../mocked/control-fixtures'
 
 test('core operator workflow', async ({ page }) => {
   const verifyRequests = await mockControlApi(page)
