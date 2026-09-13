@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { mockControlApi, navigateTo } from './control-fixtures'
+import { health, mockControlApi, navigateTo, readiness } from './control-fixtures'
 
 test('UI068-01 typed collections render rows and overview counts', async ({ page }) => {
   const verifyRequests = await mockControlApi(page)
@@ -92,4 +92,96 @@ test('UI068-07 overview and identity selectors never request the unbounded inven
   await expect.poll(() => identityReads).toContain('/admin/ui/identity-pages')
   expect(identityReads).not.toContain('/admin/ui/identities')
   verifyRequests()
+})
+
+test('UI072-01 overview renders backend diagnostics without inventory traversal and retains stale findings', async ({ page }) => {
+  const requests: string[] = []
+  let readinessReads = 0
+  page.on('request', request => {
+    if (['fetch', 'xhr'].includes(request.resourceType())) requests.push(new URL(request.url()).pathname)
+  })
+  await mockControlApi(page)
+  await page.route('**/admin/ui/readiness?*', route => {
+    readinessReads += 1
+    if (readinessReads > 1) return route.fulfill({ status: 503, body: 'Unavailable' })
+    return route.fulfill({ json: {
+      ...readiness,
+      status: 'attention',
+      finding_count: 4,
+      items: [{
+        key: '0123456789abcdef0123456789abcdef',
+        code: 'backend_unsupported_auth_mode',
+        severity: 'warning',
+        resource_kind: 'backend',
+        resource_id: '00000000-0000-4000-8000-000000000001',
+        display_name: 'archive',
+        affected_count: 3,
+      }],
+    } })
+  })
+  await page.goto('/admin/ui/')
+
+  await expect(page.getByText('Needs attention')).toBeVisible()
+  await expect(page.getByText('Backend archive uses an authentication mode unavailable to this deployment. 3 resources are affected.')).toBeVisible()
+  await expect(page.getByText('Showing 1 of 4 findings')).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Review' })).toHaveAttribute('href', '/admin/ui/azure-backends')
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+  await page.waitForTimeout(100)
+  expect(requests.filter(path => path === '/admin/ui/readiness')).toHaveLength(1)
+  await page.getByRole('button', { name: 'Refresh configuration diagnostics' }).click()
+  await expect(page.getByRole('alert')).toContainText(`Refresh failed; showing diagnostics from ${readiness.evaluated_at}.`)
+  await expect(page.getByText('Backend archive uses an authentication mode unavailable to this deployment. 3 resources are affected.')).toBeVisible()
+
+  expect(requests).toContain('/admin/ui/overview')
+  expect(requests).toContain('/admin/ui/readiness')
+  expect(requests).toContain('/admin/health')
+  for (const forbidden of ['/admin/ui/identities', '/admin/ui/identity-pages', '/admin/ui/virtual-buckets', '/admin/ui/backends', '/admin/api-keys', '/admin/ui/roles']) {
+    expect(requests).not.toContain(forbidden)
+  }
+  expect(requests.filter(path => path === '/admin/ui/readiness')).toHaveLength(3)
+  expect(health.status).toBe('healthy')
+})
+
+test('UI072-02 overview pages through all configuration findings with opaque cursors', async ({ page }) => {
+  const inventoryReads: string[] = []
+  const cursors: Array<string | null> = []
+  page.on('request', request => {
+    if (!['fetch', 'xhr'].includes(request.resourceType())) return
+    const path = new URL(request.url()).pathname
+    if (['/admin/ui/identities', '/admin/ui/identity-pages', '/admin/ui/virtual-buckets', '/admin/ui/backends', '/admin/api-keys', '/admin/ui/roles'].includes(path)) inventoryReads.push(path)
+  })
+  await mockControlApi(page)
+  await page.route('**/admin/ui/readiness?*', route => {
+    const cursor = new URL(route.request().url()).searchParams.get('after_key')
+    cursors.push(cursor)
+    const offset = cursor === 'page-2' ? 20 : 0
+    const items = Array.from({ length: 20 }, (_, index) => ({
+      key: (offset + index + 1).toString(16).padStart(32, '0'),
+      code: 'identity_no_enabled_mapping',
+      severity: 'warning',
+      resource_kind: 'identity',
+      resource_id: `00000000-0000-4000-8000-${(offset + index + 1).toString().padStart(12, '0')}`,
+      display_name: null,
+      affected_count: null,
+    }))
+    return route.fulfill({ json: {
+      ...readiness,
+      status: 'attention',
+      finding_count: 222,
+      items,
+      next_after_key: cursor === 'page-2' ? 'page-3' : 'page-2',
+    } })
+  })
+  await page.goto('/admin/ui/')
+
+  await expect(page.getByText('Showing 1-20 of 222 findings')).toBeVisible()
+  await expect(page.getByLabel('Configuration findings pagination')).toContainText('Page 1 of 12')
+  await page.getByRole('button', { name: 'Next configuration findings page' }).click()
+  await expect(page.getByText('Showing 21-40 of 222 findings')).toBeVisible()
+  await expect(page.getByLabel('Configuration findings pagination')).toContainText('Page 2 of 12')
+  await page.getByRole('button', { name: 'Previous configuration findings page' }).click()
+  await expect(page.getByText('Showing 1-20 of 222 findings')).toBeVisible()
+
+  expect(cursors).toEqual([null, 'page-2'])
+  expect(inventoryReads).toEqual([])
 })

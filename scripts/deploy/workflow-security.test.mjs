@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 const deploy = readFileSync(new URL('../../.github/workflows/deploy-ui.yml', import.meta.url), 'utf8')
+const deployedTest = readFileSync(new URL('./test-ui-aks-job.sh', import.meta.url), 'utf8')
 const publisher = readFileSync(new URL('../../.github/workflows/publish-ui-image.yml', import.meta.url), 'utf8')
 const release = readFileSync(new URL('../../.github/workflows/release.yml', import.meta.url), 'utf8')
 
@@ -11,7 +12,9 @@ test('UI deployments do not delete existing network isolation', () => {
   assert.doesNotMatch(deploy, /kubectl[^\n]*apply[^\n]*--prune/)
   assert.match(deploy, /if: inputs.deployment_environment == 'production' && inputs.network_policy_enabled == false\s+run: kubectl -n s3proxy get networkpolicy allow-ui-admin/)
   assert.ok(deploy.indexOf('get networkpolicy allow-ui-admin') < deploy.indexOf('kubectl apply'))
-  assert.match(deploy, /--labels='s3proxy.rs\/access-ui=true'/)
+  assert.match(deployedTest, /s3proxy\.rs\/access-ui: "true"/)
+  assert.match(deploy, /scripts\/deploy\/test-ui-aks-job\.sh/)
+  assert.doesNotMatch(deploy, /port-forward|playwright\.deployed/)
 })
 
 test('deployment trusts only the main publisher identity and checks source before Azure login', () => {

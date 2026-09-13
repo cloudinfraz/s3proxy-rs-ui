@@ -20,6 +20,7 @@ export function arrayRows<Row>(response: Row[]): Row[] {
 
 const identityPageSize = 100
 const backendOptionPageSize = 100
+const readinessPageSize = 20
 
 export const controlQueries = {
   identityPage: (afterId: string | null, accessMode: 'direct' | 'virtual' | null) => queryOptions({
@@ -41,6 +42,12 @@ export const controlQueries = {
   }),
   backendOption: (backendId: string) => queryOptions({ queryKey: controlKeys.backendOption(backendId), queryFn: ({ signal }) => invokeOperation('getBackendOption', { parameters: { path: { backend_id: backendId } }, signal }) }),
   overview: queryOptions({ queryKey: controlKeys.overview, queryFn: ({ signal }) => invokeOperation('getAdminOverview', { signal }) }),
+  readiness: (afterKey: string | null) => queryOptions({
+    queryKey: controlKeys.readinessPage(afterKey),
+    queryFn: ({ signal }) => invokeOperation('getAdminReadiness', { parameters: { query: { limit: readinessPageSize, after_key: afterKey ?? undefined } }, signal }),
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  }),
   policies: queryOptions({ queryKey: controlKeys.list('policies'), queryFn: async ({ signal }) => envelopeRows(await invokeOperation('listPolicies', { signal })) }),
   buckets: queryOptions({ queryKey: controlKeys.list('buckets'), queryFn: async ({ signal }) => arrayRows(await invokeOperation('listVirtualBuckets', { signal })) }),
   backends: queryOptions({ queryKey: controlKeys.list('backends'), queryFn: async ({ signal }) => envelopeRows(await invokeOperation('listBackendProjections', { signal })) }),

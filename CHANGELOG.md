@@ -5,12 +5,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.6.5] - 2026-09-12
+## [0.6.5] - 2026-09-13
 
 Compared with `v0.6.4`, this update adds paginated administration workflows,
-popup policy and IAM role details, missing API proxy routes, and stronger
-release and deployment checks. The backend contract is pinned to the
-[s3proxy-rs 0.6.3 release revision][s3proxy-rs-0.6.3].
+backend-authored configuration diagnostics, typed runtime-validated API
+operations, popup policy and IAM role details, broader browser quality gates,
+and stronger release and deployment checks. The backend contract is pinned to
+the reviewed [s3proxy-rs][s3proxy-rs] revision listed below.
 
 ### Added
 
@@ -24,6 +25,22 @@ release and deployment checks. The backend contract is pinned to the
   to be covered by matching Vite and Nginx proxy rules.
 - Added desktop and mobile regression coverage for long-list popup placement,
   keyboard navigation, focus restoration, and unsaved-draft dismissal.
+- Added backend-authored configuration diagnostics to Overview with distinct
+  loading, ready, attention, unavailable, and stale-refresh states.
+- Added Previous and Next controls for opaque-cursor finding pages, including
+  visible page and result ranges, cached back-navigation, and coverage for more
+  findings than one page can contain.
+- Added generated operation metadata and standalone runtime validators for
+  OpenAPI-constrained methods, paths, parameters, request bodies, statuses, and
+  successful response payloads.
+- Added automated axe accessibility checks and bounded Firefox and WebKit smoke
+  coverage alongside the desktop and mobile Chromium suite.
+- Added a non-root, digest-pinned, self-cleaning Kubernetes Job that validates
+  deployed UI health, security headers, assets, readiness authentication,
+  pagination controls, route isolation, and the served OpenAPI checksum.
+- Added production-shaped readiness-query qualification evidence at 10,000
+  identities and mappings, with sequential and concurrency-four regression
+  budgets. The measured plan passed without a speculative index change.
 
 ### Changed
 
@@ -44,6 +61,18 @@ release and deployment checks. The backend contract is pinned to the
   version, and explicitly enabled strict application type checking.
 - Simplified the README with a clearer quick start, command reference, container
   build instructions, and links to detailed guides.
+- Replaced browser-side `deriveReadiness` business evaluation with presentation-
+  only mapping of backend finding codes and resource identities.
+- Kept `/admin/ui/overview` as the count authority while loading readiness from
+  the additive authenticated `/admin/ui/readiness` operation.
+- Made readiness pages client-fresh for 60 seconds, disabled interval and
+  window-focus refetch, and retained explicit refresh plus configuration-
+  mutation invalidation.
+- Moved method, URL, query serialization, and successful-response validation to
+  the generated operation facade. Feature code now supplies typed operation
+  parameters instead of constructing transport paths.
+- Updated the pinned backend contract and regenerated TypeScript operation,
+  schema, and validator artifacts for configuration diagnostics.
 
 ### Fixed
 
@@ -62,6 +91,32 @@ release and deployment checks. The backend contract is pinned to the
 - Cleared stale policy simulation results when inputs change, ignored outdated
   responses, and displayed the identity, action, resource, and conditions that
   produced each result.
+- Respected identity enabled state and reported enabled mappings or IAM roles
+  whose owner is disabled without treating intentionally disabled identities as
+  active routing candidates.
+- Removed Overview and selector dependencies on the unbounded identity
+  collection. Selectors use bounded authoritative cursors, and Overview does not
+  reconstruct complete state by traversing resource pages.
+- Prevented delayed identity-policy preparation results, errors, and finalizers
+  from reopening or altering review state after identity or policy selection
+  changes, including A-to-B-to-A transitions.
+- Propagated React Query cancellation through all query-backed reads and applied
+  a tested finite request timeout without misclassifying cancellation as session
+  revocation.
+- Routed the readiness API through both Vite and Nginx instead of returning the
+  single-page application document.
+
+### Security
+
+- Rejects structurally invalid successful API payloads at the transport boundary
+  with a sanitized client error instead of exposing unchecked caller-selected
+  generic values to feature state.
+- Keeps configuration findings free of access keys, administrator key material,
+  Azure credentials, secret references, policy documents, trust values, and
+  internal database errors.
+- Runs deployed acceptance without a ServiceAccount token, Secret, bearer key,
+  database connection, or cloud identity; the temporary Job and ConfigMap are
+  removed after success or failure.
 
 ### Deployment
 
@@ -72,15 +127,22 @@ release and deployment checks. The backend contract is pinned to the
 - Preserved existing network isolation when policy rendering is disabled and
   required an existing UI NetworkPolicy for that production deployment mode.
 - Corrected the deployment health-check pod label to use UI access permissions.
+- Kept all UI image publication and AKS deployment in the protected CI/CD
+  workflows; the repository exposes no local AKS deployment command.
+- Changed the deployment workflow to schedule the maintained in-cluster UI test
+  Job instead of installing a browser and opening a local Kubernetes tunnel.
+- Added `make aks-ui-test-job` for explicitly validating an already deployed UI
+  from inside the selected cluster without changing the Deployment.
 
 ### Compatibility and upgrade notes
 
 - The checked-in contract targets [cloudinfraz/s3proxy-rs][s3proxy-rs] revision
-  `7f0cb6c00454d71316a7f118a201490fbbdbc19e`, with OpenAPI SHA-256
-  `9f768a4264c3f5088972b7400cd46b7c3b9d18f8b6bc93d11a0923eb44ae6424`.
+  `61aebf232acc29efb93a6978df7489ba609ea534`, with served OpenAPI SHA-256
+  `ca4aa1a45992e2c9c66fde634f2e08d1cd33d4c22b3cf7c2c8b656063a19528d`.
   UI and backend release numbers are independent.
 - Deploy a backend supporting the pinned identity pagination, backend options,
-  overview summary, and bucket policy filtering contracts before this UI.
+  Overview summary, configuration diagnostics, and bucket policy filtering
+  contracts before this UI.
   Validate real authenticated API responses in the target environment; mocked
   browser tests and a matching contract pin do not prove deployment compatibility.
 - Rebuild and deploy the UI image to apply the Nginx proxy fixes; refreshing
@@ -90,6 +152,12 @@ release and deployment checks. The backend contract is pinned to the
 - See the [backend changelog][s3proxy-rs-0.6.3] for SigV4 canonical URI fixes,
   `ListObjectsV2` improvements, and backend security changes. These are backend
   changes, not storage operations added to the administration UI.
+- `/admin/ui/readiness` is on-demand configuration analysis, not a health probe.
+  Kubernetes, load-balancer, and operational health checks must continue using
+  `/health` or authenticated `/admin/health` as appropriate.
+- Finding pagination bounds response rows, not database work. Each uncached page
+  recomputes the complete finding set and global count; the UI does not prefetch
+  or automatically traverse remaining pages.
 
 ## [0.6.4] - 2026-09-07
 

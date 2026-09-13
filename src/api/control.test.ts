@@ -4,6 +4,13 @@ import { arrayRows, envelopeRows, controlQueries } from './control'
 afterEach(() => { vi.unstubAllGlobals() })
 
 describe('typed read boundaries', () => {
+  it('keeps configuration diagnostics fresh for sixty seconds without focus polling', () => {
+    expect(controlQueries.readiness(null).staleTime).toBe(60_000)
+    expect(controlQueries.readiness(null).refetchOnWindowFocus).toBe(false)
+    expect(controlQueries.readiness(null).refetchInterval).toBeUndefined()
+    expect(controlQueries.readiness(null).queryKey).not.toEqual(controlQueries.readiness('next-page').queryKey)
+  })
+
   it('preserves arrays and exact envelope counts including empty results', () => {
     expect(envelopeRows({ count: 1, items: ['row'] })).toEqual(['row'])
     expect(envelopeRows({ count: 0, items: [] })).toEqual([])

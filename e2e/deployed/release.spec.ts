@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 import { expect, test } from '@playwright/test'
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
@@ -39,6 +41,10 @@ test('UI076-04 deployed base path, assets, headers and route isolation', async (
   const overview = await request.get('/admin/ui/overview')
   expect(overview.status()).toBe(403)
   expect(overview.headers()['content-type'] ?? '').toContain('application/xml')
+
+  const readiness = await request.get('/admin/ui/readiness?limit=1')
+  expect(readiness.status()).toBe(403)
+  expect(readiness.headers()['content-type'] ?? '').toContain('application/xml')
 
   const openApi = await request.get('/admin/openapi.json')
   expect(openApi.status()).toBe(200)
