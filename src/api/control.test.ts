@@ -4,6 +4,13 @@ import { arrayRows, envelopeRows, controlQueries } from './control'
 afterEach(() => { vi.unstubAllGlobals() })
 
 describe('typed read boundaries', () => {
+  it('keeps configuration diagnostics fresh for sixty seconds without focus polling', () => {
+    expect(controlQueries.readiness(null).staleTime).toBe(60_000)
+    expect(controlQueries.readiness(null).refetchOnWindowFocus).toBe(false)
+    expect(controlQueries.readiness(null).refetchInterval).toBeUndefined()
+    expect(controlQueries.readiness(null).queryKey).not.toEqual(controlQueries.readiness('next-page').queryKey)
+  })
+
   it('preserves arrays and exact envelope counts including empty results', () => {
     expect(envelopeRows({ count: 1, items: ['row'] })).toEqual(['row'])
     expect(envelopeRows({ count: 0, items: [] })).toEqual([])
@@ -61,7 +68,7 @@ describe('typed read boundaries', () => {
     const query = controlQueries.identityPage(null, null).queryFn
     if (typeof query !== 'function') throw new Error('Expected identity page query function')
 
-    await expect(query({} as never)).rejects.toThrow('Invalid identity page response')
+    await expect(query({} as never)).rejects.toMatchObject({ status: 502, message: 'The control service returned an invalid response.' })
   })
 
   it('pages backend options and resolves off-page selections by stable ID', async () => {
@@ -93,6 +100,6 @@ describe('typed read boundaries', () => {
     const query = controlQueries.backendOptionPage(null).queryFn
     if (typeof query !== 'function') throw new Error('Expected backend option page query function')
 
-    await expect(query({} as never)).rejects.toThrow('Invalid backend option page response')
+    await expect(query({} as never)).rejects.toMatchObject({ status: 502, message: 'The control service returned an invalid response.' })
   })
 })

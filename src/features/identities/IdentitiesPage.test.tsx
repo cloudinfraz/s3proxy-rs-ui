@@ -3,8 +3,8 @@ import type { ReactNode } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { api } from '../../api/client'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
+import { invokeOperation } from '../../api/operations'
 import type { Schema } from '../../api/control'
 import { invalidateControl } from '../../api/query-keys'
 import IdentitiesPage from './IdentitiesPage'
@@ -14,7 +14,10 @@ const queryClientMocks = vi.hoisted(() => ({ invalidateQueries: vi.fn(), setQuer
 
 vi.mock('@tanstack/react-query', async importOriginal => ({ ...(await importOriginal<typeof import('@tanstack/react-query')>()), useQuery: vi.fn(), useQueryClient: () => queryClientMocks }))
 vi.mock('react-router', () => ({ useNavigate: () => routerMocks.navigate, useSearchParams: vi.fn() }))
-vi.mock('../../api/client', () => ({ api: vi.fn(), ApiError: class extends Error { status = 500 } }))
+vi.mock('../../api/client', () => ({ ApiError: class extends Error { status = 500 } }))
+vi.mock('../../api/operations', () => ({ invokeOperation: vi.fn() }))
+const api = invokeOperation as unknown as Mock<(operationId: string, input?: OperationMockInput) => Promise<unknown>>
+type OperationMockInput = { parameters?: { path?: Record<string, string>; query?: Record<string, unknown> }; body?: unknown; signal?: AbortSignal }
 vi.mock('../../api/query-keys', async importOriginal => ({ ...(await importOriginal<typeof import('../../api/query-keys')>()), invalidateControl: vi.fn() }))
 vi.mock('../../components/EphemeralCredentials', () => ({ EphemeralCredentials: ({ material, dismiss, acknowledgeLabel = 'I have stored this securely', pending }: { material: { accessKey: string; secretKey: string }; dismiss: () => void; acknowledgeLabel?: string; pending?: boolean }) => <div><p>created credentials {material.accessKey} {material.secretKey}</p><button disabled={pending} onClick={dismiss}>{acknowledgeLabel}</button></div> }))
 vi.mock('./DirectMappingDetails', () => ({ default: () => <p>direct mapping detail</p> }))
@@ -80,7 +83,7 @@ describe('IdentitiesPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close dialog' }))
     fireEvent.click(screen.getByRole('button', { name: 'Delete ACCESS_ONE' }))
     fireEvent.click(within(screen.getByRole('alertdialog', { name: 'Delete identity' })).getByRole('button', { name: 'Delete ACCESS_ONE' }))
-    await waitFor(() => expect(api).toHaveBeenCalledWith('/admin/credentials/ACCESS_ONE', { method: 'DELETE' }))
+    await waitFor(() => expect(api).toHaveBeenCalledWith('deleteCredential', { parameters: { path: { access_key: 'ACCESS_ONE' } } }))
   })
 
   it('moves through server-backed identity pages and resets the cursor when filtering', () => {
@@ -139,9 +142,8 @@ describe('IdentitiesPage', () => {
     fireEvent.change(within(dialog).getByLabelText('Azure account'), { target: { value: 'newaccount' } })
     fireEvent.submit(within(dialog).getByRole('button', { name: 'Create identity' }).closest('form')!)
 
-    await waitFor(() => expect(api).toHaveBeenCalledWith('/admin/credentials', {
-      method: 'POST',
-      body: JSON.stringify({ s3_access_key: '', s3_secret_key: '', azure_account: 'newaccount', use_managed_identity: true, access_mode: 'virtual', versioning_enabled: false, default_backend_id: null }),
+    await waitFor(() => expect(api).toHaveBeenCalledWith('createCredential', {
+      body: { s3_access_key: '', s3_secret_key: '', azure_account: 'newaccount', use_managed_identity: true, access_mode: 'virtual', versioning_enabled: false, default_backend_id: null },
     }))
     expect(await screen.findByText(/generated-secret/)).toBeTruthy()
     routerMocks.navigate.mockImplementationOnce(() => {

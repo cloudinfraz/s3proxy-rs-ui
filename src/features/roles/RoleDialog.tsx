@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { api, ApiError } from '../../api/client'
+import { ApiError } from '../../api/client'
 import type { Schema } from '../../api/control'
+import { invokeOperation } from '../../api/operations'
 import { controlKeys, invalidateControl } from '../../api/query-keys'
 import { DestructiveDialog, ErrorBanner, Modal } from '../../components/control'
 import { completionGuard } from '../operations/state'
@@ -28,12 +29,12 @@ export default function RoleDialog({ operation, initial, limits, close, changed 
   close: () => void; changed: (detail: RoleDetail | null) => void
 }) {
   const client = useQueryClient()
-  const identitySelector = useIdentitySelectorPage(null, operation === 'create' || operation === 'trust')
-  const identities = identitySelector.query
   const [cursors, setCursors] = useState<Array<string | null>>([null])
   const cursor = cursors[cursors.length - 1]
-  const policies = useQuery({ queryKey: [...controlKeys.list('policies'), 'role-options', cursor], enabled: operation === 'attach', queryFn: () => api<Schema['AdminIamRolePolicyPage']>(`/admin/ui/role-policies?limit=100${cursor ? `&after_id=${encodeURIComponent(cursor)}` : ''}`) })
+  const policies = useQuery({ queryKey: [...controlKeys.list('policies'), 'role-options', cursor], enabled: operation === 'attach', queryFn: ({ signal }) => invokeOperation('listRolePolicyOptions', { parameters: { query: { limit: 100, after_id: cursor ?? undefined } }, signal }) })
   const [draft, setDraft] = useState(() => roleDraft(limits, initial))
+  const identitySelector = useIdentitySelectorPage(null, operation === 'create' || operation === 'trust', draft.owner)
+  const identities = identitySelector.query
   const [initialDraft] = useState(() => JSON.stringify(draft))
   const [review, setReview] = useState<Review | null>(null)
   const [pending, setPending] = useState(false)
@@ -43,7 +44,8 @@ export default function RoleDialog({ operation, initial, limits, close, changed 
   useEffect(() => { const owner = guard.current; return () => owner.cancel() }, [])
   const update = <Field extends keyof RoleDraft>(field: Field, value: RoleDraft[Field]) => setDraft(current => ({ ...current, [field]: value }))
   const needsIdentities = operation === 'create' || operation === 'trust'
-  const dependenciesReady = (!needsIdentities || (identities.data && !identities.isError)) && (operation !== 'attach' || (policies.data && !policies.isError))
+  const selectedOwnerReady = !draft.owner || identitySelector.items.some(owner => owner.credential_id === draft.owner)
+  const dependenciesReady = (!needsIdentities || (identities.data && !identities.isError && !identitySelector.selectedQuery.isFetching && selectedOwnerReady)) && (operation !== 'attach' || (policies.data && !policies.isError))
 
   async function prepare(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -54,12 +56,13 @@ export default function RoleDialog({ operation, initial, limits, close, changed 
     try {
       if (operation === 'create') {
         const owners = await identities.refetch()
-        if (owners.isError || !owners.data?.items.some(owner => owner.credential_id === draft.owner && owner.enabled)) throw new Error('Selected resource owner is unavailable')
+        const owner = owners.data?.items.find(item => item.credential_id === draft.owner) ?? identitySelector.selectedQuery.data
+        if (owners.isError || owner?.credential_id !== draft.owner || !owner.enabled) throw new Error('Selected resource owner is unavailable')
         createRoleRequest(draft, limits)
         if (guard.current.current(request)) setReview({})
       } else {
         if (!initial) throw new Error('Role review is unavailable')
-        const detail = await api<RoleDetail>(`/admin/ui/roles/${encodeURIComponent(initial.role.id)}`)
+        const detail = await invokeOperation('getAdminRole', { parameters: { path: { role_id: initial.role.id } } })
         let policy: RolePolicy | undefined
         if (operation === 'attach') {
           const options = await policies.refetch()
@@ -78,13 +81,12 @@ export default function RoleDialog({ operation, initial, limits, close, changed 
     const request = guard.current.begin(); setPending(true); setError(null)
     try {
       if (operation === 'create') {
-        const detail = await api<RoleDetail>('/admin/ui/roles', { method: 'POST', body: JSON.stringify(createRoleRequest(draft, limits)) })
+        const detail = await invokeOperation('createAdminRole', { body: createRoleRequest(draft, limits) })
         void invalidateControl(client)
         if (guard.current.current(request)) { changed(detail); close() }
       } else {
         if (!review.detail) throw new Error('Role review is unavailable')
-        const mutation = mutationRequest(operation, draft, review.detail, review.policy)
-        const result = await api<Schema['AdminIamRoleMutationResult']>(mutation.url, { method: mutation.method, body: JSON.stringify(mutation.body) })
+        const result = await invokeRoleMutation(operation, draft, review.detail, review.policy)
         void invalidateControl(client)
         if (!guard.current.current(request)) return
         changed(result.detail)
@@ -101,7 +103,7 @@ export default function RoleDialog({ operation, initial, limits, close, changed 
           await invalidateControl(client)
           if (initial && guard.current.current(request)) {
             try {
-              const latest = await api<RoleDetail>(`/admin/ui/roles/${encodeURIComponent(initial.role.id)}`)
+              const latest = await invokeOperation('getAdminRole', { parameters: { path: { role_id: initial.role.id } } })
               if (guard.current.current(request)) changed(latest)
             } catch {
               if (guard.current.current(request)) setError(new Error('The role changed, but current details could not be refreshed.'))
@@ -118,6 +120,7 @@ export default function RoleDialog({ operation, initial, limits, close, changed 
   const content = <>
     {error && <ErrorBanner error={error} />}
     {needsIdentities && identities.isError && <ErrorBanner error={new Error('Identity metadata unavailable')} retry={() => { void identities.refetch() }} />}
+    {needsIdentities && draft.owner && identitySelector.selectedQuery.isError && <ErrorBanner error={new Error('Selected resource owner metadata unavailable')} retry={() => { void identitySelector.selectedQuery.refetch() }} />}
     {operation === 'attach' && policies.isError && <ErrorBanner error={new Error('Policy metadata unavailable')} retry={() => { void policies.refetch() }} />}
     {retired ? <><p role="status">Retired {retired.count} session rows. Remaining: {retainedLabel(retired.detail.retained_sessions)}.</p><div className="dialog-actions"><button onClick={close}>Close</button>{retired.detail.retained_sessions.count > 0 && <button className="primary" onClick={() => { setRetired(null); setError(null) }}>Review next batch</button>}</div></>
       : review ? <><dl className="role-detail-grid"><dt>Role</dt><dd>{review.detail?.role.role_arn ?? `arn:aws:iam::${draft.account}:role${draft.path}${draft.name}`}</dd>
@@ -130,9 +133,9 @@ export default function RoleDialog({ operation, initial, limits, close, changed 
         {operation === 'retire' && <><dt>Maximum this batch</dt><dd>{draft.batch}</dd></>}
       </dl>{!destructiveReview && <div className="dialog-actions"><button disabled={pending} onClick={() => setReview(null)}>Back</button><button className="primary" disabled={pending} onClick={() => { void persist() }}>{pending ? 'Applying...' : 'Confirm change'}</button></div>}</>
         : <form className="operation-form" onSubmit={event => { void prepare(event) }}>
-          {operation === 'create' && <><label>Account ID<input required pattern="[0-9]{12}" maxLength={12} value={draft.account} onChange={event => { update('account', event.target.value); update('trust', draft.trust.map(statement => ({ ...statement, principals: [] }))) }} /></label><label>Role path<input required value={draft.path} maxLength={512} onChange={event => update('path', event.target.value)} /></label><label>Role name<input required maxLength={64} value={draft.name} onChange={event => update('name', event.target.value)} /></label><label>Resource owner<select required value={draft.owner} onChange={event => update('owner', event.target.value)}><option value="">Select identity</option>{identities.data?.items.map(identity => <option key={identity.credential_id} value={identity.credential_id} disabled={!identity.enabled}>{identity.s3_access_key}</option>)}</select></label></>}
+          {operation === 'create' && <><label>Account ID<input required pattern="[0-9]{12}" maxLength={12} value={draft.account} onChange={event => { update('account', event.target.value); update('trust', draft.trust.map(statement => ({ ...statement, principals: [] }))) }} /></label><label>Role path<input required value={draft.path} maxLength={512} onChange={event => update('path', event.target.value)} /></label><label>Role name<input required maxLength={64} value={draft.name} onChange={event => update('name', event.target.value)} /></label><label>Resource owner<select required value={draft.owner} onChange={event => update('owner', event.target.value)}><option value="">Select identity</option>{identitySelector.items.map(identity => <option key={identity.credential_id} value={identity.credential_id} disabled={!identity.enabled}>{identity.s3_access_key}</option>)}</select></label></>}
           {(operation === 'create' || operation === 'settings') && <label>Maximum duration (seconds)<input type="number" required min={limits.min_duration_seconds} max={limits.max_duration_seconds} step={1} value={draft.duration} onChange={event => update('duration', event.target.value)} /></label>}
-          {(operation === 'create' || operation === 'trust') && <><TrustEditor account={draft.account} statements={draft.trust} identities={identities.data?.items ?? []} change={value => update('trust', value)} /><IdentitySelectorPagination page={identitySelector.page} pending={identities.isFetching} canPrevious={identitySelector.canPrevious} canNext={identitySelector.canNext} previous={identitySelector.previous} next={identitySelector.next} /></>}
+          {(operation === 'create' || operation === 'trust') && <><TrustEditor account={draft.account} statements={draft.trust} identities={identitySelector.items} change={value => update('trust', value)} /><IdentitySelectorPagination page={identitySelector.page} pending={identities.isFetching || identitySelector.selectedQuery.isFetching} canPrevious={identitySelector.canPrevious} canNext={identitySelector.canNext} previous={identitySelector.previous} next={identitySelector.next} /></>}
           {operation === 'trust' && <label className="checkbox-field"><input type="checkbox" required checked={draft.acknowledge} onChange={event => update('acknowledge', event.target.checked)} /> Replace all existing trust statements and conditions, including hidden values.</label>}
           {operation === 'enabled' && <label className="checkbox-field"><input type="checkbox" checked={draft.enabled} onChange={event => update('enabled', event.target.checked)} /> Enabled</label>}
           {(operation === 'attach' || operation === 'detach') && <><label>Policy<select required value={draft.policy} onChange={event => update('policy', event.target.value)}><option value="">Select policy</option>{policyOptions?.map(policy => <option key={policy.id} value={policy.id}>{policy.name}</option>)}</select></label>{operation === 'attach' && <div className="role-pagination"><button type="button" className="icon-button" aria-label="Previous policy page" title="Previous policy page" disabled={cursors.length === 1 || policies.isFetching} onClick={() => { update('policy', ''); setCursors(current => current.slice(0, -1)) }}><ChevronLeft size={16} /></button><span>Policy page {cursors.length}</span><button type="button" className="icon-button" aria-label="Next policy page" title="Next policy page" disabled={!policies.data?.next_after_id || policies.isFetching} onClick={() => { if (policies.data?.next_after_id) { update('policy', ''); setCursors(current => [...current, policies.data.next_after_id]) } }}><ChevronRight size={16} /></button></div>}</>}
@@ -142,4 +145,17 @@ export default function RoleDialog({ operation, initial, limits, close, changed 
   </>
   if (destructiveReview) return <DestructiveDialog title={titles[operation]} description={impacts[operation]} confirmLabel={confirmLabel} pending={pending} onClose={() => setReview(null)} onConfirm={() => { void persist() }}>{content}</DestructiveDialog>
   return <Modal wide={operation === 'create' || operation === 'trust'} dirty={JSON.stringify(draft) !== initialDraft} title={review ? `Confirm: ${titles[operation]}` : titles[operation]} description={impacts[operation]} onClose={close} pending={pending}>{content}</Modal>
+}
+
+function invokeRoleMutation(operation: Exclude<RoleOperation, 'create'>, draft: RoleDraft, detail: RoleDetail, policy?: RolePolicy) {
+  const parameters = { path: { role_id: detail.role.id } }
+  switch (operation) {
+    case 'trust': return invokeOperation('replaceReviewedRoleTrust', { parameters, body: mutationRequest('trust', draft, detail, policy).body as Schema['ReviewRoleTrustRequest'] })
+    case 'settings': return invokeOperation('updateReviewedRoleSettings', { parameters, body: mutationRequest('settings', draft, detail, policy).body as Schema['ReviewRoleSettingsRequest'] })
+    case 'enabled': return invokeOperation('setReviewedRoleEnabled', { parameters, body: mutationRequest('enabled', draft, detail, policy).body as Schema['ReviewRoleEnabledRequest'] })
+    case 'retire': return invokeOperation('retireReviewedRoleSessions', { parameters, body: mutationRequest('retire', draft, detail, policy).body as Schema['ReviewRoleRetirementRequest'] })
+    case 'delete': return invokeOperation('deleteReviewedRole', { parameters, body: mutationRequest('delete', draft, detail, policy).body as Schema['ReviewRoleDeleteRequest'] })
+    case 'attach': return invokeOperation('attachReviewedRolePolicy', { parameters, body: mutationRequest('attach', draft, detail, policy).body as Schema['ReviewRolePolicyRequest'] })
+    case 'detach': return invokeOperation('detachReviewedRolePolicy', { parameters, body: mutationRequest('detach', draft, detail, policy).body as Schema['ReviewRolePolicyRequest'] })
+  }
 }

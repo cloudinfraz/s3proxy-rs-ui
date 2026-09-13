@@ -1,8 +1,3 @@
-import type { paths } from './schema'
-
-export type LoginResponse = paths['/admin/session/login']['post']['responses']['200']['content']['application/json']
-export type SessionResponse = paths['/admin/session']['get']['responses']['200']['content']['application/json']
-
 export class ApiError extends Error {
   readonly status: number
   readonly code: string | null
@@ -13,7 +8,6 @@ export class ApiError extends Error {
     this.code = code
   }
 }
-
 export type ApiErrorContext = Readonly<{ path: string; method: string }>
 export type ApiErrorInterceptor = (error: ApiError, context: ApiErrorContext) => void
 
@@ -111,7 +105,14 @@ async function toApiError(response: Response) {
   return new ApiError(response.status, message, code)
 }
 
-export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
+export type TransportResponse = Readonly<{ status: number; value: unknown }>
+const requestTimeoutMilliseconds = 30_000
+
+function abortReason(signal: AbortSignal) {
+  return signal.reason ?? new DOMException('The operation was aborted.', 'AbortError')
+}
+
+export async function requestTransport(path: string, init: RequestInit = {}): Promise<TransportResponse> {
   const method = (init.method ?? 'GET').toUpperCase()
   const context = { path, method }
   const mutating = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)
@@ -124,65 +125,50 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     headers.set('x-csrf-token', csrfToken)
   }
 
-  const response = await fetch(path, {
-    ...init,
-    headers,
-    credentials: 'same-origin',
-    cache: 'no-store',
-  }).catch(() => {
-    throw interceptApiError(new ApiError(0, 'The control service could not be reached. Retry the request.'), context)
-  })
-  if (!response.ok) {
-    const error = await toApiError(response)
-    if (response.status === 403 && path !== '/admin/session' && path !== '/admin/session/login') {
-      protectedForbiddenHandler?.()
-    }
-    throw interceptApiError(error, context)
-  }
-  if (response.status === 204) return undefined as T
-  const contentType = response.headers.get('content-type') ?? ''
-  if (!/\bapplication\/(?:[\w.+-]+\+)?json\b/i.test(contentType)) {
-    await response.body?.cancel().catch(() => undefined)
-    throw interceptApiError(new ApiError(502, 'The control service returned an invalid response.'), context)
-  }
+  const callerSignal = init.signal
+  const controller = new AbortController()
+  let timedOut = false
+  const cancel = () => controller.abort(callerSignal ? abortReason(callerSignal) : undefined)
+  if (callerSignal?.aborted) cancel()
+  else callerSignal?.addEventListener('abort', cancel, { once: true })
+  const timeout = setTimeout(() => {
+    timedOut = true
+    controller.abort(new DOMException('The control service request timed out.', 'TimeoutError'))
+  }, requestTimeoutMilliseconds)
   try {
-    return await response.json() as T
-  } catch {
-    throw interceptApiError(new ApiError(502, 'The control service returned an invalid response.'), context)
+    const response = await fetch(path, {
+      ...init,
+      signal: controller.signal,
+      headers,
+      credentials: 'same-origin',
+      cache: 'no-store',
+    }).catch(() => {
+      if (callerSignal?.aborted) throw abortReason(callerSignal)
+      if (timedOut) throw interceptApiError(new ApiError(408, 'The control service request timed out. Retry the request.'), context)
+      throw interceptApiError(new ApiError(0, 'The control service could not be reached. Retry the request.'), context)
+    })
+    if (!response.ok) {
+      const error = await toApiError(response)
+      if (response.status === 403 && path !== '/admin/session' && path !== '/admin/session/login') {
+        protectedForbiddenHandler?.()
+      }
+      throw interceptApiError(error, context)
+    }
+    if (response.status === 204) return { status: response.status, value: undefined }
+    const contentType = response.headers.get('content-type') ?? ''
+    if (!/\bapplication\/(?:[\w.+-]+\+)?json\b/i.test(contentType)) {
+      await response.body?.cancel().catch(() => undefined)
+      throw interceptApiError(new ApiError(502, 'The control service returned an invalid response.'), context)
+    }
+    try {
+      return { status: response.status, value: await response.json() as unknown }
+    } catch {
+      if (callerSignal?.aborted) throw abortReason(callerSignal)
+      if (timedOut) throw interceptApiError(new ApiError(408, 'The control service request timed out. Retry the request.'), context)
+      throw interceptApiError(new ApiError(502, 'The control service returned an invalid response.'), context)
+    }
+  } finally {
+    clearTimeout(timeout)
+    callerSignal?.removeEventListener('abort', cancel)
   }
-}
-
-function invalidSessionResponse(): ApiError {
-  return new ApiError(502, 'The control service returned an invalid session response.')
-}
-
-function parseSessionCredentials(value: unknown): LoginResponse {
-  if (!value || typeof value !== 'object') throw invalidSessionResponse()
-  const token = Reflect.get(value, 'csrf_token')
-  const expiresAt = Reflect.get(value, 'expires_at')
-  if (typeof token !== 'string' || token.trim() === '') throw invalidSessionResponse()
-  if (typeof expiresAt !== 'string' || !Number.isFinite(Date.parse(expiresAt))) throw invalidSessionResponse()
-  return { csrf_token: token, expires_at: expiresAt }
-}
-
-export async function login(apiKey: string): Promise<LoginResponse> {
-  const value = await api<unknown>('/admin/session/login', {
-    method: 'POST',
-    body: JSON.stringify({ api_key: apiKey }),
-  })
-  return parseSessionCredentials(value)
-}
-
-export async function getSession(signal?: AbortSignal): Promise<SessionResponse> {
-  const value = await api<unknown>('/admin/session', { signal })
-  if (!value || typeof value !== 'object') throw invalidSessionResponse()
-  const authenticated = Reflect.get(value, 'authenticated')
-  if (typeof authenticated !== 'boolean') throw invalidSessionResponse()
-  if (!authenticated) return { authenticated, csrf_token: '', expires_at: '' }
-  return { authenticated, ...parseSessionCredentials(value) }
-}
-
-export async function logout() {
-  await api<void>('/admin/session', { method: 'DELETE' })
-  setCsrfToken(null)
 }

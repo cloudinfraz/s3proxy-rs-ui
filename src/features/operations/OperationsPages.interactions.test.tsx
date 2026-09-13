@@ -13,8 +13,8 @@ const operationsMocks = vi.hoisted(() => ({ api: vi.fn() }))
 
 vi.mock('../../api/client', async importOriginal => ({
   ...await importOriginal<typeof import('../../api/client')>(),
-  api: operationsMocks.api,
 }))
+vi.mock('../../api/operations', () => ({ invokeOperation: operationsMocks.api }))
 
 const adminKey = {
   id: 'key-1',
@@ -69,10 +69,10 @@ afterEach(() => {
 
 describe('operations page interactions', () => {
   it('creates an admin key from form values and requires acknowledgement of the returned secret', async () => {
-    operationsMocks.api.mockImplementation(async (path: string, init: RequestInit = {}) => {
-      if (path === '/admin/api-keys' && init.method === 'POST') return { api_key: 'one-time-admin-secret' }
-      if (path === '/admin/api-keys') return [adminKey]
-      throw new Error(`Unexpected API request: ${path}`)
+    operationsMocks.api.mockImplementation(async (operationId: string) => {
+      if (operationId === 'createAdminKey') return { api_key: 'one-time-admin-secret' }
+      if (operationId === 'listAdminKeys') return [adminKey]
+      throw new Error(`Unexpected API operation: ${operationId}`)
     })
     renderPage(<AdminKeysPage />)
 
@@ -84,9 +84,8 @@ describe('operations page interactions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create key' }))
 
     expect(await screen.findByText('one-time-admin-secret')).toBeTruthy()
-    expect(operationsMocks.api).toHaveBeenCalledWith('/admin/api-keys', {
-      method: 'POST',
-      body: JSON.stringify({ key_name: 'release-key', description: 'release automation', expires_in_days: 14, created_by: 'browser-ui' }),
+    expect(operationsMocks.api).toHaveBeenCalledWith('createAdminKey', {
+      body: { key_name: 'release-key', description: 'release automation', expires_in_days: 14, created_by: 'browser-ui' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'I have stored this securely' }))
     await waitFor(() => expect(screen.queryByText('one-time-admin-secret')).toBeNull())
@@ -94,13 +93,13 @@ describe('operations page interactions', () => {
 
   it('validates key fields, sends null optional values, and keeps creation errors actionable', async () => {
     let createResult: 'missing-secret' | 'api-error' = 'missing-secret'
-    operationsMocks.api.mockImplementation(async (path: string, init: RequestInit = {}) => {
-      if (path === '/admin/api-keys' && init.method === 'POST') {
+    operationsMocks.api.mockImplementation(async (operationId: string) => {
+      if (operationId === 'createAdminKey') {
         if (createResult === 'api-error') throw new ApiError(422, 'invalid key')
         return {}
       }
-      if (path === '/admin/api-keys') return [adminKey]
-      throw new Error(`Unexpected API request: ${path}`)
+      if (operationId === 'listAdminKeys') return [adminKey]
+      throw new Error(`Unexpected API operation: ${operationId}`)
     })
     renderPage(<AdminKeysPage />)
 
@@ -121,9 +120,8 @@ describe('operations page interactions', () => {
     fireEvent.change(expires, { target: { value: '' } })
     fireEvent.click(screen.getByRole('button', { name: 'Create key' }))
     expect((await screen.findByRole('alert')).textContent).toContain('Admin key creation failed')
-    expect(operationsMocks.api).toHaveBeenCalledWith('/admin/api-keys', {
-      method: 'POST',
-      body: JSON.stringify({ key_name: 'minimal-key', description: null, expires_in_days: null, created_by: 'browser-ui' }),
+    expect(operationsMocks.api).toHaveBeenCalledWith('createAdminKey', {
+      body: { key_name: 'minimal-key', description: null, expires_in_days: null, created_by: 'browser-ui' },
     })
 
     createResult = 'api-error'
@@ -135,32 +133,32 @@ describe('operations page interactions', () => {
   it('enables and deletes admin keys with the selected action payload', async () => {
     const disabledKey = { ...adminKey, id: 'key-2', key_name: 'standby', enabled: false, status: 'disabled' }
     const encodedKey = { ...adminKey, id: 'key-3', key_name: 'release/key' }
-    operationsMocks.api.mockImplementation(async (path: string, init: RequestInit = {}) => {
-      if (path === '/admin/api-keys') return [disabledKey, encodedKey]
-      if (path.startsWith('/admin/api-keys/') && (init.method === 'PUT' || init.method === 'DELETE')) return undefined
-      throw new Error(`Unexpected API request: ${path}`)
+    operationsMocks.api.mockImplementation(async (operationId: string) => {
+      if (operationId === 'listAdminKeys') return [disabledKey, encodedKey]
+      if (operationId === 'updateAdminKey' || operationId === 'deleteAdminKey') return undefined
+      throw new Error(`Unexpected API operation: ${operationId}`)
     })
     renderPage(<AdminKeysPage />)
 
     expect(await screen.findByText('standby')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Enable standby' }))
     fireEvent.click(screen.getByRole('button', { name: 'Enable standby' }))
-    await waitFor(() => expect(operationsMocks.api).toHaveBeenCalledWith('/admin/api-keys/standby', {
-      method: 'PUT',
-      body: JSON.stringify({ enabled: true }),
+    await waitFor(() => expect(operationsMocks.api).toHaveBeenCalledWith('updateAdminKey', {
+      parameters: { path: { key_name: 'standby' } },
+      body: { enabled: true },
     }))
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete release/key' }))
     fireEvent.click(screen.getByRole('button', { name: 'Delete release/key' }))
-    await waitFor(() => expect(operationsMocks.api).toHaveBeenCalledWith('/admin/api-keys/release%2Fkey', { method: 'DELETE' }))
+    await waitFor(() => expect(operationsMocks.api).toHaveBeenCalledWith('deleteAdminKey', { parameters: { path: { key_name: 'release/key' } } }))
   })
 
   it('keeps an admin-key action open when the update fails', async () => {
-    operationsMocks.api.mockImplementation(async (path: string, init: RequestInit = {}) => {
-      if (path === '/admin/api-keys' && !init.method) return [adminKey]
-      if (path === '/admin/api-keys/automation' && init.method === 'PUT') throw new ApiError(409, 'changed')
-      throw new Error(`Unexpected API request: ${path}`)
+    operationsMocks.api.mockImplementation(async (operationId: string) => {
+      if (operationId === 'listAdminKeys') return [adminKey]
+      if (operationId === 'updateAdminKey') throw new ApiError(409, 'changed')
+      throw new Error(`Unexpected API operation: ${operationId}`)
     })
     renderPage(<AdminKeysPage />)
 
@@ -187,7 +185,7 @@ describe('operations page interactions', () => {
     expect(await screen.findByText('event-0')).toBeTruthy()
     expect(screen.queryByText('event-25')).toBeNull()
     fireEvent.change(screen.getByLabelText('Recent events'), { target: { value: '25' } })
-    await waitFor(() => expect(operationsMocks.api).toHaveBeenCalledWith('/admin/audit?limit=25'))
+    await waitFor(() => expect(operationsMocks.api).toHaveBeenCalledWith('listAuditEvents', expect.objectContaining({ parameters: { query: { limit: 25 } } })))
     const nextPage = screen.getByRole('button', { name: 'Next page' })
     if (!(nextPage instanceof HTMLButtonElement)) throw new Error('Expected the next-page button')
     await waitFor(() => expect(nextPage.disabled).toBe(false))

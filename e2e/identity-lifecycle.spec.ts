@@ -80,15 +80,15 @@ for (const mode of ['direct', 'virtual'] as const) {
     const verify = await mockControlApi(page)
     let fail = false
     await page.route('**/admin/ui/identity-pages?*', route => route.fulfill(fail ? { status: 503 } : { json: {
-      items: [{ ...collections['/admin/ui/identities'].items[0], access_mode: mode, policy_attachment_count: null }],
+      items: [{ ...collections['/admin/ui/identities'].items[0], access_mode: mode, policy_attachment_count: 0 }],
       next_after_id: null, default_page_size: 100, max_page_size: 200,
-    } }))
+    } satisfies components['schemas']['IdentityProjectionPage'] }))
     await page.goto('/admin/ui/credentials')
     await page.getByRole('button', { name: 'View fixture-access', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: 'Identity details', exact: true })
     await expect(dialog.getByText(mode, { exact: true })).toBeVisible()
     await expect(dialog.getByText('00000000-0000-4000-8000-000000000001', { exact: true })).toBeVisible()
-    await expect(dialog.getByText('Unavailable', { exact: true })).toBeVisible()
+    await expect(dialog.getByText('0', { exact: true })).toBeVisible()
     fail = true
     await dialog.getByRole('button', { name: 'Refresh', exact: true }).click()
     await expect(dialog.getByRole('status')).toHaveText('Identity metadata unavailable.')
@@ -102,13 +102,13 @@ for (const mode of ['direct', 'virtual'] as const) {
 }
 
 for (const backendState of ['disabled', 'missing'] as const) {
-  test(`UI070-02 edits preserve ${backendState} backend and unknown enabled metadata across failures`, async ({ page }) => {
+  test(`UI070-02 edits preserve ${backendState} backend metadata across failures`, async ({ page }) => {
     const verify = await mockControlApi(page)
     const backendId = '00000000-0000-4000-8000-000000000001'
     await page.route('**/admin/ui/identity-pages?*', route => route.fulfill({ json: {
-      items: [{ ...collections['/admin/ui/identities'].items[0], default_backend_id: backendId, enabled: null }],
+      items: [{ ...collections['/admin/ui/identities'].items[0], default_backend_id: backendId, enabled: true }],
       next_after_id: null, default_page_size: 100, max_page_size: 200,
-    } }))
+    } satisfies components['schemas']['IdentityProjectionPage'] }))
     await page.route('**/admin/ui/backend-options?*', route => route.fulfill({ json: {
       items: backendState === 'missing' ? [] : [{ ...collections['/admin/ui/backend-options'].items[0], enabled: false }],
       next_after_id: null, default_page_size: 100, max_page_size: 200,
@@ -121,13 +121,23 @@ for (const backendState of ['disabled', 'missing'] as const) {
     await page.route('**/admin/credentials/fixture-access', route => {
       expect(route.request().method()).toBe('PUT')
       updates.push(route.request().postDataJSON())
-      return route.fulfill({ status })
+      if (status !== 200) return route.fulfill({ status })
+      return route.fulfill({ json: {
+        credential_id: '00000000-0000-4000-8000-000000000001',
+        s3_access_key: 'fixture-access',
+        azure_account: 'fixtureaccount',
+        access_mode: 'direct',
+        use_managed_identity: true,
+        versioning_enabled: true,
+        default_backend_id: backendId,
+        credential_scope: null,
+      } satisfies components['schemas']['CredentialDetail'] })
     })
     await page.goto('/admin/ui/credentials')
     await page.getByRole('button', { name: 'Edit fixture-access', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: 'Edit identity', exact: true })
     await expect(dialog.getByLabel('Default backend')).toHaveValue(backendId)
-    await expect(dialog.getByLabel('Enabled state unavailable')).toBeDisabled()
+    await expect(dialog.getByLabel('Enabled', { exact: true })).toBeChecked()
     await dialog.getByLabel('Versioning enabled', { exact: true }).check()
     for (const failure of [400, 403, 404, 409, 503]) {
       status = failure
@@ -136,10 +146,10 @@ for (const backendState of ['disabled', 'missing'] as const) {
       await expect(dialog.getByLabel('Versioning enabled', { exact: true })).toBeChecked()
       await expect(dialog.getByLabel('Default backend')).toHaveValue(backendId)
     }
-    status = 204
+    status = 200
     await dialog.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(dialog).toHaveCount(0)
-    expect(updates).toEqual(Array.from({ length: 6 }, () => ({ versioning_enabled: true })))
+    expect(updates).toEqual(Array.from({ length: 6 }, () => ({ enabled: true, versioning_enabled: true })))
     await page.getByRole('button', { name: 'Replace fixture-access', exact: true }).click()
     const replacement = page.getByRole('dialog', { name: 'Create replacement', exact: true })
     await expect(replacement.getByLabel('Default backend')).toHaveValue(backendId)

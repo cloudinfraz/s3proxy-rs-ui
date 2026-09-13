@@ -4,11 +4,7 @@ Describe the problem and the user-visible behavior of this change.
 
 ## Validation
 
-- [ ] `npm run lint`
-- [ ] `npm test`
-- [ ] `npm run test:deploy`
-- [ ] `npm run build`
-- [ ] `npm run test:e2e`, when browser behavior changed
+- [ ] `make check`
 
 List any checks not run and explain why.
 

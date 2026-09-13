@@ -47,6 +47,18 @@ revision:
 
 Do not hand-edit the generated schema.
 
+### Using the control API
+
+Feature modules must use named operations from `src/api/operations.ts`; they
+must not construct control API URLs or call the private transport. Operation
+methods, parameters, bodies, success statuses, and runtime validators are
+generated from `contracts/admin-openapi.json`.
+
+Follow Red-Green-Refactor for boundary changes. Run generator tests with
+`node --test scripts/api/generate-operations.test.mjs`. Every React Query
+function must forward its `signal`; caller cancellation remains distinct from
+the sanitized 30-second timeout error.
+
 ## Testing
 
 Run the complete local validation gate before opening a pull request:
@@ -61,13 +73,23 @@ To iterate on a smaller change, use the relevant commands first:
 npm run lint
 npm test
 npm run test:deploy
+npm run test:release
 npm run build
 npm run test:e2e
+npm run test:e2e:a11y
+npm run test:e2e:cross-browser
 ```
 
-Install Chromium once with `npx playwright install --with-deps chromium` before
-running browser tests. The live suite has additional isolation requirements in
+Install the required engines once with
+`npx playwright install --with-deps chromium firefox webkit` before running
+browser tests. Do not add axe rule exclusions to make a check pass; fix the
+rendered accessibility problem or document a narrowly scoped, expiring exception
+in a separately reviewed change. The live suite has additional isolation requirements in
 [`e2e/README.md`](e2e/README.md).
+
+If local WebKit dependencies are unavailable, run
+`npm run test:e2e:cross-browser:container`. The fallback is pinned to an
+immutable official Playwright image digest and does not modify host packages.
 
 ## Pull requests
 

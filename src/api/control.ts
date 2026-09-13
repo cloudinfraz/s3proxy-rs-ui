@@ -1,8 +1,8 @@
 import { queryOptions } from '@tanstack/react-query'
-import { api } from './client'
 import type { components } from './schema'
 import { controlKeys } from './query-keys'
-import { auditLimit } from '../features/operations/state'
+import { auditLimit } from './parameters'
+import { invokeOperation } from './operations'
 
 export type Schema = components['schemas']
 
@@ -20,38 +20,44 @@ export function arrayRows<Row>(response: Row[]): Row[] {
 
 const identityPageSize = 100
 const backendOptionPageSize = 100
+const readinessPageSize = 20
 
 export const controlQueries = {
-  identities: queryOptions({ queryKey: controlKeys.list('identities'), queryFn: async () => envelopeRows(await api<Schema['IdentityProjectionListResponse']>('/admin/ui/identities')) }),
   identityPage: (afterId: string | null, accessMode: 'direct' | 'virtual' | null) => queryOptions({
     queryKey: controlKeys.identityPage(afterId, accessMode),
-    queryFn: async () => {
-      const response = await api<Schema['IdentityProjectionPage']>(`/admin/ui/identity-pages?limit=${identityPageSize}${afterId ? `&after_id=${encodeURIComponent(afterId)}` : ''}${accessMode ? `&access_mode=${accessMode}` : ''}`)
+    queryFn: async ({ signal }) => {
+      const response = await invokeOperation('listIdentityProjectionPage', { parameters: { query: { limit: identityPageSize, after_id: afterId ?? undefined, access_mode: accessMode ?? undefined } }, signal })
       if (!Array.isArray(response.items) || response.items.length > identityPageSize || !(response.next_after_id === null || typeof response.next_after_id === 'string')) throw new Error('Invalid identity page response')
       return response
     },
   }),
-  identity: (credentialId: string) => queryOptions({ queryKey: controlKeys.detail('identities', credentialId), queryFn: () => api<Schema['IdentityProjection']>(`/admin/ui/identities/${encodeURIComponent(credentialId)}`) }),
+  identity: (credentialId: string) => queryOptions({ queryKey: controlKeys.detail('identities', credentialId), queryFn: ({ signal }) => invokeOperation('getIdentityProjection', { parameters: { path: { credential_id: credentialId } }, signal }) }),
   backendOptionPage: (afterId: string | null) => queryOptions({
     queryKey: controlKeys.backendOptionPage(afterId),
-    queryFn: async () => {
-      const response = await api<Schema['StorageBackendOptionPage']>(`/admin/ui/backend-options?limit=${backendOptionPageSize}${afterId ? `&after_id=${encodeURIComponent(afterId)}` : ''}`)
+    queryFn: async ({ signal }) => {
+      const response = await invokeOperation('listBackendOptions', { parameters: { query: { limit: backendOptionPageSize, after_id: afterId ?? undefined } }, signal })
       if (!Array.isArray(response.items) || response.items.length > backendOptionPageSize || !(response.next_after_id === null || typeof response.next_after_id === 'string')) throw new Error('Invalid backend option page response')
       return response
     },
   }),
-  backendOption: (backendId: string) => queryOptions({ queryKey: controlKeys.backendOption(backendId), queryFn: () => api<Schema['StorageBackendOption']>(`/admin/ui/backend-options/${encodeURIComponent(backendId)}`) }),
-  overview: queryOptions({ queryKey: controlKeys.overview, queryFn: () => api<Schema['AdminOverviewSummary']>('/admin/ui/overview') }),
-  policies: queryOptions({ queryKey: controlKeys.list('policies'), queryFn: async () => envelopeRows(await api<Schema['PolicyListResponse']>('/admin/policies')) }),
-  buckets: queryOptions({ queryKey: controlKeys.list('buckets'), queryFn: async () => arrayRows(await api<Schema['VirtualBucketList']>('/admin/virtual-buckets')) }),
-  backends: queryOptions({ queryKey: controlKeys.list('backends'), queryFn: async () => envelopeRows(await api<Schema['StorageBackendProjectionListResponse']>('/admin/ui/backends')) }),
-  keys: queryOptions({ queryKey: controlKeys.list('keys'), queryFn: async () => arrayRows(await api<Schema['AdminApiKeyList']>('/admin/api-keys')) }),
-  roles: queryOptions({ queryKey: controlKeys.list('roles'), queryFn: async () => {
-    const response = await api<Schema['AdminIamRolePage']>('/admin/ui/roles?limit=100')
+  backendOption: (backendId: string) => queryOptions({ queryKey: controlKeys.backendOption(backendId), queryFn: ({ signal }) => invokeOperation('getBackendOption', { parameters: { path: { backend_id: backendId } }, signal }) }),
+  overview: queryOptions({ queryKey: controlKeys.overview, queryFn: ({ signal }) => invokeOperation('getAdminOverview', { signal }) }),
+  readiness: (afterKey: string | null) => queryOptions({
+    queryKey: controlKeys.readinessPage(afterKey),
+    queryFn: ({ signal }) => invokeOperation('getAdminReadiness', { parameters: { query: { limit: readinessPageSize, after_key: afterKey ?? undefined } }, signal }),
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  }),
+  policies: queryOptions({ queryKey: controlKeys.list('policies'), queryFn: async ({ signal }) => envelopeRows(await invokeOperation('listPolicies', { signal })) }),
+  buckets: queryOptions({ queryKey: controlKeys.list('buckets'), queryFn: async ({ signal }) => arrayRows(await invokeOperation('listVirtualBuckets', { signal })) }),
+  backends: queryOptions({ queryKey: controlKeys.list('backends'), queryFn: async ({ signal }) => envelopeRows(await invokeOperation('listBackendProjections', { signal })) }),
+  keys: queryOptions({ queryKey: controlKeys.list('keys'), queryFn: async ({ signal }) => arrayRows(await invokeOperation('listAdminKeys', { signal })) }),
+  roles: queryOptions({ queryKey: controlKeys.list('roles'), queryFn: async ({ signal }) => {
+    const response = await invokeOperation('listAdminRoles', { parameters: { query: { limit: 100 } }, signal })
     if (!response || !Array.isArray(response.items) || response.items.length > 100 || !(response.next_after_id === null || typeof response.next_after_id === 'string')) throw new Error('Invalid role page response')
     return response
   } }),
-  capabilities: queryOptions({ queryKey: controlKeys.capabilities, queryFn: () => api<Schema['ControlCapabilities']>('/admin/capabilities') }),
-  health: queryOptions({ queryKey: controlKeys.health, queryFn: () => api<Schema['AdminHealthResponse']>('/admin/health') }),
-  audit: (limit: number) => queryOptions({ queryKey: controlKeys.audit(auditLimit(limit)), queryFn: async () => arrayRows(await api<Schema['AuditEventList']>(`/admin/audit?limit=${auditLimit(limit)}`)) }),
+  capabilities: queryOptions({ queryKey: controlKeys.capabilities, queryFn: ({ signal }) => invokeOperation('getCapabilities', { signal }) }),
+  health: queryOptions({ queryKey: controlKeys.health, queryFn: ({ signal }) => invokeOperation('adminHealth', { signal }) }),
+  audit: (limit: number) => queryOptions({ queryKey: controlKeys.audit(auditLimit(limit)), queryFn: async ({ signal }) => arrayRows(await invokeOperation('listAuditEvents', { parameters: { query: { limit: auditLimit(limit) } }, signal })) }),
 }

@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { auditLimit, auditPage, completionGuard } from './state'
+import { auditPage, completionGuard } from './state'
 
 describe('bounded audit window', () => {
-  it.each([1, 50, 100, 200])('accepts valid limit %s', limit => expect(auditLimit(limit)).toBe(limit))
-  it.each([0, -1, 201, 1.5, NaN, Infinity])('rejects invalid limit %s', limit => expect(() => auditLimit(limit)).toThrow('Audit limit must be an integer from 1 to 200'))
   it('clamps pages after the result window shrinks', () => {
     expect(auditPage([1, 2], 8)).toEqual({ rows: [1, 2], index: 0, pages: 1 })
     expect(auditPage([], 0)).toEqual({ rows: [], index: 0, pages: 1 })

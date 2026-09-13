@@ -2,11 +2,14 @@
 import type { ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { api } from '../../api/client'
+import { afterEach, describe, expect, it, vi, type Mock } from 'vitest'
+import { invokeOperation } from '../../api/operations'
 import ManagedPolicies from './ManagedPolicies'
 
-vi.mock('../../api/client', () => ({ api: vi.fn(), ApiError: class extends Error { status = 409 } }))
+vi.mock('../../api/client', () => ({ ApiError: class extends Error { status = 409 } }))
+vi.mock('../../api/operations', () => ({ invokeOperation: vi.fn() }))
+const api = invokeOperation as unknown as Mock<(operationId: string, input?: OperationMockInput) => Promise<unknown>>
+type OperationMockInput = { parameters?: { path?: Record<string, string>; query?: Record<string, unknown> }; body?: unknown; signal?: AbortSignal }
 vi.mock('../../api/query-keys', async importOriginal => ({ ...(await importOriginal<typeof import('../../api/query-keys')>()), invalidateControl: vi.fn() }))
 vi.mock('../../components/control', () => ({
   DialogFlow: ({ children }: { children: ReactNode }) => <>{children}</>,
@@ -39,7 +42,7 @@ describe('ManagedPolicies', () => {
   })
 
   it('loads detail and completes reviewed deletion', async () => {
-    vi.mocked(api).mockImplementation(async url => url === '/admin/ui/policies?limit=100' ? { items: [summary], next_after_id: null, max_page_size: 100 } : url === '/admin/ui/policies/policy-id' ? detail : { detail: null })
+    vi.mocked(api).mockImplementation(async operationId => operationId === 'listAdminPolicies' ? { items: [summary], next_after_id: null, max_page_size: 100 } as never : operationId === 'getAdminPolicy' ? detail as never : { detail: null } as never)
     renderView()
     fireEvent.click(await screen.findByRole('button', { name: 'View ReadOnly' }))
     expect(await screen.findByText('read access')).toBeTruthy()
@@ -49,14 +52,14 @@ describe('ManagedPolicies', () => {
     expect(screen.queryByRole('region', { name: 'Managed policy detail' })).toBeNull()
     fireEvent.click(within(screen.getByRole('dialog', { name: 'Delete ReadOnly' })).getByRole('button', { name: 'Review change' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Delete ReadOnly' }))
-    await waitFor(() => expect(api).toHaveBeenCalledWith('/admin/ui/policies/policy-id', expect.objectContaining({ method: 'DELETE' })))
+    await waitFor(() => expect(api).toHaveBeenCalledWith('deleteReviewedAdminPolicy', expect.objectContaining({ parameters: { path: { policy_id: 'policy-id' } } })))
   })
 
   it('validates and creates a policy through the review step', async () => {
-    vi.mocked(api).mockImplementation(async (url, options) => {
-      if (url === '/admin/ui/policies?limit=100') return { items: [], next_after_id: null, max_page_size: 100 }
-      if (url === '/admin/ui/policies/validate') return { valid: true, violations: [], json_bytes: 40, statements: 0, compiled_bytes: 10 }
-      if (url === '/admin/ui/policies' && options?.method === 'POST') return detail
+    vi.mocked(api).mockImplementation(async operationId => {
+      if (operationId === 'listAdminPolicies') return { items: [], next_after_id: null, max_page_size: 100 } as never
+      if (operationId === 'validateAdminPolicyDraft') return { valid: true, violations: [], json_bytes: 40, statements: 0, compiled_bytes: 10 } as never
+      if (operationId === 'createAdminPolicy') return detail as never
       throw new Error('unexpected request')
     })
     renderView()
@@ -65,13 +68,13 @@ describe('ManagedPolicies', () => {
     fireEvent.submit(screen.getByRole('button', { name: 'Review change' }).closest('form')!)
     expect(await screen.findByText('Validated bytes')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Confirm change' }))
-    await waitFor(() => expect(api).toHaveBeenCalledWith('/admin/ui/policies', expect.objectContaining({ method: 'POST' })))
+    await waitFor(() => expect(api).toHaveBeenCalledWith('createAdminPolicy', expect.objectContaining({ body: expect.objectContaining({ name: 'ReadOnly' }) })))
   })
 
   it('shows server validation findings and keeps the draft in edit mode', async () => {
-    vi.mocked(api).mockImplementation(async url => {
-      if (url === '/admin/ui/policies?limit=100') return { items: [], next_after_id: null, max_page_size: 100 }
-      if (url === '/admin/ui/policies/validate') return { valid: false, violations: [{ code: 'invalid_action', field: 'Statement[0].Action', message: 'Unsupported action' }], json_bytes: 40, statements: 1, compiled_bytes: 0 }
+    vi.mocked(api).mockImplementation(async operationId => {
+      if (operationId === 'listAdminPolicies') return { items: [], next_after_id: null, max_page_size: 100 } as never
+      if (operationId === 'validateAdminPolicyDraft') return { valid: false, violations: [{ code: 'invalid_action', field: 'Statement[0].Action', message: 'Unsupported action' }], json_bytes: 40, statements: 1, compiled_bytes: 0 } as never
       throw new Error('unexpected request')
     })
     renderView()
@@ -105,10 +108,10 @@ describe('ManagedPolicies', () => {
     fireEvent.submit(screen.getByRole('button', { name: 'Review change' }).closest('form')!)
     fireEvent.click(await screen.findByRole('button', { name: 'Confirm change' }))
 
-    await waitFor(() => expect(api).toHaveBeenLastCalledWith('/admin/ui/policies', expect.objectContaining({
-      body: expect.stringContaining('s3:DeleteObject'),
+    await waitFor(() => expect(api).toHaveBeenLastCalledWith('createAdminPolicy', expect.objectContaining({
+      body: expect.objectContaining({ document: expect.objectContaining({ Statement: [expect.objectContaining({ Action: 's3:DeleteObject' })] }) }),
     })))
-    expect(vi.mocked(api).mock.calls.at(-1)?.[1]?.body).not.toContain('s3:GetObject')
+    expect(JSON.stringify(vi.mocked(api).mock.calls.at(-1)?.[1]?.body)).not.toContain('s3:GetObject')
   })
 
   it('discards a delayed managed edit validation after the document changes', async () => {

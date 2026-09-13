@@ -1,10 +1,3 @@
-export function auditLimit(limit: number) {
-  if (!Number.isInteger(limit) || limit < 1 || limit > 200) {
-    throw new Error('Audit limit must be an integer from 1 to 200')
-  }
-  return limit
-}
-
 export function auditPage<Row>(rows: readonly Row[], page: number) {
   if (!Number.isInteger(page) || page < 0) throw new Error('Invalid audit page')
   const pages = Math.max(1, Math.ceil(rows.length / 25))

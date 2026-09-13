@@ -3,7 +3,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useQuery } from '@tanstack/react-query'
-import { api } from '../../api/client'
+import { invokeOperation as api } from '../../api/operations'
 import { fetchResourceRows } from '../../api/resources'
 import { invalidateControl } from '../../api/query-keys'
 import ResourcePage from './ResourcePage'
@@ -13,7 +13,7 @@ vi.mock('@tanstack/react-query', async importOriginal => ({
   useQuery: vi.fn(),
   useQueryClient: vi.fn(() => ({ invalidateQueries: vi.fn() })),
 }))
-vi.mock('../../api/client', () => ({ api: vi.fn() }))
+vi.mock('../../api/operations', () => ({ invokeOperation: vi.fn() }))
 vi.mock('../../api/resources', () => ({ fetchResourceRows: vi.fn() }))
 vi.mock('../../api/query-keys', async importOriginal => ({
   ...await importOriginal<typeof import('../../api/query-keys')>(),
@@ -75,9 +75,8 @@ describe('ResourcePage', () => {
     fireEvent.change(screen.getByLabelText('Azure account'), { target: { value: 'storageaccount' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
-    await waitFor(() => expect(api).toHaveBeenCalledWith('/admin/credentials', {
-      method: 'POST',
-      body: JSON.stringify({ use_managed_identity: true, access_mode: 'direct', versioning_enabled: false, s3_access_key: 'access-key', s3_secret_key: 'secret-key', azure_account: 'storageaccount' }),
+    await waitFor(() => expect(api).toHaveBeenCalledWith('createCredential', {
+      body: { use_managed_identity: true, access_mode: 'direct', versioning_enabled: false, s3_access_key: 'access-key', s3_secret_key: 'secret-key', azure_account: 'storageaccount' },
     }))
     expect(invalidateControl).toHaveBeenCalledOnce()
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
@@ -124,7 +123,7 @@ describe('ResourcePage', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('Delete failed. Retry after checking the resource.')
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete record-id' }))
-    await waitFor(() => expect(api).toHaveBeenLastCalledWith('/admin/virtual-buckets/record-id', { method: 'DELETE' }))
+    await waitFor(() => expect(api).toHaveBeenLastCalledWith('deleteVirtualBucket', { parameters: { path: { bucket_id: 'record-id' } } }))
     expect(invalidateControl).toHaveBeenCalledOnce()
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
   })

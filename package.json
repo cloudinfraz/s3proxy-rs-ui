@@ -20,7 +20,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "generate:api": "openapi-typescript contracts/admin-openapi.json -o src/api/schema.d.ts",
+    "generate:api": "openapi-typescript contracts/admin-openapi.json -o src/api/schema.d.ts && node scripts/api/generate-operations.mjs contracts/admin-openapi.json src/api/generated/operations.ts src/api/generated/validators.js",
     "build": "npm run generate:api && tsc -b && vite build",
     "lint": "oxlint",
     "test": "vitest run src",
@@ -28,6 +28,9 @@
     "test:deploy": "node --test scripts/deploy/*.test.mjs && scripts/deploy/render-ui-manifest.test.sh",
     "test:release": "node --test scripts/release/*.test.mjs",
     "test:e2e": "playwright test",
+    "test:e2e:a11y": "playwright test --config playwright.accessibility.config.ts",
+    "test:e2e:cross-browser": "playwright test --config playwright.cross-browser.config.ts",
+    "test:e2e:cross-browser:container": "scripts/release/run-cross-browser-container.sh",
     "test:e2e:live": "playwright test --config playwright.live.config.ts",
     "preview": "vite preview --host 127.0.0.1"
   },
@@ -42,6 +45,7 @@
     "react-router": "8.3.1"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
     "@playwright/test": "1.63.0",
     "@testing-library/react": "16.3.3",
     "@types/node": "26.4.1",
@@ -49,6 +53,8 @@
     "@types/react-dom": "19.2.7",
     "@vitejs/plugin-react": "6.1.1",
     "@vitest/coverage-v8": "5.0.0",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
     "jsdom": "30.0.1",
     "openapi-typescript": "7.13.0",
     "oxlint": "1.81.0",

@@ -1,12 +1,18 @@
 import { expect, test } from '@playwright/test'
+import type { components } from '../src/api/schema'
 import { emptyCollections, mockControlApi } from './control-fixtures'
 
 test('login and cookie mutation keep credential material out of browser storage', async ({ page }) => {
   const verifyRequests = await mockControlApi(page, true)
   let mutationCsrf: string | null = null
-  const outboundRequests: string[] = []
+  const unrelatedRequests: string[] = []
+  const consoleMessages: string[] = []
+  page.on('console', message => consoleMessages.push(message.text()))
   page.on('request', request => {
-    outboundRequests.push(`${request.url()}\n${request.postData() ?? ''}`)
+    const path = new URL(request.url()).pathname
+    const expectedCredentialRequest = path === '/admin/session/login'
+      || (path === '/admin/credentials' && request.method() === 'POST')
+    if (!expectedCredentialRequest) unrelatedRequests.push(`${request.url()}\n${request.postData() ?? ''}`)
   })
   const emptyLists = [
     '/admin/credentials', '/admin/ui/identities', '/admin/ui/identity-pages', '/admin/ui/backend-options', '/admin/virtual-buckets', '/admin/backends', '/admin/policies', '/admin/api-keys',
@@ -30,7 +36,16 @@ test('login and cookie mutation keep credential material out of browser storage'
     await page.route(`**${path}`, async route => {
       if (path === '/admin/credentials' && route.request().method() === 'POST') {
         mutationCsrf = route.request().headers()['x-csrf-token'] ?? null
-        return route.fulfill({ status: 201, json: { credential_id: 'created-id', s3_access_key: 'generated-access', s3_secret_key: 'generated-one-time-secret', s3_endpoint: 'https://synthetic.invalid' } })
+        return route.fulfill({ status: 201, json: {
+          credential_id: '00000000-0000-4000-8000-000000000099',
+          s3_access_key: 'generated-access',
+          s3_secret_key: 'generated-one-time-secret',
+          s3_endpoint: 'https://synthetic.invalid',
+          azure_account: 'testaccount',
+          access_mode: 'direct',
+          use_managed_identity: true,
+          default_backend_id: null,
+        } satisfies components['schemas']['CredentialCreatedResponse'] })
       }
       return route.fulfill({ status: 200, json: emptyCollections[path as keyof typeof emptyCollections] })
     })
@@ -62,7 +77,9 @@ test('login and cookie mutation keep credential material out of browser storage'
   expect(storage.body).not.toContain('generated-one-time-secret')
   expect(page.url()).not.toContain('generated-access')
   expect(page.url()).not.toContain('generated-one-time-secret')
-  expect(JSON.stringify(outboundRequests)).not.toContain('generated-access')
-  expect(JSON.stringify(outboundRequests)).not.toContain('generated-one-time-secret')
+  const unrelatedOutput = JSON.stringify({ consoleMessages, unrelatedRequests })
+  expect(unrelatedOutput).not.toContain('browser-test-admin-key')
+  expect(unrelatedOutput).not.toContain('generated-access')
+  expect(unrelatedOutput).not.toContain('generated-one-time-secret')
   verifyRequests()
 })

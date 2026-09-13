@@ -1,4 +1,10 @@
+/// <reference types="node" />
+
 import { expect, test } from '@playwright/test'
+import { createHash } from 'node:crypto'
+import { readFileSync } from 'node:fs'
+
+const expectedOpenApiSha256 = (JSON.parse(readFileSync('contracts/backend-contract.json', 'utf8')) as { openapi_sha256: string }).openapi_sha256
 
 test('UI076-04 deployed base path, assets, headers and route isolation', async ({ page, request }) => {
   const errors: string[] = []
@@ -31,6 +37,19 @@ test('UI076-04 deployed base path, assets, headers and route isolation', async (
   const identityPage = await request.get('/admin/ui/identity-pages?limit=1')
   expect(identityPage.status()).toBe(403)
   expect(identityPage.headers()['content-type'] ?? '').toContain('application/xml')
+
+  const overview = await request.get('/admin/ui/overview')
+  expect(overview.status()).toBe(403)
+  expect(overview.headers()['content-type'] ?? '').toContain('application/xml')
+
+  const readiness = await request.get('/admin/ui/readiness?limit=1')
+  expect(readiness.status()).toBe(403)
+  expect(readiness.headers()['content-type'] ?? '').toContain('application/xml')
+
+  const openApi = await request.get('/admin/openapi.json')
+  expect(openApi.status()).toBe(200)
+  expect(openApi.headers()['content-type'] ?? '').toContain('application/json')
+  expect(createHash('sha256').update(await openApi.body()).digest('hex')).toBe(expectedOpenApiSha256)
 
   expect((await request.get('/bucket')).status()).toBe(404)
   expect((await request.get('/metrics')).status()).toBe(404)

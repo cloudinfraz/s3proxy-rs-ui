@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Trash2, Power } from 'lucide-react'
-import { api, ApiError } from '../../api/client'
+import { ApiError } from '../../api/client'
 import { controlQueries, type Schema } from '../../api/control'
+import { invokeOperation } from '../../api/operations'
 import { invalidateControl } from '../../api/query-keys'
 import { DataTable, DestructiveDialog, ErrorBanner, Modal, OneTimeSecretDialog, Page, RefreshButton } from '../../components/control'
 import { completionGuard } from './state'
@@ -39,7 +40,7 @@ export default function AdminKeysPage() {
     setPending(true)
     setError(null)
     try {
-      const result = await api<Schema['CreateAdminApiKeyResponse']>('/admin/api-keys', { method: 'POST', body: JSON.stringify(body) })
+      const result = await invokeOperation('createAdminKey', { body })
       void invalidateControl(client)
       if (!guard.current.current(request)) return
       if (!result.api_key) throw new Error('The server did not return a one-time key')
@@ -58,7 +59,8 @@ export default function AdminKeysPage() {
     setPending(true)
     setError(null)
     try {
-      await api<void>(`/admin/api-keys/${encodeURIComponent(action.key.key_name)}`, action.kind === 'delete' ? { method: 'DELETE' } : { method: 'PUT', body: JSON.stringify({ enabled: !action.key.enabled } satisfies Schema['UpdateAdminApiKeyRequest']) })
+      if (action.kind === 'delete') await invokeOperation('deleteAdminKey', { parameters: { path: { key_name: action.key.key_name } } })
+      else await invokeOperation('updateAdminKey', { parameters: { path: { key_name: action.key.key_name } }, body: { enabled: !action.key.enabled } })
       void invalidateControl(client)
       if (guard.current.current(request)) dismiss()
     } catch (cause) {

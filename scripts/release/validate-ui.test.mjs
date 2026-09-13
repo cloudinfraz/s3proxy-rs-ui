@@ -11,9 +11,10 @@ const expectedCommands = [
   'npm ci --ignore-scripts --registry=https://registry.npmjs.org/',
   'npm audit --audit-level=high --registry=https://registry.npmjs.org/',
   'npm run generate:api',
-  'git diff --exit-code -- src/api/schema.d.ts',
-  'npm run lint', 'npm test', 'npm run test:deploy', 'npm run test:release',
-  'npm run build', 'npx playwright install --with-deps chromium', 'npm run test:e2e',
+  'git diff --exit-code -- src/api/schema.d.ts src/api/generated',
+  'scripts/release/validate-source.sh',
+  'npx playwright install --with-deps chromium firefox webkit',
+  'npm run test:e2e', 'npm run test:e2e:a11y', 'npm run test:e2e:cross-browser',
 ]
 
 function validate({ failCommand = '', checksum = 'expected' } = {}) {
@@ -26,6 +27,8 @@ function validate({ failCommand = '', checksum = 'expected' } = {}) {
     for (const command of ['npm', 'npx', 'git']) {
       writeFileSync(join(bin, command), `#!/bin/bash\ncommand="${command} $*"\nprintf '%s\\n' "$command" >> "$COMMAND_LOG"\n[[ "$command" != "$FAIL_COMMAND" ]]\n`, { mode: 0o755 })
     }
+    mkdirSync(join(directory, 'scripts/release'), { recursive: true })
+    writeFileSync(join(directory, 'scripts/release/validate-source.sh'), '#!/bin/bash\ncommand="scripts/release/validate-source.sh"\nprintf "%s\\n" "$command" >>"$COMMAND_LOG"\n[[ "$command" != "$FAIL_COMMAND" ]]\n', { mode: 0o755 })
     writeFileSync(join(bin, 'node'), '#!/bin/bash\nprintf "expected\\n"\n', { mode: 0o755 })
     writeFileSync(join(bin, 'sha256sum'), '#!/bin/bash\nprintf "%s  contract\\n" "$TEST_CHECKSUM"\n', { mode: 0o755 })
     const result = spawnSync('bash', [script], {

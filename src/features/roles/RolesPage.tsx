@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, Clock, Eye, Link, MoreHorizontal, Plus, Power, ShieldCheck, Trash2, Unlink } from 'lucide-react'
 import { DropdownMenu } from '@radix-ui/themes'
-import { api } from '../../api/client'
-import { controlQueries, type Schema } from '../../api/control'
+import { controlQueries } from '../../api/control'
+import { invokeOperation } from '../../api/operations'
 import { controlKeys } from '../../api/query-keys'
 import { DataTable, DialogFlow, ErrorBanner, Modal, Page, RefreshButton } from '../../components/control'
 import { completionGuard } from '../operations/state'
@@ -15,8 +15,8 @@ export default function RolesPage() {
   const createButton = useRef<HTMLButtonElement>(null)
   const [cursors, setCursors] = useState<Array<string | null>>([null])
   const cursor = cursors[cursors.length - 1]
-  const roles = useQuery({ queryKey: [...controlKeys.list('roles'), 'page', cursor], queryFn: async () => {
-    const result = await api<Schema['AdminIamRolePage']>(`/admin/ui/roles?limit=100${cursor ? `&after_id=${encodeURIComponent(cursor)}` : ''}`)
+  const roles = useQuery({ queryKey: [...controlKeys.list('roles'), 'page', cursor], queryFn: async ({ signal }) => {
+    const result = await invokeOperation('listAdminRoles', { parameters: { query: { limit: 100, after_id: cursor ?? undefined } }, signal })
     if (!result || !Array.isArray(result.items) || result.items.length > 100 || !result.limits || !(result.next_after_id === null || typeof result.next_after_id === 'string')) throw new Error('Invalid role page response')
     return result
   } })
@@ -32,7 +32,7 @@ export default function RolesPage() {
   async function load(id: string) {
     const request = guard.current.begin(); setPending(true); setError(null); setSelectedId(id); setSelected(null)
     try {
-      const detail = await api<RoleDetail>(`/admin/ui/roles/${encodeURIComponent(id)}`)
+      const detail = await invokeOperation('getAdminRole', { parameters: { path: { role_id: id } } })
       if (guard.current.current(request)) setSelected(detail)
     } catch (cause) { if (guard.current.current(request)) setError(new Error(cause instanceof Error ? cause.message : 'Role details unavailable')) }
     finally { if (guard.current.current(request)) setPending(false) }

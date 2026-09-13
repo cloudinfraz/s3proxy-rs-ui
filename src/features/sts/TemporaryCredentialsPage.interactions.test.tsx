@@ -10,8 +10,8 @@ const stsMocks = vi.hoisted(() => ({ api: vi.fn(), writeText: vi.fn() }))
 
 vi.mock('../../api/client', async importOriginal => ({
   ...await importOriginal<typeof import('../../api/client')>(),
-  api: stsMocks.api,
 }))
+vi.mock('../../api/operations', () => ({ invokeOperation: stsMocks.api }))
 
 const capabilities = {
   plane: 'control',
@@ -57,11 +57,11 @@ beforeEach(() => {
   vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })))
   Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: stsMocks.writeText } })
   stsMocks.writeText.mockResolvedValue(undefined)
-  stsMocks.api.mockImplementation(async (path: string) => {
-    if (path === '/admin/capabilities') return capabilities
-    if (path.includes('after_id=next-page')) return { items: [role('role-2', 'Reader')], next_after_id: null, limits }
-    if (path === '/admin/ui/roles?limit=100') return { items: [role('role-1', 'Writer')], next_after_id: 'next-page', limits }
-    throw new Error(`Unexpected API request: ${path}`)
+  stsMocks.api.mockImplementation(async (operationId: string, input?: { parameters?: { query?: { after_id?: string } } }) => {
+    if (operationId === 'getCapabilities') return capabilities
+    if (operationId === 'listAdminRoles' && input?.parameters?.query?.after_id === 'next-page') return { items: [role('role-2', 'Reader')], next_after_id: null, limits }
+    if (operationId === 'listAdminRoles') return { items: [role('role-1', 'Writer')], next_after_id: 'next-page', limits }
+    throw new Error(`Unexpected API operation: ${operationId}`)
   })
 })
 
