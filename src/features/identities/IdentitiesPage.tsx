@@ -3,7 +3,7 @@ import { flushSync } from 'react-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router'
 import { ChevronLeft, ChevronRight, Eye, KeyRound, Pencil, Plus, RotateCw, Trash2 } from 'lucide-react'
-import { ApiError } from '../../api/client'
+import { ApiError, isIndeterminateMutationError } from '../../api/client'
 import { controlQueries, type Schema } from '../../api/control'
 import { invokeOperation } from '../../api/operations'
 import { invalidateControl } from '../../api/query-keys'
@@ -42,6 +42,7 @@ export default function IdentitiesPage() {
   const [oneTime, setOneTime] = useState<CreatedCredentialMaterial | null>(null)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<Error | null>(null)
+  const [indeterminate, setIndeterminate] = useState<'create' | 'rotate' | null>(null)
   const guard = useRef(completionGuard())
   useEffect(() => { const owner = guard.current; return () => owner.cancel() }, [])
   useEffect(() => {
@@ -60,17 +61,27 @@ export default function IdentitiesPage() {
     setOneTime(null)
     setPending(false)
     setError(null)
+    setIndeterminate(null)
   }
 
   function begin() {
     const request = guard.current.begin()
     setPending(true)
     setError(null)
+    setIndeterminate(null)
     return request
   }
 
-  function report(cause: unknown, operation: string, request: number) {
+  function report(cause: unknown, operation: string, request: number, recovery?: 'create' | 'rotate') {
     if (!guard.current.current(request)) return
+    if (recovery && isIndeterminateMutationError(cause)) {
+      setIndeterminate(recovery)
+      setError(new Error(recovery === 'rotate'
+        ? 'Secret rotation may have completed, so the previous secret may no longer work. Rotate again to issue another secret for the same access key.'
+        : 'Identity creation may have completed, but its one-time credentials were not received. Refresh the identity list and remove any unusable identity before creating another.'))
+      if (recovery === 'create') void invalidateControl(queryClient)
+      return
+    }
     setError(new Error(cause instanceof ApiError ? `${operation} failed (HTTP ${cause.status})` : `${operation} failed`))
   }
 
@@ -102,7 +113,7 @@ export default function IdentitiesPage() {
       setOneTime({ credentialId: result.credential_id, accessMode: result.access_mode, accessKey: result.s3_access_key, secretKey: result.s3_secret_key, endpoint: result.s3_endpoint })
       if (refreshBeforeHandoff) await invalidateControl(queryClient)
       else void invalidateControl(queryClient)
-    } catch (cause) { report(cause, 'Identity creation', request) }
+    } catch (cause) { report(cause, 'Identity creation', request, 'create') }
     finally { if (guard.current.current(request)) setPending(false) }
   }
 
@@ -130,12 +141,13 @@ export default function IdentitiesPage() {
         if (!action.identity.credential_id) throw new Error('Identity has no stable identifier')
         const result = await invokeOperation('rotateCredentialSecret', { parameters: { path: { credential_id: action.identity.credential_id } } })
         if (!guard.current.current(request)) return
+        if (result.credential_id !== action.identity.credential_id || result.s3_access_key !== action.identity.s3_access_key || !isNonBlank(result.s3_secret_key)) throw new Error('The server returned invalid rotated credentials')
         setAction(null)
         setOneTime({ credentialId: result.credential_id, accessMode: action.identity.access_mode, accessKey: result.s3_access_key, secretKey: result.s3_secret_key })
       }
       void invalidateControl(queryClient)
       if (guard.current.current(request) && action.kind !== 'rotate' && action.kind !== 'replace') dismiss()
-    } catch (cause) { report(cause, action.kind === 'rotate' ? 'Secret rotation' : action.kind === 'replace' ? 'Identity replacement' : 'Identity update', request) }
+    } catch (cause) { report(cause, action.kind === 'rotate' ? 'Secret rotation' : action.kind === 'replace' ? 'Identity replacement' : 'Identity update', request, action.kind === 'rotate' ? 'rotate' : undefined) }
     finally { if (guard.current.current(request)) setPending(false) }
   }
 
@@ -169,9 +181,9 @@ export default function IdentitiesPage() {
       { label: 'Actions', value: identity => <div className="row-actions"><button className="icon-button" title={directMappingsOnly ? 'View direct mapping details' : 'View identity details'} aria-label={`View ${identity.s3_access_key}`} onClick={() => { dismiss(); setSelectedBackendId(identity.default_backend_id ?? ''); setDetailsKey(identity.credential_id ?? identity.s3_access_key) }}><Eye size={16} /></button><button className="icon-button" title={directMappingsOnly ? 'Configure mapping' : 'Edit identity'} aria-label={`Edit ${identity.s3_access_key}`} onClick={() => { dismiss(); setSelectedBackendId(identity.default_backend_id ?? ''); setAction({ identity, kind: 'edit' }) }}><Pencil size={16} /></button>{!directMappingsOnly && <><button className="icon-button" title="Rotate secret" aria-label={`Rotate ${identity.s3_access_key}`} disabled={!identity.credential_id} onClick={() => { dismiss(); setAction({ identity, kind: 'rotate' }) }}><RotateCw size={16} /></button><button className="icon-button" title="Create replacement" aria-label={`Replace ${identity.s3_access_key}`} onClick={() => { dismiss(); setSelectedBackendId(identity.default_backend_id ?? ''); setAction({ identity, kind: 'replace' }) }}><KeyRound size={16} /></button></>}<button className="icon-button danger" title={directMappingsOnly ? 'Remove mapping' : 'Delete identity'} aria-label={`Delete ${identity.s3_access_key}`} onClick={() => { dismiss(); setAction({ identity, kind: 'delete' }) }}><Trash2 size={16} /></button></div> },
     ]} />}
     <div className="identity-pagination" aria-label="S3 identity pagination"><button className="icon-button" aria-label="Previous identity page" title="Previous page" disabled={identityCursors.length === 1 || identities.isFetching} onClick={() => { dismiss(); setIdentityCursors(value => value.slice(0, -1)) }}><ChevronLeft size={16} /></button><span>Page {identityCursors.length}</span><button className="icon-button" aria-label="Next identity page" title="Next page" disabled={!identityPage.data?.next_after_id || identities.isFetching} onClick={() => { if (identityPage.data?.next_after_id) { dismiss(); setIdentityCursors(value => [...value, identityPage.data!.next_after_id]) } }}><ChevronRight size={16} /></button></div>
-    {(creating || draft) && <Modal title={draft ? 'Create replacement' : directMappingsOnly ? 'Add direct mapping' : 'Create S3 identity'} description={draft ? 'Creates new credentials from reviewed settings. Mappings and policies are not copied; the original identity is unchanged.' : virtualMappingWorkflow.current ? 'Creates server-generated S3 credentials for a new virtual bucket mapping.' : 'Creates metadata only and uses Managed Identity for Azure access.'} onClose={dismiss} pending={pending}><form className="operation-form" onSubmit={create}><label>Azure account<input name="azure_account" required pattern="[a-z0-9]{3,24}" autoComplete="off" defaultValue={draft?.azureAccount ?? ''} /></label>{directMappingsOnly ? <input type="hidden" name="access_mode" value="direct" /> : virtualMappingWorkflow.current ? <label>Mode<input name="access_mode" value="virtual" readOnly /></label> : <div><label htmlFor="identity-create-mode">Mode</label><select id="identity-create-mode" name="access_mode" defaultValue={draft?.accessMode ?? 'direct'}><option value="direct">Direct</option><option value="virtual">Virtual</option></select></div>}<label>Default backend<select name="default_backend_id" value={selectedBackendId} onChange={event => setSelectedBackendId(event.target.value)}><option value="">Legacy account route</option>{backendOptions.map(backend => <option key={backend.id} value={backend.id} disabled={backend.disabled}>{backend.label}</option>)}</select></label><BackendSelectorPagination page={backendSelector.page} pending={backendSelector.query.isFetching} canPrevious={backendSelector.canPrevious} canNext={backendSelector.canNext} previous={backendSelector.previous} next={backendSelector.next} /><label className="checkbox-field"><input name="versioning_enabled" type="checkbox" defaultChecked={draft?.versioningEnabled ?? false} /> Versioning enabled</label>{error && <ErrorBanner error={error} />}<div className="dialog-actions"><button type="button" disabled={pending} onClick={dismiss}>Cancel</button><button className="primary" disabled={pending}>{pending ? 'Creating...' : draft ? 'Create replacement' : directMappingsOnly ? 'Add mapping' : 'Create identity'}</button></div></form></Modal>}
+    {(creating || draft) && <Modal title={draft ? 'Create replacement' : directMappingsOnly ? 'Add direct mapping' : 'Create S3 identity'} description={draft ? 'Creates new credentials from reviewed settings. Mappings and policies are not copied; the original identity is unchanged.' : virtualMappingWorkflow.current ? 'Creates server-generated S3 credentials for a new virtual bucket mapping.' : 'Creates metadata only and uses Managed Identity for Azure access.'} onClose={dismiss} pending={pending}><form className="operation-form" onSubmit={create}><label>Azure account<input name="azure_account" required pattern="[a-z0-9]{3,24}" autoComplete="off" defaultValue={draft?.azureAccount ?? ''} /></label>{directMappingsOnly ? <input type="hidden" name="access_mode" value="direct" /> : virtualMappingWorkflow.current ? <label>Mode<input name="access_mode" value="virtual" readOnly /></label> : <div><label htmlFor="identity-create-mode">Mode</label><select id="identity-create-mode" name="access_mode" defaultValue={draft?.accessMode ?? 'direct'}><option value="direct">Direct</option><option value="virtual">Virtual</option></select></div>}<label>Default backend<select name="default_backend_id" value={selectedBackendId} onChange={event => setSelectedBackendId(event.target.value)}><option value="">Legacy account route</option>{backendOptions.map(backend => <option key={backend.id} value={backend.id} disabled={backend.disabled}>{backend.label}</option>)}</select></label><BackendSelectorPagination page={backendSelector.page} pending={backendSelector.query.isFetching} canPrevious={backendSelector.canPrevious} canNext={backendSelector.canNext} previous={backendSelector.previous} next={backendSelector.next} /><label className="checkbox-field"><input name="versioning_enabled" type="checkbox" defaultChecked={draft?.versioningEnabled ?? false} /> Versioning enabled</label>{error && <ErrorBanner error={error} />}<div className="dialog-actions"><button type="button" disabled={pending} onClick={dismiss}>Cancel</button><button className="primary" disabled={pending || indeterminate === 'create'}>{pending ? 'Creating...' : draft ? 'Create replacement' : directMappingsOnly ? 'Add mapping' : 'Create identity'}</button></div></form></Modal>}
     {action?.kind === 'edit' && <Modal title={directMappingsOnly ? 'Configure direct mapping' : 'Edit identity'} description="Access key, mode and secret are not changed by this form." onClose={dismiss} pending={pending}><form className="operation-form" onSubmit={confirm}>{directMappingsOnly && <label>Azure account<input name="azure_account" required pattern="[a-z0-9]{3,24}" readOnly={!action.identity.use_managed_identity} defaultValue={action.identity.azure_account} /></label>}<label>Default backend<select name="default_backend_id" value={selectedBackendId} onChange={event => setSelectedBackendId(event.target.value)}><option value="">Keep current selection</option>{backendOptions.map(backend => <option key={backend.id} value={backend.id} disabled={backend.disabled}>{backend.label}</option>)}</select></label><BackendSelectorPagination page={backendSelector.page} pending={backendSelector.query.isFetching} canPrevious={backendSelector.canPrevious} canNext={backendSelector.canNext} previous={backendSelector.previous} next={backendSelector.next} /><label className="checkbox-field"><input name="enabled" type="checkbox" disabled={action.identity.enabled === null} defaultChecked={action.identity.enabled === true} /> {action.identity.enabled === null ? 'Enabled state unavailable' : 'Enabled'}</label><label className="checkbox-field"><input name="versioning_enabled" type="checkbox" defaultChecked={action.identity.versioning_enabled} /> Versioning enabled</label>{error && <ErrorBanner error={error} />}<div className="dialog-actions"><button type="button" disabled={pending} onClick={dismiss}>Cancel</button><button className="primary" disabled={pending}>{pending ? 'Saving...' : 'Save'}</button></div></form></Modal>}
-      {action && (action.kind === 'rotate' || action.kind === 'delete') && <DestructiveDialog title={action.kind === 'rotate' ? 'Rotate secret' : directMappingsOnly ? 'Remove direct mapping' : 'Delete identity'} description={action.kind === 'delete' ? directMappingsOnly ? directMappingRemovalDescription(action.identity) : `Revokes this identity and removes ${counts(action.identity)}. Azure containers and blobs are retained.` : 'Immediately invalidates the current secret and parent-revision temporary credentials.'} confirmLabel={`${action.kind === 'rotate' ? 'Rotate' : directMappingsOnly ? 'Remove' : 'Delete'} ${action.identity.s3_access_key}`} pending={pending} onClose={dismiss} onConfirm={() => { void confirm() }}><p className="confirmation-name">{action.identity.s3_access_key}</p>{error && <ErrorBanner error={error} />}</DestructiveDialog>}
+      {action && (action.kind === 'rotate' || action.kind === 'delete') && <DestructiveDialog title={action.kind === 'rotate' ? 'Rotate secret' : directMappingsOnly ? 'Remove direct mapping' : 'Delete identity'} description={action.kind === 'delete' ? directMappingsOnly ? directMappingRemovalDescription(action.identity) : `Revokes this identity and removes ${counts(action.identity)}. Azure containers and blobs are retained.` : 'Immediately invalidates the current secret and parent-revision temporary credentials.'} confirmLabel={`${action.kind === 'rotate' ? indeterminate === 'rotate' ? 'Rotate again' : 'Rotate' : directMappingsOnly ? 'Remove' : 'Delete'} ${action.identity.s3_access_key}`} pending={pending} onClose={dismiss} onConfirm={() => { void confirm() }}><p className="confirmation-name">{action.identity.s3_access_key}</p>{error && <ErrorBanner error={error} />}</DestructiveDialog>}
     {detailsKey && !directMappingsOnly && <Modal title="Identity details" description="Read-only identity metadata and control-plane dependencies." onClose={dismiss}>{selectedIdentity ? <dl className="identity-details">
       <dt>Identity ID</dt><dd>{selectedIdentity.credential_id ?? 'Unavailable'}</dd>
       <dt>Access key</dt><dd>{selectedIdentity.s3_access_key}</dd>

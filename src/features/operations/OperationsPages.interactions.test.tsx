@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactElement } from 'react'
 import { ApiError } from '../../api/client'
@@ -128,6 +128,27 @@ describe('operations page interactions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create key' }))
     await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('HTTP 422'))
     expect(screen.getByRole('dialog', { name: 'Create admin key' })).toBeTruthy()
+  })
+
+  it('refreshes key metadata and blocks duplicate creation after an indeterminate outcome', async () => {
+    operationsMocks.api.mockImplementation(async (operationId: string) => {
+      if (operationId === 'createAdminKey') throw new ApiError(408, 'timed out', null, 'timeout')
+      if (operationId === 'listAdminKeys') return [adminKey]
+      throw new Error(`Unexpected API operation: ${operationId}`)
+    })
+    renderPage(<AdminKeysPage />)
+
+    await screen.findByText('automation')
+    fireEvent.click(screen.getByRole('button', { name: 'Create admin key' }))
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'uncertain-key' } })
+    const dialog = screen.getByRole('dialog', { name: 'Create admin key' })
+    const submit = within(dialog).getByRole('button', { name: 'Create key' })
+    fireEvent.click(submit)
+
+    expect(await within(dialog).findByRole('alert')).toHaveProperty('textContent', expect.stringContaining('may have completed'))
+    expect(submit).toHaveProperty('disabled', true)
+    expect(operationsMocks.api.mock.calls.filter(([operationId]) => operationId === 'createAdminKey')).toHaveLength(1)
+    await waitFor(() => expect(operationsMocks.api.mock.calls.filter(([operationId]) => operationId === 'listAdminKeys').length).toBeGreaterThan(1))
   })
 
   it('enables and deletes admin keys with the selected action payload', async () => {

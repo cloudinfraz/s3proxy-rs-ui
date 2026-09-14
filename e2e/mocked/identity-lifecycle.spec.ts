@@ -255,6 +255,32 @@ test('UI070-01 creates and rotates identities without widening update payloads',
   verify()
 })
 
+test('UI070-01 recovers a lost rotation response by explicitly rotating again', async ({ page }) => {
+  const verify = await mockControlApi(page)
+  const requestBodies: Array<string | null> = []
+  await page.route('**/admin/credentials/00000000-0000-4000-8000-000000000001/rotate-secret', route => {
+    requestBodies.push(route.request().postData())
+    if (requestBodies.length === 1) return route.abort('connectionfailed')
+    return route.fulfill({ json: {
+      credential_id: '00000000-0000-4000-8000-000000000001',
+      s3_access_key: 'fixture-access',
+      s3_secret_key: 'synthetic-recovery-secret',
+    } satisfies components['schemas']['RotateCredentialSecretResponse'] })
+  })
+
+  await page.goto('/admin/ui/credentials')
+  await page.getByRole('button', { name: 'Rotate fixture-access' }).click()
+  const dialog = page.getByRole('alertdialog', { name: 'Rotate secret' })
+  await dialog.getByRole('button', { name: 'Rotate fixture-access', exact: true }).click()
+  await expect(dialog.getByRole('alert')).toContainText('may have completed')
+  await dialog.getByRole('button', { name: 'Rotate again fixture-access', exact: true }).click()
+
+  await expect(page.getByRole('dialog', { name: 'One-time S3 credentials' })).toContainText('synthetic-recovery-secret')
+  expect(requestBodies).toEqual([null, null])
+  expect(await page.evaluate(() => [localStorage.length, sessionStorage.length])).toEqual([0, 0])
+  verify()
+})
+
 test('UI070-03 delayed rotation cannot restore a dismissed secret', async ({ page }) => {
   const verify = await mockControlApi(page)
   let release: () => void = () => undefined

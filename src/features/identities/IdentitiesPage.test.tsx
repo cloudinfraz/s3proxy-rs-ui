@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
+import { ApiError } from '../../api/client'
 import { invokeOperation } from '../../api/operations'
 import type { Schema } from '../../api/control'
 import { invalidateControl } from '../../api/query-keys'
@@ -14,7 +15,20 @@ const queryClientMocks = vi.hoisted(() => ({ invalidateQueries: vi.fn(), setQuer
 
 vi.mock('@tanstack/react-query', async importOriginal => ({ ...(await importOriginal<typeof import('@tanstack/react-query')>()), useQuery: vi.fn(), useQueryClient: () => queryClientMocks }))
 vi.mock('react-router', () => ({ useNavigate: () => routerMocks.navigate, useSearchParams: vi.fn() }))
-vi.mock('../../api/client', () => ({ ApiError: class extends Error { status = 500 } }))
+vi.mock('../../api/client', () => ({
+  ApiError: class extends Error {
+    readonly status: number
+    readonly code: string | null
+    readonly kind: string
+    constructor(status = 500, message = 'API error', code: string | null = null, kind = 'response') {
+      super(message)
+      this.status = status
+      this.code = code
+      this.kind = kind
+    }
+  },
+  isIndeterminateMutationError: (cause: unknown) => cause instanceof Error && 'kind' in cause && ['transport', 'timeout', 'invalid-response'].includes(String(cause.kind)),
+}))
 vi.mock('../../api/operations', () => ({ invokeOperation: vi.fn() }))
 const api = invokeOperation as unknown as Mock<(operationId: string, input?: OperationMockInput) => Promise<unknown>>
 type OperationMockInput = { parameters?: { path?: Record<string, string>; query?: Record<string, unknown> }; body?: unknown; signal?: AbortSignal }
@@ -128,6 +142,54 @@ describe('IdentitiesPage', () => {
     fireEvent.change(screen.getByLabelText('Azure account'), { target: { value: 'newaccount' } })
     fireEvent.submit(within(screen.getByRole('dialog', { name: 'Create S3 identity' })).getByRole('button', { name: 'Create identity' }).closest('form')!)
     expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'Identity creation failed')
+  })
+
+  it('blocks duplicate identity creation when the transport outcome is indeterminate', async () => {
+    mockQueries(query({ data: [] }))
+    vi.mocked(api).mockRejectedValueOnce(new ApiError(408, 'timed out', null, 'timeout'))
+    render(<IdentitiesPage />)
+    fireEvent.click(screen.getByRole('button', { name: 'Create identity' }))
+    fireEvent.change(screen.getByLabelText('Azure account'), { target: { value: 'newaccount' } })
+    const dialog = screen.getByRole('dialog', { name: 'Create S3 identity' })
+    const submit = within(dialog).getByRole('button', { name: 'Create identity' })
+    fireEvent.submit(submit.closest('form')!)
+
+    expect(await within(dialog).findByRole('alert')).toHaveProperty('textContent', expect.stringContaining('may have completed'))
+    expect(submit).toHaveProperty('disabled', true)
+    expect(invalidateControl).toHaveBeenCalledOnce()
+    expect(api).toHaveBeenCalledTimes(1)
+  })
+
+  it('recovers an indeterminate rotation by explicitly rotating the same identity again', async () => {
+    mockQueries(query({ data: [identity] }))
+    vi.mocked(api)
+      .mockRejectedValueOnce(new ApiError(408, 'timed out', null, 'timeout'))
+      .mockResolvedValueOnce({ credential_id: identity.credential_id, s3_access_key: identity.s3_access_key, s3_secret_key: 'replacement-secret' })
+    render(<IdentitiesPage />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rotate ACCESS_ONE' }))
+    const dialog = screen.getByRole('alertdialog', { name: 'Rotate secret' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Rotate ACCESS_ONE' }))
+
+    expect(await within(dialog).findByRole('alert')).toHaveProperty('textContent', expect.stringContaining('may have completed'))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Rotate again ACCESS_ONE' }))
+    expect(await screen.findByText(/created credentials ACCESS_ONE replacement-secret/)).toBeTruthy()
+    expect(api).toHaveBeenCalledTimes(2)
+    expect(api).toHaveBeenNthCalledWith(1, 'rotateCredentialSecret', { parameters: { path: { credential_id: identity.credential_id } } })
+    expect(api).toHaveBeenNthCalledWith(2, 'rotateCredentialSecret', { parameters: { path: { credential_id: identity.credential_id } } })
+  })
+
+  it('rejects rotated credentials for a different identity', async () => {
+    mockQueries(query({ data: [identity] }))
+    vi.mocked(api).mockResolvedValueOnce({ credential_id: '22222222-2222-4222-8222-222222222222', s3_access_key: identity.s3_access_key, s3_secret_key: 'wrong-target-secret' })
+    render(<IdentitiesPage />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rotate ACCESS_ONE' }))
+    const dialog = screen.getByRole('alertdialog', { name: 'Rotate secret' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Rotate ACCESS_ONE' }))
+
+    expect(await within(dialog).findByRole('alert')).toHaveProperty('textContent', 'Secret rotation failed')
+    expect(screen.queryByText(/wrong-target-secret/)).toBeNull()
   })
 
   it('creates a server-generated virtual identity and continues to mapping creation after acknowledgement', async () => {
