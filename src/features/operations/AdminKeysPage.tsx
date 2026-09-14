@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Trash2, Power } from 'lucide-react'
-import { ApiError } from '../../api/client'
+import { ApiError, isIndeterminateMutationError } from '../../api/client'
 import { controlQueries, type Schema } from '../../api/control'
 import { invokeOperation } from '../../api/operations'
 import { invalidateControl } from '../../api/query-keys'
@@ -17,6 +17,7 @@ export default function AdminKeysPage() {
   const [secret, setSecret] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<Error | null>(null)
+  const [creationIndeterminate, setCreationIndeterminate] = useState(false)
   const [action, setAction] = useState<KeyAction | null>(null)
   const guard = useRef(completionGuard())
   useEffect(() => { const owner = guard.current; return () => owner.cancel() }, [])
@@ -27,6 +28,7 @@ export default function AdminKeysPage() {
     setSecret(null)
     setPending(false)
     setError(null)
+    setCreationIndeterminate(false)
     setAction(null)
   }
 
@@ -39,6 +41,7 @@ export default function AdminKeysPage() {
     const request = guard.current.begin()
     setPending(true)
     setError(null)
+    setCreationIndeterminate(false)
     try {
       const result = await invokeOperation('createAdminKey', { body })
       void invalidateControl(client)
@@ -47,7 +50,11 @@ export default function AdminKeysPage() {
       setSecret(result.api_key)
       setCreating(false)
     } catch (cause) {
-      if (guard.current.current(request)) setError(new Error(cause instanceof ApiError ? `Admin key creation failed (HTTP ${cause.status})` : 'Admin key creation failed'))
+      if (guard.current.current(request) && isIndeterminateMutationError(cause)) {
+        setCreationIndeterminate(true)
+        setError(new Error('Admin key creation may have completed, but the one-time key was not received. Refresh the key list; if this name exists, delete it before creating a replacement.'))
+        void invalidateControl(client)
+      } else if (guard.current.current(request)) setError(new Error(cause instanceof ApiError ? `Admin key creation failed (HTTP ${cause.status})` : 'Admin key creation failed'))
     } finally {
       if (guard.current.current(request)) setPending(false)
     }
@@ -77,7 +84,7 @@ export default function AdminKeysPage() {
       { label: 'Expires', value: key => key.expires_at ?? 'Never' }, { label: 'Last used', value: key => key.last_used_at ?? 'Never' },
       { label: 'Actions', value: key => <div className="row-actions"><button className="icon-button" title={key.enabled ? 'Disable key' : 'Enable key'} aria-label={`${key.enabled ? 'Disable' : 'Enable'} ${key.key_name}`} onClick={() => { dismiss(); setAction({ key, kind: 'toggle' }) }}><Power size={17} /></button><button className="icon-button danger" title="Delete key" aria-label={`Delete ${key.key_name}`} onClick={() => { dismiss(); setAction({ key, kind: 'delete' }) }}><Trash2 size={17} /></button></div> },
     ]} />}
-    {creating && <Modal title="Create admin key" description="New administrative access" onClose={dismiss} pending={pending}><form className="operation-form" onSubmit={create}><label>Name<input name="key_name" required maxLength={100} autoComplete="off" /></label><label>Description<input name="description" maxLength={500} /></label><label>Expires in days<input name="expires_in_days" type="number" min={1} step={1} /></label>{error && <ErrorBanner error={error} />}<div className="dialog-actions"><button type="button" disabled={pending} onClick={dismiss}>Cancel</button><button className="primary" disabled={pending}>{pending ? 'Creating...' : 'Create key'}</button></div></form></Modal>}
+    {creating && <Modal title="Create admin key" description="New administrative access" onClose={dismiss} pending={pending}><form className="operation-form" onSubmit={create}><label>Name<input name="key_name" required maxLength={100} autoComplete="off" /></label><label>Description<input name="description" maxLength={500} /></label><label>Expires in days<input name="expires_in_days" type="number" min={1} step={1} /></label>{error && <ErrorBanner error={error} />}<div className="dialog-actions"><button type="button" disabled={pending} onClick={dismiss}>Cancel</button><button className="primary" disabled={pending || creationIndeterminate}>{pending ? 'Creating...' : 'Create key'}</button></div></form></Modal>}
     {secret && <OneTimeSecretDialog title="One-time admin key" description="This key will not be available after acknowledgement." acknowledge={dismiss}><code className="one-time-key">{secret}</code></OneTimeSecretDialog>}
     {action && <DestructiveDialog title={`${action.kind === 'delete' ? 'Delete' : action.key.enabled ? 'Disable' : 'Enable'} admin key`} description={action.kind === 'delete' ? 'Permanently revokes this administrative credential and its sessions. This cannot be undone.' : action.key.enabled ? 'Revokes administrative access for this key and its sessions. You may lose your current session.' : 'Restores administrative access for this key.'} confirmLabel={`${action.kind === 'delete' ? 'Delete' : action.key.enabled ? 'Disable' : 'Enable'} ${action.key.key_name}`} pending={pending} onClose={dismiss} onConfirm={() => { void confirm() }}><p className="confirmation-name">{action.key.key_name}</p>{error && <ErrorBanner error={error} />}</DestructiveDialog>}
   </Page>

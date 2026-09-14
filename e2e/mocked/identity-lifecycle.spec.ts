@@ -34,6 +34,38 @@ test('S3 identities use bounded cursor pagination', async ({ page }) => {
   verify()
 })
 
+test('readiness cleanup deletes selected obsolete identities with existing operations', async ({ page }) => {
+  const verify = await mockControlApi(page)
+  const obsolete = {
+    ...collections['/admin/ui/identities'].items[0],
+    credential_id: '00000000-0000-4000-8000-000000000009',
+    s3_access_key: 'obsolete-access',
+    access_mode: 'virtual' as const,
+    virtual_bucket_count: 0,
+    policy_attachment_count: 0,
+  }
+  const deletions: string[] = []
+  await page.route('**/admin/ui/identity-pages?*', route => route.fulfill({ json: {
+    items: [obsolete], next_after_id: null, default_page_size: 100, max_page_size: 200,
+  } satisfies components['schemas']['IdentityProjectionPage'] }))
+  await page.route('**/admin/credentials/obsolete-access', route => {
+    deletions.push(route.request().method())
+    return route.fulfill({ status: 204 })
+  })
+
+  await page.goto('/admin/ui/credentials')
+  await page.getByRole('button', { name: 'Select listed candidates' }).click()
+  await expect(page.getByRole('checkbox', { name: 'Select obsolete-access for cleanup' })).toBeChecked()
+  await page.getByRole('button', { name: 'Delete selected (1)' }).click()
+  const dialog = page.getByRole('alertdialog', { name: 'Delete obsolete identities' })
+  await expect(dialog).toContainText('0 mappings, 0 policy attachments')
+  await dialog.getByRole('button', { name: 'Delete 1 identities' }).click()
+
+  await expect(page.getByRole('status')).toContainText('1 deleted, 0 failed, 0 need verification')
+  expect(deletions).toEqual(['DELETE'])
+  verify()
+})
+
 test('UI070-02 replacement reviews safe settings, validates and retries without changing the original', async ({ page }) => {
   const verify = await mockControlApi(page)
   const bodies: components['schemas']['CreateCredentialRequest'][] = []
@@ -251,6 +283,32 @@ test('UI070-01 creates and rotates identities without widening update payloads',
   await page.getByRole('button', { name: 'I have stored this securely', exact: true }).click()
   expect(requests[0].body).toEqual({ s3_access_key: '', s3_secret_key: '', azure_account: 'createdaccount', use_managed_identity: true, access_mode: 'direct', versioning_enabled: false, default_backend_id: '00000000-0000-4000-8000-000000000001' })
   expect(requests[1]).toEqual({ path: '/rotate-secret', body: null })
+  expect(await page.evaluate(() => [localStorage.length, sessionStorage.length])).toEqual([0, 0])
+  verify()
+})
+
+test('UI070-01 recovers a lost rotation response by explicitly rotating again', async ({ page }) => {
+  const verify = await mockControlApi(page)
+  const requestBodies: Array<string | null> = []
+  await page.route('**/admin/credentials/00000000-0000-4000-8000-000000000001/rotate-secret', route => {
+    requestBodies.push(route.request().postData())
+    if (requestBodies.length === 1) return route.abort('connectionfailed')
+    return route.fulfill({ json: {
+      credential_id: '00000000-0000-4000-8000-000000000001',
+      s3_access_key: 'fixture-access',
+      s3_secret_key: 'synthetic-recovery-secret',
+    } satisfies components['schemas']['RotateCredentialSecretResponse'] })
+  })
+
+  await page.goto('/admin/ui/credentials')
+  await page.getByRole('button', { name: 'Rotate fixture-access' }).click()
+  const dialog = page.getByRole('alertdialog', { name: 'Rotate secret' })
+  await dialog.getByRole('button', { name: 'Rotate fixture-access', exact: true }).click()
+  await expect(dialog.getByRole('alert')).toContainText('may have completed')
+  await dialog.getByRole('button', { name: 'Rotate again fixture-access', exact: true }).click()
+
+  await expect(page.getByRole('dialog', { name: 'One-time S3 credentials' })).toContainText('synthetic-recovery-secret')
+  expect(requestBodies).toEqual([null, null])
   expect(await page.evaluate(() => [localStorage.length, sessionStorage.length])).toEqual([0, 0])
   verify()
 })

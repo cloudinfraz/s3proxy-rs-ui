@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { invokeOperation } from '../../api/operations'
 import ManagedPolicies from './ManagedPolicies'
 
-vi.mock('../../api/client', () => ({ ApiError: class extends Error { status = 409 } }))
+vi.mock('../../api/client', () => ({ ApiError: class extends Error { status = 409 }, isIndeterminateMutationError: () => false }))
 vi.mock('../../api/operations', () => ({ invokeOperation: vi.fn() }))
 const api = invokeOperation as unknown as Mock<(operationId: string, input?: OperationMockInput) => Promise<unknown>>
 type OperationMockInput = { parameters?: { path?: Record<string, string>; query?: Record<string, unknown> }; body?: unknown; signal?: AbortSignal }
@@ -53,6 +53,32 @@ describe('ManagedPolicies', () => {
     fireEvent.click(within(screen.getByRole('dialog', { name: 'Delete ReadOnly' })).getByRole('button', { name: 'Review change' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Delete ReadOnly' }))
     await waitFor(() => expect(api).toHaveBeenCalledWith('deleteReviewedAdminPolicy', expect.objectContaining({ parameters: { path: { policy_id: 'policy-id' } } })))
+  })
+
+  it('batch deletes only unattached policies after authoritative impact review', async () => {
+    const unattached = { ...summary, credential_attachment_count: 0, role_attachment_count: 0 }
+    const attached = { ...summary, id: 'attached-policy-id', name: 'AttachedPolicy' }
+    const authoritative = { ...detail, policy: unattached, impact_token: 'fresh-impact' }
+    vi.mocked(api).mockImplementation(async operationId => {
+      if (operationId === 'listAdminPolicies') return { items: [unattached, attached], next_after_id: null, max_page_size: 100 } as never
+      if (operationId === 'getAdminPolicy') return authoritative as never
+      if (operationId === 'deleteReviewedAdminPolicy') return { detail: null } as never
+      throw new Error('unexpected request')
+    })
+    renderView()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Select unattached' }))
+    expect(screen.getByRole('checkbox', { name: 'Select ReadOnly for cleanup' })).toHaveProperty('checked', true)
+    fireEvent.click(screen.getByRole('button', { name: 'Delete selected (1)' }))
+    const dialog = screen.getByRole('alertdialog', { name: 'Delete unattached policies' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete 1 policies' }))
+
+    await waitFor(() => expect(api).toHaveBeenCalledWith('getAdminPolicy', { parameters: { path: { policy_id: 'policy-id' } } }))
+    expect(api).toHaveBeenCalledWith('deleteReviewedAdminPolicy', {
+      parameters: { path: { policy_id: 'policy-id' } },
+      body: { expected_impact_token: 'fresh-impact' },
+    })
+    expect(await screen.findByRole('status')).toHaveProperty('textContent', '1 deleted, 0 failed, 0 need verification.')
   })
 
   it('validates and creates a policy through the review step', async () => {

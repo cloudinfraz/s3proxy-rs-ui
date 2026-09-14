@@ -7,6 +7,7 @@ import { invokeOperation } from '../../api/operations'
 import { invalidateControl } from '../../api/query-keys'
 import { DataTable, DestructiveDialog, DialogFlow, ErrorBanner, Modal, RefreshButton } from '../../components/control'
 import { completionGuard } from '../operations/state'
+import { batchOperationLimit, runBoundedBatch } from '../operations/batch'
 import { createPolicyRequest, deletePolicyRequest, emptyPolicyDocument, formatPolicyDocument, policyKeys, updatePolicyRequest, validationRequest, type PolicyDetail, type PolicySummary } from './policy-state'
 
 type Operation = 'create' | 'edit' | 'delete'
@@ -27,19 +28,63 @@ export default function ManagedPolicies() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const detail = useQuery({ queryKey: policyKeys.managedDetail(selectedId ?? ''), enabled: selectedId !== null, queryFn: ({ signal }) => invokeOperation('getAdminPolicy', { parameters: { path: { policy_id: selectedId! } }, signal }) })
   const [operation, setOperation] = useState<Operation | null>(null)
+  const client = useQueryClient()
+  const [cleanupSelection, setCleanupSelection] = useState<Set<string>>(() => new Set())
+  const [cleanupOpen, setCleanupOpen] = useState(false)
+  const [cleanupPending, setCleanupPending] = useState(false)
+  const [cleanupResult, setCleanupResult] = useState<string | null>(null)
+  const [cleanupFailures, setCleanupFailures] = useState<readonly string[]>([])
+  const cleanupCandidates = (policies.data?.items ?? []).filter(policy => policy.deletable && policy.credential_attachment_count === 0 && policy.role_attachment_count === 0)
+  const selectedCleanup = cleanupCandidates.filter(policy => cleanupSelection.has(policy.id))
 
   function select(policy: PolicySummary) { setSelectedId(policy.id); setOperation(null) }
+  function toggleCleanup(policyId: string) {
+    setCleanupResult(null)
+    setCleanupFailures([])
+    setCleanupSelection(current => {
+      const next = new Set(current)
+      if (next.has(policyId)) next.delete(policyId)
+      else if (next.size < batchOperationLimit) next.add(policyId)
+      return next
+    })
+  }
+
+  async function cleanupPolicies() {
+    if (cleanupPending || selectedCleanup.length === 0) return
+    setCleanupPending(true)
+    try {
+      const result = await runBoundedBatch([...selectedCleanup], async policy => {
+        const authoritative = await invokeOperation('getAdminPolicy', { parameters: { path: { policy_id: policy.id } } })
+        if (!authoritative.policy.deletable || authoritative.policy.credential_attachment_count !== 0 || authoritative.policy.role_attachment_count !== 0) throw new Error('Policy is no longer an unattached cleanup candidate')
+        await invokeOperation('deleteReviewedAdminPolicy', { parameters: { path: { policy_id: policy.id } }, body: deletePolicyRequest(authoritative) })
+      })
+      setCleanupOpen(false)
+      setCleanupSelection(new Set(result.failed.map(item => item.key.id).concat(result.indeterminate.map(item => item.key.id))))
+      setCleanupResult(`${result.succeeded.length} deleted, ${result.failed.length} failed, ${result.indeterminate.length} need verification.`)
+      setCleanupFailures([
+        ...result.failed.map(item => `${item.key.name}: deletion failed`),
+        ...result.indeterminate.map(item => `${item.key.name}: deletion outcome needs verification`),
+      ])
+      await invalidateControl(client)
+    } finally {
+      setCleanupPending(false)
+    }
+  }
+
   return <section className="policy-section" aria-labelledby="managed-policy-title">
-    <div className="section-heading"><div><h2 id="managed-policy-title">Managed policies</h2><p>Names are immutable after creation. Permission changes affect attached identities and active role sessions.</p></div><div className="page-actions"><RefreshButton pending={policies.isFetching || detail.isFetching} refresh={() => { void policies.refetch(); if (selectedId) void detail.refetch() }} /><button ref={createButton} className="primary" onClick={() => setOperation('create')}><Plus size={16} />Create policy</button></div></div>
+    <div className="section-heading"><div><h2 id="managed-policy-title">Managed policies</h2><p>Names are immutable after creation. Permission changes affect attached identities and active role sessions.</p></div><div className="page-actions"><RefreshButton pending={policies.isFetching || detail.isFetching} refresh={() => { void policies.refetch(); if (selectedId) void detail.refetch() }} />{cleanupCandidates.length > 0 && <button type="button" onClick={() => { setCleanupFailures([]); setCleanupSelection(new Set(cleanupCandidates.slice(0, batchOperationLimit).map(policy => policy.id))) }}>Select unattached</button>}<button className="danger" disabled={selectedCleanup.length === 0 || cleanupPending} onClick={() => setCleanupOpen(true)}><Trash2 size={16} />Delete selected ({selectedCleanup.length})</button><button ref={createButton} className="primary" onClick={() => setOperation('create')}><Plus size={16} />Create policy</button></div></div>
     {policies.isError && <ErrorBanner error={policies.error} retry={() => { void policies.refetch() }} />}
+    {cleanupResult && <div role="status"><p>{cleanupResult}</p>{cleanupFailures.length > 0 && <ul>{cleanupFailures.map(item => <li key={item}>{item}</li>)}</ul>}</div>}
     <DataTable rows={policies.data?.items ?? []} loading={policies.isPending} rowKey={row => row.id} columns={[
+      ...(cleanupCandidates.length > 0 ? [{ label: 'Select', value: (row: PolicySummary) => cleanupCandidates.some(candidate => candidate.id === row.id) ? <input type="checkbox" aria-label={`Select ${row.name} for cleanup`} checked={cleanupSelection.has(row.id)} onChange={() => toggleCleanup(row.id)} /> : null }] : []),
       { label: 'Name', value: row => <strong>{row.name}</strong> },
       { label: 'Revision', value: row => row.revision },
       { label: 'Attachments', value: row => `${row.credential_attachment_count} identities / ${row.role_attachment_count} roles` },
       { label: 'Protection', value: row => row.deletable ? 'Operator managed' : 'Built in' },
       { label: 'Actions', value: row => <button className="icon-button" aria-label={`View ${row.name}`} title="View policy" onClick={() => select(row)}><Eye size={16} /></button> },
     ]} />
-    <div className="policy-pagination"><button className="icon-button" aria-label="Previous policy page" title="Previous policy page" disabled={cursors.length === 1 || policies.isFetching} onClick={() => setCursors(value => value.slice(0, -1))}><ChevronLeft size={16} /></button><span>Page {cursors.length}</span><button className="icon-button" aria-label="Next policy page" title="Next policy page" disabled={!policies.data?.next_after_id || policies.isFetching} onClick={() => { if (policies.data?.next_after_id) setCursors(value => [...value, policies.data!.next_after_id]) }}><ChevronRight size={16} /></button></div>
+    <div className="policy-pagination"><button className="icon-button" aria-label="Previous policy page" title="Previous policy page" disabled={cursors.length === 1 || policies.isFetching} onClick={() => { setCleanupSelection(new Set()); setCursors(value => value.slice(0, -1)) }}><ChevronLeft size={16} /></button><span>Page {cursors.length}</span><button className="icon-button" aria-label="Next policy page" title="Next policy page" disabled={!policies.data?.next_after_id || policies.isFetching} onClick={() => { if (policies.data?.next_after_id) { setCleanupSelection(new Set()); setCursors(value => [...value, policies.data!.next_after_id]) } }}><ChevronRight size={16} /></button></div>
+    {cleanupOpen && <DestructiveDialog title="Delete unattached policies" description="Each policy is rechecked against authoritative attachment counts and deleted through the existing reviewed operation. Completed deletions are not rolled back if a later item fails." confirmLabel={`Delete ${selectedCleanup.length} policies`} pending={cleanupPending} onClose={() => setCleanupOpen(false)} onConfirm={() => { void cleanupPolicies() }}><ul className="cleanup-impact">{selectedCleanup.map(policy => <li key={policy.id}><strong>{policy.name}</strong>: 0 identity attachments, 0 role attachments</li>)}</ul></DestructiveDialog>}
     {(selectedId || operation) && <DialogFlow fallbackFocus={createButton}>
     {selectedId && !operation && <Modal wide title={detail.data?.policy.name ?? 'Policy details'} description="Managed policy details" onClose={() => setSelectedId(null)} actions={<><RefreshButton pending={detail.isFetching} refresh={() => { void detail.refetch() }} /><button disabled={!detail.data || detail.isError || detail.isFetching} onClick={() => setOperation('edit')}><Pencil size={16} />Edit policy</button><button className="danger" disabled={!detail.data?.policy.deletable || detail.isError || detail.isFetching} onClick={() => setOperation('delete')}><Trash2 size={16} />Delete policy</button></>}><section aria-label="Managed policy detail">
       {detail.isError && <ErrorBanner error={detail.error} retry={() => { void detail.refetch() }} />}

@@ -15,6 +15,34 @@
   margin-bottom: 18px;
 }
 
+.identity-cleanup {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  padding: 12px 0;
+  border-block: 1px solid #d8dfda;
+}
+
+.identity-cleanup p,
+.identity-cleanup-result {
+  margin: 4px 0 0;
+  font-size: 13px;
+}
+
+.cleanup-impact {
+  max-height: 280px;
+  overflow: auto;
+}
+
+@media (max-width: 700px) {
+  .identity-cleanup {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
 .identity-pagination {
   display: flex;
   align-items: center;

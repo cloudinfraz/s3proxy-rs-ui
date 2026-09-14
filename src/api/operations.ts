@@ -61,7 +61,7 @@ function operationQuery(parameters: unknown) {
 }
 
 function invalidResponse(): ApiError {
-  return new ApiError(502, 'The control service returned an invalid response.')
+  return new ApiError(502, 'The control service returned an invalid response.', null, 'invalid-response')
 }
 
 export async function invokeOperation<Id extends OperationId>(
@@ -85,7 +85,7 @@ export async function invokeOperation<Id extends OperationId>(
 }
 
 function invalidSessionResponse(): ApiError {
-  return new ApiError(502, 'The control service returned an invalid session response.')
+  return new ApiError(502, 'The control service returned an invalid session response.', null, 'invalid-response')
 }
 
 function parseSessionCredentials(value: LoginResponse): LoginResponse {
