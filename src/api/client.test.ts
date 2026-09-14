@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { addApiErrorInterceptor, ApiError, hasCsrfToken, requestTransport, setCsrfToken, setProtectedForbiddenHandler } from './client'
+import { addApiErrorInterceptor, ApiError, hasCsrfToken, isIndeterminateMutationError, requestTransport, setCsrfToken, setProtectedForbiddenHandler } from './client'
 import { getSession, login, logout } from './operations'
 
 async function api<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
@@ -19,6 +19,18 @@ afterEach(() => {
 })
 
 describe('browser API client', () => {
+  it.each([
+    [new ApiError(0, 'offline', null, 'transport'), true],
+    [new ApiError(408, 'timed out', null, 'timeout'), true],
+    [new ApiError(502, 'invalid response', null, 'invalid-response'), true],
+    [new ApiError(408, 'request timeout response'), false],
+    [new ApiError(502, 'bad gateway response'), false],
+    [new ApiError(503, 'unavailable response'), false],
+    [new Error('offline'), false],
+  ])('classifies mutation outcome certainty without relying on status alone', (error, expected) => {
+    expect(isIndeterminateMutationError(error)).toBe(expected)
+  })
+
   it('keeps the login key and CSRF token out of browser storage', async () => {
     const localSet = vi.fn()
     const sessionSet = vi.fn()

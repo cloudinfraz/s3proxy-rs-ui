@@ -32,5 +32,8 @@ export function presentFinding(finding: Schema['ConfigurationFinding']): Present
     case 'admin_key_expired': message = `${named('Admin key', label)} has expired.`; break
     case 'admin_key_expiring': message = `${named('Admin key', label)} expires within seven days.`; break
   }
-  return { message, href: routes[finding.resource_kind] }
+  const href = finding.code === 'identity_no_enabled_mapping'
+    ? `/credentials?finding=identity_no_enabled_mapping&credential_id=${encodeURIComponent(finding.resource_id)}`
+    : routes[finding.resource_kind]
+  return { message, href }
 }

@@ -1,12 +1,20 @@
+export type ApiErrorKind = 'response' | 'transport' | 'timeout' | 'invalid-response'
+
 export class ApiError extends Error {
   readonly status: number
   readonly code: string | null
+  readonly kind: ApiErrorKind
 
-  constructor(status: number, message: string, code: string | null = null) {
+  constructor(status: number, message: string, code: string | null = null, kind: ApiErrorKind = 'response') {
     super(message)
     this.status = status
     this.code = code
+    this.kind = kind
   }
+}
+
+export function isIndeterminateMutationError(cause: unknown): cause is ApiError {
+  return cause instanceof ApiError && ['transport', 'timeout', 'invalid-response'].includes(cause.kind)
 }
 export type ApiErrorContext = Readonly<{ path: string; method: string }>
 export type ApiErrorInterceptor = (error: ApiError, context: ApiErrorContext) => void
@@ -144,8 +152,8 @@ export async function requestTransport(path: string, init: RequestInit = {}): Pr
       cache: 'no-store',
     }).catch(() => {
       if (callerSignal?.aborted) throw abortReason(callerSignal)
-      if (timedOut) throw interceptApiError(new ApiError(408, 'The control service request timed out. Retry the request.'), context)
-      throw interceptApiError(new ApiError(0, 'The control service could not be reached. Retry the request.'), context)
+      if (timedOut) throw interceptApiError(new ApiError(408, 'The control service request timed out. Retry the request.', null, 'timeout'), context)
+      throw interceptApiError(new ApiError(0, 'The control service could not be reached. Retry the request.', null, 'transport'), context)
     })
     if (!response.ok) {
       const error = await toApiError(response)
@@ -158,14 +166,14 @@ export async function requestTransport(path: string, init: RequestInit = {}): Pr
     const contentType = response.headers.get('content-type') ?? ''
     if (!/\bapplication\/(?:[\w.+-]+\+)?json\b/i.test(contentType)) {
       await response.body?.cancel().catch(() => undefined)
-      throw interceptApiError(new ApiError(502, 'The control service returned an invalid response.'), context)
+      throw interceptApiError(new ApiError(502, 'The control service returned an invalid response.', null, 'invalid-response'), context)
     }
     try {
       return { status: response.status, value: await response.json() as unknown }
     } catch {
       if (callerSignal?.aborted) throw abortReason(callerSignal)
-      if (timedOut) throw interceptApiError(new ApiError(408, 'The control service request timed out. Retry the request.'), context)
-      throw interceptApiError(new ApiError(502, 'The control service returned an invalid response.'), context)
+      if (timedOut) throw interceptApiError(new ApiError(408, 'The control service request timed out. Retry the request.', null, 'timeout'), context)
+      throw interceptApiError(new ApiError(502, 'The control service returned an invalid response.', null, 'invalid-response'), context)
     }
   } finally {
     clearTimeout(timeout)
