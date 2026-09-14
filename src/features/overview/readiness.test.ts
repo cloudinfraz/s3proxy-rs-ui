@@ -20,7 +20,7 @@ describe('configuration diagnostics presentation', () => {
     })
     expect(presentFinding({ ...finding, code: 'identity_no_enabled_mapping', resource_kind: 'identity', display_name: null })).toEqual({
       message: 'A virtual identity has no enabled bucket mappings.',
-      href: '/credentials',
+      href: `/credentials?finding=identity_no_enabled_mapping&credential_id=${finding.resource_id}`,
     })
     expect(presentFinding({ ...finding, code: 'role_no_attached_policy', resource_kind: 'iam_role', display_name: 'reader' }).href).toBe('/iam-roles')
     expect(presentFinding({ ...finding, code: 'admin_key_expiring', resource_kind: 'admin_api_key', display_name: 'automation' }).href).toBe('/keys')

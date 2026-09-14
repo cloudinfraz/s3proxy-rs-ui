@@ -26,7 +26,7 @@ describe('API architecture boundary', () => {
   it('maps every literal operation invocation to generated OpenAPI metadata', () => {
     const operationIds = contents.flatMap(file => [...file.source.matchAll(/invokeOperation\(['"]([^'"]+)['"]/g)].map(match => match[1]))
     const unknown = operationIds.filter(operationId => !(operationId in operationMetadata))
-    expect(operationIds).toHaveLength(81)
+    expect(operationIds).toHaveLength(84)
     expect(new Set(operationIds).size).toBe(68)
     expect(unknown).toEqual([])
   })

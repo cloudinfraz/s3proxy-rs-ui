@@ -63,6 +63,7 @@ function mockQueries(identities: ReturnType<typeof query>, backends = query({ da
     if (key[1] === 'backends' && key[3] === 'page') return backendData as never
     if (key[1] === 'backends') return query() as never
     if (key.includes('capabilities')) return capabilities as never
+    if (key[2] === 'detail') return query() as never
     return identityData as never
   })
 }
@@ -123,6 +124,25 @@ describe('IdentitiesPage', () => {
     fireEvent.change(screen.getByLabelText('View'), { target: { value: 'direct' } })
     expect(routerMocks.setSearchParams).toHaveBeenCalledWith({ mode: 'direct' })
     expect(screen.getByText('Page 1')).toBeTruthy()
+  })
+
+  it('deletes selected obsolete virtual identities through existing single-delete operations', async () => {
+    const obsolete = { ...identity, credential_id: '22222222-2222-4222-8222-222222222222', s3_access_key: 'OBSOLETE', access_mode: 'virtual' as const, virtual_bucket_count: 0, policy_attachment_count: 0 }
+    const active = { ...obsolete, credential_id: '33333333-3333-4333-8333-333333333333', s3_access_key: 'ACTIVE', virtual_bucket_count: 1 }
+    mockQueries(query({ data: [obsolete, active] }))
+    vi.mocked(api).mockResolvedValue(undefined)
+    render(<IdentitiesPage />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Select listed candidates' }))
+    expect(screen.getByRole('checkbox', { name: 'Select OBSOLETE for cleanup' })).toHaveProperty('checked', true)
+    expect(screen.queryByRole('checkbox', { name: 'Select ACTIVE for cleanup' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete selected (1)' }))
+    const dialog = screen.getByRole('alertdialog', { name: 'Delete obsolete identities' })
+    expect(dialog.textContent).toContain('0 mappings, 0 policy attachments')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete 1 identities' }))
+
+    await waitFor(() => expect(api).toHaveBeenCalledWith('deleteCredential', { parameters: { path: { access_key: 'OBSOLETE' } } }))
+    expect(await screen.findByRole('status')).toHaveProperty('textContent', '1 deleted, 0 failed, 0 need verification.')
   })
 
   it('creates an identity and reports asynchronous creation failure', async () => {
