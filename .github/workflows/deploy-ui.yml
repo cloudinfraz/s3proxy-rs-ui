@@ -86,14 +86,14 @@ jobs:
           [[ "$UI_REVISION" =~ ^[0-9a-f]{40}$ ]] || { echo "UI revision must be a full Git commit SHA" >&2; exit 1; }
 
       - name: Azure login
-        uses: azure/login@7ddb5af1ef8758cf1353cf3b42f940aee27ba21c # v3.0.2
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.S3PROXY_AZURE_SUBSCRIPTION_ID }}
 
       - name: Install kubectl
-        uses: azure/setup-kubectl@829323503d1be3d00ca8346e5391ca0b07a9ab0d # v5.1.0
+        uses: azure/setup-kubectl@bda439f5f36b99b262ebdcd3613869bddb064c8e # v5.2.0
 
       - name: Install kubelogin
         uses: azure/use-kubelogin@0ce7c36141aa27d4934872cf00b0120804c98a29 # v1.3
@@ -137,7 +137,7 @@ jobs:
         run: kubectl -n s3proxy get networkpolicy allow-ui-admin >/dev/null
 
       - name: Prepare UI deployment verifier
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version
 
